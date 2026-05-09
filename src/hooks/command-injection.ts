@@ -1,0 +1,102 @@
+import { buildReviewCodePrompt } from "../workflow/run-review-code.js";
+import { loadConfig } from "../config/load-config.js";
+import { OmreConfig } from "../config/schema.js";
+
+export interface ReviewCodeMatch {
+  matched: boolean;
+  args: string;
+}
+
+export function parseReviewCodeCommand(text: string, config: OmreConfig): ReviewCodeMatch {
+  const names = [config.command.name, ...config.command.aliases].filter(Boolean);
+  const trimmed = text.trim();
+  for (const name of names) {
+    const prefix = `/${name}`;
+    if (trimmed === prefix) return { matched: true, args: "" };
+    if (trimmed.startsWith(`${prefix} `)) return { matched: true, args: trimmed.slice(prefix.length).trim() };
+  }
+  return { matched: false, args: "" };
+}
+
+/**
+ * Validate and sanitize user-provided review-code arguments.
+ *
+ * ⚠️ SECURITY NOTE: This uses a static regex blacklist, which is a defense-in-depth
+ * measure but cannot be complete against all prompt-injection techniques (e.g. Unicode
+ * homoglyphs, zero-width spaces, base64/rot13 encoding, etc.). The primary defense is
+ * that user args are always JSON-encoded and wrapped in opaque delimiters inside the
+ * final prompt (see buildReviewCodePrompt), so the model treats them as data, not
+ * instructions. This layer catches obvious attempts and raises the barrier for casual
+ * misuse.
+ */
+export function validateAndSanitizeArgs(args: string): string {
+  if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(args)) {
+    throw new Error("Invalid input: control characters are not allowed in review-code arguments.");
+  }
+
+  // Detect Unicode direction-override and homoglyph characters often used to obfuscate
+  // injection payloads (e.g. U+202E right-to-left-override, U+200B zero-width space).
+  if (/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/.test(args)) {
+    throw new Error("Invalid input: Unicode formatting characters are not allowed in review-code arguments.");
+  }
+
+  const forbiddenPatterns = [
+    /ignore\s+(all\s+)?previous\s+instructions?/i,
+    /ignore\s+(the\s+)?above\s+instructions?/i,
+    /forget\s+(all\s+)?previous\s+instructions?/i,
+    /system\s*:\s*/i,
+    /you\s+are\s+now\s+/i,
+    /new\s+role\s*:/i,
+    /disregard\s+(the\s+)?(above|previous)/i,
+    /override\s+(all\s+)?previous\s+instructions?/i,
+    /do\s+not\s+follow\s+(the\s+)?(above|previous)/i,
+    /end\s+(of\s+)?(previous|above)\s+instructions?/i,
+  ];
+  for (const pattern of forbiddenPatterns) {
+    if (pattern.test(args)) {
+      throw new Error(`Invalid input: potential prompt injection detected (matched "${pattern.source}").`);
+    }
+  }
+
+  return args;
+}
+
+export const MAX_ARGS_LENGTH = 4_000;
+
+export interface InjectReviewCodeInput {
+  command: string;
+  args: string;
+  cwd?: string;
+  trusted?: boolean;
+}
+
+export function injectReviewCodePrompt(input: InjectReviewCodeInput): string | undefined {
+  const cwd = input.cwd ?? process.cwd();
+  const config = loadConfig(cwd, input.trusted ?? false);
+  if (!config.enabled || !config.command.enabled) return undefined;
+  if (config.command.injection === "disabled" || config.command.injection === "tool") return undefined;
+  const names = [config.command.name, ...config.command.aliases].filter(Boolean);
+  if (!names.includes(input.command)) return undefined;
+  let args = input.args ?? "";
+  if (args.length > MAX_ARGS_LENGTH) {
+    args = args.slice(0, MAX_ARGS_LENGTH) + "\n[WARNING: User guidance truncated due to excessive length]";
+  }
+  args = validateAndSanitizeArgs(args);
+  return buildReviewCodePrompt({ args, cwd }).prompt;
+}
+
+export function maybeInjectReviewCodePrompt(text: string, cwd = process.cwd()): string | undefined {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("/")) return undefined;
+  const config = loadConfig(cwd);
+  if (!config.enabled || !config.command.enabled) return undefined;
+  if (config.command.injection === "disabled" || config.command.injection === "tool") return undefined;
+  const match = parseReviewCodeCommand(text, config);
+  if (!match.matched) return undefined;
+  let args = match.args;
+  if (args.length > MAX_ARGS_LENGTH) {
+    args = args.slice(0, MAX_ARGS_LENGTH) + "\n[WARNING: User guidance truncated due to excessive length]";
+  }
+  args = validateAndSanitizeArgs(args);
+  return buildReviewCodePrompt({ args, cwd }).prompt;
+}
