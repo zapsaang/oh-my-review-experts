@@ -13,7 +13,7 @@ export { validateReviewerHandoff, type ValidationOutcome, type ReviewerHandoff, 
 
 function makeTextPart(sessionID: string, text: string) {
   return {
-    id: `omre-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    id: `prt-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
     sessionID,
     messageID: "",
     type: "text" as const,
