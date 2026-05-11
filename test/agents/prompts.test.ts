@@ -102,6 +102,23 @@ describe("buildMandatoryOutputPersistence", () => {
     expect(prompt).toContain(".omre/handoffs/run-001/");
     expect(prompt).toContain("Mandatory Output Persistence");
   });
+
+  it("requires a JSON header block", () => {
+    const prompt = buildMandatoryOutputPersistence(".omre/handoffs", "run-001");
+    expect(prompt).toContain("```json");
+    expect(prompt).toContain("schema_version");
+    expect(prompt).toContain("findings");
+    expect(prompt).toContain("JSON.parse");
+  });
+
+  it("includes Markdown body section after JSON header rules", () => {
+    const prompt = buildMandatoryOutputPersistence(".omre/handoffs", "run-001");
+    expect(prompt).toContain("# Review Handoff");
+    expect(prompt).toContain("## Metadata");
+    expect(prompt).toContain("## Findings");
+    expect(prompt).toContain("## Suggested Fixes");
+    expect(prompt).toContain("## Open Questions");
+  });
 });
 
 describe("buildReportWriterInputRule", () => {
@@ -110,6 +127,20 @@ describe("buildReportWriterInputRule", () => {
     expect(prompt).toContain("run-001");
     expect(prompt).toContain(".omre/handoffs/run-001/*.md");
     expect(prompt).toContain("source of truth");
+  });
+
+  it("instructs reading JSON header first", () => {
+    const prompt = buildReportWriterInputRule(".omre/handoffs", "run-001");
+    expect(prompt).toContain("JSON header");
+    expect(prompt).toContain("Read the JSON header FIRST");
+  });
+
+  it("defines handoff status values including unreadable", () => {
+    const prompt = buildReportWriterInputRule(".omre/handoffs", "run-001");
+    expect(prompt).toContain("completed");
+    expect(prompt).toContain("blocked");
+    expect(prompt).toContain("handoff_missing");
+    expect(prompt).toContain("unreadable");
   });
 });
 

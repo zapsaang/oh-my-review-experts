@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   GLOBAL_ARBITER_JSON,
   RESULT_VALIDATOR_JSON,
+  REVIEWER_FINDING_JSON,
+  REVIEWER_HANDOFF_JSON,
+  SCHEMA_VERSION,
   SLICE_ARBITER_JSON,
   SLICE_PLANNER_JSON,
   SLICE_PLAN_VALIDATOR_JSON,
@@ -59,5 +62,42 @@ describe("JSON schema constants", () => {
     expect(RESULT_VALIDATOR_JSON.length).toBeGreaterThan(0);
     expect(SLICE_ARBITER_JSON.length).toBeGreaterThan(0);
     expect(GLOBAL_ARBITER_JSON.length).toBeGreaterThan(0);
+    expect(REVIEWER_FINDING_JSON.length).toBeGreaterThan(0);
+    expect(REVIEWER_HANDOFF_JSON.length).toBeGreaterThan(0);
+  });
+
+  it("SCHEMA_VERSION is '1'", () => {
+    expect(SCHEMA_VERSION).toBe("1");
+  });
+
+  it("REVIEWER_FINDING_JSON is valid JSON with expected fields", () => {
+    const parsed = JSON.parse(REVIEWER_FINDING_JSON);
+    expect(parsed.id).toBe("sec-1");
+    expect(parsed.severity).toBe("critical|high|medium|low");
+    expect(parsed.file).toBe("src/foo.ts");
+    expect(parsed.line).toBe(42);
+    expect(parsed.title).toBe("…");
+    expect(parsed.description).toBe("…");
+    expect(parsed.evidence).toBe("…");
+    expect(parsed.confidence).toBe("high|medium|low");
+    expect(parsed.classification).toBe("injection");
+  });
+
+  it("REVIEWER_HANDOFF_JSON is valid JSON with expected structure", () => {
+    const parsed = JSON.parse(REVIEWER_HANDOFF_JSON);
+    expect(parsed.schema_version).toBe("1");
+    expect(parsed.task_id).toBe("<subagent task id>");
+    expect(parsed.agent).toBe("reviewer-security");
+    expect(parsed.dimension).toBe("security");
+    expect(parsed.status).toBe("completed");
+    expect(parsed.target).toEqual({ kind: "working-tree", value: "<summary>" });
+    expect(parsed.slice_id).toBe("slice-1");
+    expect(Array.isArray(parsed.findings)).toBe(true);
+    expect(parsed.findings.length).toBe(1);
+    expect(parsed.meta).toEqual({ total_findings: 1, notes: "" });
+  });
+
+  it("REVIEWER_HANDOFF_JSON references the current SCHEMA_VERSION", () => {
+    expect(REVIEWER_HANDOFF_JSON).toContain(`"schema_version": "${SCHEMA_VERSION}"`);
   });
 });

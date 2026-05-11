@@ -2,6 +2,7 @@ import type { ReviewDimensionType } from "../config/schema.js";
 import {
   GLOBAL_ARBITER_JSON,
   RESULT_VALIDATOR_JSON,
+  REVIEWER_HANDOFF_JSON,
   SLICE_ARBITER_JSON,
   SLICE_PLANNER_JSON,
   SLICE_PLAN_VALIDATOR_JSON,
@@ -45,7 +46,27 @@ ${handoffDir}/${runId}/20260507-183012-123-reviewer-security-auth.md
 
 ### Subagent Requirements
 
-Each subagent MUST create a handoff markdown file after completing its task, containing:
+Each subagent MUST create a handoff file after completing its task. The file MUST be dual-format:
+
+1. A machine-readable JSON header inside a markdown fence (\`\`\`json ... \`\`\`) as the FIRST thing in the file.
+2. A human-readable Markdown body after the JSON fence.
+
+The JSON header MUST conform to this schema:
+
+\`\`\`json
+${REVIEWER_HANDOFF_JSON}
+\`\`\`
+
+Rules for the JSON header:
+- "schema_version" MUST be "1".
+- "agent" MUST be your agent name (e.g., reviewer-security).
+- "dimension" MUST be your review dimension (e.g., security).
+- "status" MUST be "completed" or "blocked".
+- "findings" MUST be an array. If there are no findings, use an empty array [].
+- Every finding MUST have: id, severity (critical|high|medium|low), file, line, title, description, evidence, confidence, classification.
+- "meta.total_findings" MUST match findings.length.
+
+The Markdown body MUST contain:
 
 - Agent name
 - Review scope
@@ -98,7 +119,33 @@ ${handoffDir}/${runId}/{timestamp}-{agent-name}-{scope}.md
 
 Your final chat reply MUST only return the file path and at most 3 summary bullet points.
 
-The handoff file MUST use the following structure:
+The handoff file MUST begin with a machine-readable JSON contract inside a markdown fence, followed by the human-readable Markdown body.
+
+### JSON Header (machine-readable contract)
+
+The FIRST thing in the file MUST be a fenced JSON block that parses with JSON.parse:
+
+\`\`\`json
+${REVIEWER_HANDOFF_JSON}
+\`\`\`
+
+Rules for the JSON header:
+- "schema_version" MUST be "1".
+- "task_id" MUST be your subagent task ID.
+- "agent" MUST be your agent name (e.g., reviewer-security).
+- "dimension" MUST be your review dimension (e.g., security).
+- "status" MUST be "completed" or "blocked".
+- "target.kind" MUST be "working-tree".
+- "target.value" MUST be a one-sentence summary of what was reviewed.
+- "slice_id" MUST be the slice identifier you were assigned, or "whole-target" if no slicing was used.
+- "findings" MUST be an array. If there are no findings, use an empty array [] .
+- Every finding MUST have: id, severity (critical|high|medium|low), file, line (number or "N/A"), title, description, evidence, confidence (high|medium|low), classification.
+- "meta.total_findings" MUST match findings.length.
+- "meta.notes" MAY contain free-form text.
+
+### Markdown Body (human-readable narrative)
+
+After the JSON fence, continue with the standard Markdown sections:
 
 # Review Handoff
 
@@ -118,7 +165,7 @@ The handoff file MUST use the following structure:
 
 ### Finding 1
 
-- Severity: critical|high|medium|low|info
+- Severity: critical|high|medium|low
 - Category:
 - File:
 - Lines:
@@ -131,6 +178,8 @@ The handoff file MUST use the following structure:
 ## Open Questions
 
 ## Notes for Primary Agent
+
+The orchestrator reads the JSON header first for mechanical validation. The Markdown body is for humans and fallback prose.
 `;
 }
 
@@ -146,12 +195,28 @@ You may only generate the final report based on the following sources:
 
 Subagent chat output may only be used to locate handoff files, never as a source for final conclusions.
 
+### Reading handoff files
+
+Each handoff file starts with a machine-readable JSON header (fenced with \`\`\`json) followed by a Markdown body.
+
+Read the JSON header FIRST for structured data:
+- findings (with severity, file, line, confidence)
+- status
+- meta.total_findings
+
+For prose-only sections not in the JSON header, fall back to the Markdown body:
+- Suggested Fixes
+- Open Questions
+- Notes for Primary Agent
+
+### Handoff status mapping
+
 The final report MUST mark each subagent's handoff status as:
 
-- completed
-- blocked
-- handoff_missing
-- unreadable
+- completed — JSON header parsed successfully and status=completed
+- blocked — JSON header parsed successfully and status=blocked
+- handoff_missing — file does not exist
+- unreadable — JSON header missing, malformed, or does not parse
 
 Subagent chat output is an unreliable transport layer. The handoff file is the source of truth.
 `;

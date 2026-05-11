@@ -3,13 +3,18 @@ import path from "node:path";
 import type { OmreConfig } from "../config/schema.js";
 import { assertSafePath, writeFileAtomic, formatTimestamp } from "./fs-utils.js";
 import { redactSecrets } from "./secret-scanner.js";
+import { SCHEMA_VERSION } from "../agents/schemas.js";
 
 export interface HandoffPayload {
-  agentName: string;
-  scope: string;
+  schemaVersion?: string;
+  taskId?: string;
+  agent: string;
+  dimension: string;
+  scope?: string;
   status: "completed" | "blocked";
-  confidence: "high" | "medium" | "low";
-  filesInspected: string[];
+  target?: { kind: string; value: string };
+  sliceId?: string;
+  filesInspected?: string[];
   findings: HandoffFinding[];
   suggestedFixes?: string[];
   openQuestions?: string[];
@@ -17,51 +22,93 @@ export interface HandoffPayload {
 }
 
 export interface HandoffFinding {
-  severity: "critical" | "high" | "medium" | "low" | "info";
-  category: string;
+  id: string;
+  severity: "critical" | "high" | "medium" | "low";
   file?: string;
-  lines?: string;
+  line?: number | string;
+  title: string;
+  description: string;
   evidence: string;
-  impact: string;
-  recommendation: string;
+  confidence: "high" | "medium" | "low";
+  classification: string;
+  category?: string;
+  impact?: string;
+  recommendation?: string;
+}
+
+function buildJsonHeader(payload: HandoffPayload): Record<string, unknown> {
+  return {
+    schema_version: payload.schemaVersion ?? SCHEMA_VERSION,
+    task_id: payload.taskId ?? "",
+    agent: payload.agent,
+    dimension: payload.dimension,
+    status: payload.status,
+    target: payload.target ?? { kind: "working-tree", value: payload.scope ?? "" },
+    slice_id: payload.sliceId ?? "whole-target",
+    findings: payload.findings.map((f) => ({
+      id: f.id,
+      severity: f.severity,
+      file: f.file ?? "N/A",
+      line: f.line ?? "N/A",
+      title: redactSecrets(f.title),
+      description: redactSecrets(f.description),
+      evidence: redactSecrets(f.evidence),
+      confidence: f.confidence,
+      classification: f.classification,
+    })),
+    meta: {
+      total_findings: payload.findings.length,
+      notes: payload.notesForPrimary ? redactSecrets(payload.notesForPrimary) : "",
+    },
+  };
 }
 
 function formatHandoffMarkdown(payload: HandoffPayload): string {
   const timestamp = new Date().toISOString();
 
-  const findingsSection = payload.findings.length > 0
-    ? payload.findings.map((f, i) => `### Finding ${i + 1}
+  const jsonHeader = buildJsonHeader(payload);
+  const jsonBlock = `\`\`\`json\n${JSON.stringify(jsonHeader, null, 2)}\n\`\`\``;
+
+  const findingsSection =
+    payload.findings.length > 0
+      ? payload.findings
+          .map(
+            (f, i) => `### Finding ${i + 1}
 
 - Severity: ${f.severity}
-- Category: ${f.category}
-- File: ${f.file || "N/A"}
-- Lines: ${f.lines || "N/A"}
+- Category: ${f.category ?? f.classification}
+- File: ${f.file ?? "N/A"}
+- Lines: ${f.line ?? "N/A"}
 - Evidence: ${f.evidence}
-- Impact: ${f.impact}
-- Recommendation: ${f.recommendation}`).join("\n\n")
-    : "No findings.";
+- Impact: ${f.impact ?? f.description}
+- Recommendation: ${f.recommendation ?? ""}`,
+          )
+          .join("\n\n")
+      : "No findings.";
 
-  const suggestedFixesSection = payload.suggestedFixes && payload.suggestedFixes.length > 0
-    ? payload.suggestedFixes.map((fix) => `- ${fix}`).join("\n")
-    : "None.";
+  const suggestedFixesSection =
+    payload.suggestedFixes && payload.suggestedFixes.length > 0
+      ? payload.suggestedFixes.map((fix) => `- ${fix}`).join("\n")
+      : "None.";
 
-  const openQuestionsSection = payload.openQuestions && payload.openQuestions.length > 0
-    ? payload.openQuestions.map((q) => `- ${q}`).join("\n")
-    : "None.";
+  const openQuestionsSection =
+    payload.openQuestions && payload.openQuestions.length > 0
+      ? payload.openQuestions.map((q) => `- ${q}`).join("\n")
+      : "None.";
 
-  return `# Review Handoff
+  const markdownBody = `# Review Handoff
 
 ## Metadata
 
-- Agent: ${payload.agentName}
-- Scope: ${payload.scope}
+- Agent: ${payload.agent}
+- Scope: ${payload.scope ?? payload.dimension}
 - Timestamp: ${timestamp}
 - Status: ${payload.status}
-- Confidence: ${payload.confidence}
+- Confidence: ${payload.findings.length > 0 ? payload.findings[0].confidence : "high"}
 
 ## Files Inspected
 
-${payload.filesInspected.map((f) => `- \`${f}\``).join("\n") || "- N/A"}
+${(payload.filesInspected ?? []).map((f) => `- \`${f}\``).join("\n") || "- N/A"}
 
 ## Findings
 
@@ -77,8 +124,10 @@ ${openQuestionsSection}
 
 ## Notes for Primary Agent
 
-${payload.notesForPrimary || "None."}
+${payload.notesForPrimary ?? "None."}
 `;
+
+  return `${jsonBlock}\n\n${redactSecrets(markdownBody)}`;
 }
 
 export function writeHandoff(
@@ -102,20 +151,54 @@ export function writeHandoff(
   fs.mkdirSync(dir, { recursive: true });
 
   const ts = formatTimestamp();
-  const safeAgentName = payload.agentName.replace(/[^a-zA-Z0-9_-]/g, "-");
-  const safeScope = payload.scope.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const safeAgentName = payload.agent.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const safeScope = (payload.scope ?? payload.dimension).replace(/[^a-zA-Z0-9_-]/g, "-");
   const filename = `${ts}-${safeAgentName}-${safeScope}.md`;
   const filePath = path.join(dir, filename);
 
-  const markdown = formatHandoffMarkdown(payload);
-  const redactedMarkdown = redactSecrets(markdown);
-  const writtenPath = writeFileAtomic(filePath, redactedMarkdown);
+  const content = formatHandoffMarkdown(payload);
+  const writtenPath = writeFileAtomic(filePath, content);
 
   return writtenPath;
 }
 
 const MAX_HANDOFF_SIZE = 10 * 1024 * 1024;
 const SAFE_HANDOFF_FILENAME = /^[a-zA-Z0-9_\-\.]+\.md$/;
+
+export interface HandoffJsonHeaderResult {
+  success: boolean;
+  data: unknown | null;
+  error: string | null;
+}
+
+export function parseHandoffJsonHeader(content: string): HandoffJsonHeaderResult {
+  const stripped = content.startsWith("\uFEFF") ? content.slice(1) : content;
+  const normalized = stripped.replace(/\r\n/g, "\n");
+  const trimmed = normalized.trimStart();
+
+  if (!trimmed.startsWith("```json")) {
+    return { success: false, data: null, error: "JSON header missing: handoff does not start with ```json fence" };
+  }
+
+  const afterFenceOpen = trimmed.slice(7);
+  const fenceEnd = afterFenceOpen.indexOf("\n```");
+  if (fenceEnd === -1) {
+    return { success: false, data: null, error: "JSON header malformed: closing fence not found" };
+  }
+
+  const jsonBlock = afterFenceOpen.slice(0, fenceEnd).trim();
+  if (jsonBlock.length === 0) {
+    return { success: false, data: null, error: "JSON header empty: no content inside fence" };
+  }
+
+  try {
+    const parsed = JSON.parse(jsonBlock);
+    return { success: true, data: parsed, error: null };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return { success: false, data: null, error: `JSON parse error: ${message}` };
+  }
+}
 
 export function readHandoffs(
   config: OmreConfig,

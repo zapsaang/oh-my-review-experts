@@ -5,6 +5,37 @@
  * Any schema evolution only requires updating this file.
  */
 
+/** Current schema version for handoff contracts. Bump on breaking changes. */
+export const SCHEMA_VERSION = "1";
+
+/** Expected JSON output for a single reviewer finding. */
+export const REVIEWER_FINDING_JSON = `{
+  "id": "sec-1",
+  "severity": "critical|high|medium|low",
+  "file": "src/foo.ts",
+  "line": 42,
+  "title": "…",
+  "description": "…",
+  "evidence": "…",
+  "confidence": "high|medium|low",
+  "classification": "injection"
+}`;
+
+/** Expected JSON output for a reviewer handoff header (machine-readable contract). */
+export const REVIEWER_HANDOFF_JSON = `{
+  "schema_version": "${SCHEMA_VERSION}",
+  "task_id": "<subagent task id>",
+  "agent": "reviewer-security",
+  "dimension": "security",
+  "status": "completed",
+  "target": { "kind": "working-tree", "value": "<summary>" },
+  "slice_id": "slice-1",
+  "findings": [
+    ${REVIEWER_FINDING_JSON}
+  ],
+  "meta": { "total_findings": 1, "notes": "" }
+}`;
+
 /** Expected JSON output for the slice planner. */
 export const SLICE_PLANNER_JSON = `{
   "status": "completed",
