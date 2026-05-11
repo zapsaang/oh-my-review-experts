@@ -2,6 +2,7 @@ import { buildReviewCodePrompt, persistReport, renderLocalDryRun } from "../work
 import { loadConfig } from "../config/load-config.js";
 import { validateAndSanitizeArgs, MAX_ARGS_LENGTH } from "../hooks/command-injection.js";
 import { writeHandoff, type HandoffPayload } from "./handoff.js";
+import { validateReviewerHandoff, type ExpectedValues } from "../workflow/validate-result.js";
 
 /**
  * Plugin tools exported for CLI and programmatic use.
@@ -36,5 +37,8 @@ export const tools = {
   },
   omre_config: async (input: { cwd?: string } = {}): Promise<ReturnType<typeof loadConfig>> => {
     return loadConfig(input.cwd ?? process.cwd());
+  },
+  omre_validate_handoff: async (input: { filePath: string; expected?: ExpectedValues }): Promise<ReturnType<typeof validateReviewerHandoff>> => {
+    return validateReviewerHandoff(input.filePath, input.expected);
   },
 };

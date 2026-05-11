@@ -114,10 +114,11 @@ Execution requirements:
 2. Use the heuristic slices above unless they are obviously wrong. Do not exceed maxSlices.
 3. For each slice, invoke only the selected reviewers listed in reviewersBySlice as independent subagents.
 4. Each reviewer subagent runs with its own context and returns findings via the handoff protocol.
-5. Use partial rerun: retry only malformed/failed reviewer outputs once.
-6. Run slice-level arbitration, then global arbitration.
-7. Render final output as Markdown.
-8. Also provide a final JSON object suitable for report persistence.
+5. Before feeding reviewer output to the arbiter, validate the handoff file using the validation protocol. Do not feed reviewer output to the arbiter until validation passes.
+6. If validation fails with retryRecommended=true, retry that reviewer once. If still invalid after retry, mark the dimension as degraded and proceed.
+7. Run slice-level arbitration, then global arbitration.
+8. Render final output as Markdown.
+9. Also provide a final JSON object suitable for report persistence.
 
 ${handoffProtocol}
 

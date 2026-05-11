@@ -7,6 +7,8 @@ import { VERSION } from "./version.js"
 export { buildReviewCodePrompt, persistReport, renderLocalDryRun } from "./workflow/run-review-code.js"
 export { loadConfig } from "./config/load-config.js"
 export { writeHandoff, readHandoffs, type HandoffPayload, type HandoffFinding } from "./tools/handoff.js"
+export { tools } from "./tools/plugin-tools.js"
+export { validateReviewerHandoff, type ValidationOutcome, type ReviewerHandoff, type ExpectedValues } from "./workflow/validate-result.js"
 
 
 function makeTextPart(sessionID: string, text: string) {
