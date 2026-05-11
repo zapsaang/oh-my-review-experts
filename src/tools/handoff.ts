@@ -4,6 +4,7 @@ import type { OmreConfig } from "../config/schema.js";
 import { assertSafePath, writeFileAtomic, formatTimestamp } from "./fs-utils.js";
 import { redactSecrets } from "./secret-scanner.js";
 import { SCHEMA_VERSION } from "../agents/schemas.js";
+import { validateSchemaVersion } from "../workflow/validate-result.js";
 
 export interface HandoffPayload {
   schemaVersion?: string;
@@ -193,6 +194,14 @@ export function parseHandoffJsonHeader(content: string): HandoffJsonHeaderResult
 
   try {
     const parsed = JSON.parse(jsonBlock);
+    const versionCheck = validateSchemaVersion(parsed);
+    if (!versionCheck.valid) {
+      return {
+        success: false,
+        data: parsed,
+        error: `Schema version mismatch: expected ${SCHEMA_VERSION}, got ${(parsed as Record<string, unknown>).schema_version}. ${versionCheck.failureReason}`,
+      };
+    }
     return { success: true, data: parsed, error: null };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

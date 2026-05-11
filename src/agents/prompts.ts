@@ -3,6 +3,7 @@ import {
   GLOBAL_ARBITER_JSON,
   RESULT_VALIDATOR_JSON,
   REVIEWER_HANDOFF_JSON,
+  SCHEMA_VERSION,
   SLICE_ARBITER_JSON,
   SLICE_PLANNER_JSON,
   SLICE_PLAN_VALIDATOR_JSON,
@@ -16,6 +17,10 @@ If no findings exist, return an empty findings list.
 Never fabricate issues.
 Every finding must be evidence-backed and anchored to file:line when possible.
 `;
+
+export const LEAF_GUARDRAIL = `You are a leaf reviewer. Do not invoke the task tool. Do not invoke the skill tool. Do not delegate to any subagent. Your output must be a single handoff file per the handoff protocol, followed by the short chat reply specified by that protocol.`;
+
+export const LEAF_COORDINATOR_GUARDRAIL = `You are a leaf coordinator. Do not invoke the task tool. Do not invoke the skill tool. Do not delegate to any subagent. Your output must follow the exact format specified in your instructions, with no additional commentary.`;
 
 // Review Code Handoff Protocol
 // Subagent chat output is an unreliable transport layer. The handoff file is the source of truth.
@@ -58,7 +63,7 @@ ${REVIEWER_HANDOFF_JSON}
 \`\`\`
 
 Rules for the JSON header:
-- "schema_version" MUST be "1".
+- "schema_version" MUST be "${SCHEMA_VERSION}".
 - "agent" MUST be your agent name (e.g., reviewer-security).
 - "dimension" MUST be your review dimension (e.g., security).
 - "status" MUST be "completed" or "blocked".
@@ -130,7 +135,7 @@ ${REVIEWER_HANDOFF_JSON}
 \`\`\`
 
 Rules for the JSON header:
-- "schema_version" MUST be "1".
+- "schema_version" MUST be "${SCHEMA_VERSION}".
 - "task_id" MUST be your subagent task ID.
 - "agent" MUST be your agent name (e.g., reviewer-security).
 - "dimension" MUST be your review dimension (e.g., security).
@@ -223,7 +228,9 @@ Subagent chat output is an unreliable transport layer. The handoff file is the s
 }
 
 function makeReviewerPrompt(dimension: ReviewDimensionType, focus: string, extra = ""): string {
-  return `You are the ${dimension} reviewer.
+  return `${LEAF_GUARDRAIL}
+
+You are the ${dimension} reviewer.
 Review only ${focus}.
 ${extra}Return findings with dimension=${dimension}.`;
 }
@@ -272,7 +279,9 @@ export const COMPLETE_REVIEWER_PROMPTS: Record<ReviewDimensionType, string> = {
   concurrency: composePrompt("concurrency"),
 };
 
-export const SLICE_PLANNER_PROMPT = `You are the diff slice planner.
+export const SLICE_PLANNER_PROMPT = `${LEAF_COORDINATOR_GUARDRAIL}
+
+You are the diff slice planner.
 Do not review code. Partition a code change into coherent review slices.
 Prefer module/bounded-context boundaries and isolate high-risk files: migrations, API/schema contracts, dependency manifests, infra/deployment config.
 Allowed slice_type values: business-module, migration, api-contract, dependency-change, infra-change, shared-library, test-only, docs-only.
@@ -280,25 +289,35 @@ Output JSON exactly:
 ${SLICE_PLANNER_JSON}
 Rules: use reason not reasoning; files must be string arrays; no prose outside JSON.`;
 
-export const SLICE_PLAN_VALIDATOR_PROMPT = `You are the slice plan validator.
+export const SLICE_PLAN_VALIDATOR_PROMPT = `${LEAF_COORDINATOR_GUARDRAIL}
+
+You are the slice plan validator.
 Validate slice planner JSON. Do not review code.
 Valid iff status=completed, should_slice boolean, slicing_mode in none/module-based/risk-based/hybrid, reason string, slices array, every slice has slice_id, allowed slice_type, title, and files as non-empty string array.
 Return JSON: ${SLICE_PLAN_VALIDATOR_JSON}`;
 
-export const RESULT_VALIDATOR_PROMPT = `You are the review result validator.
+export const RESULT_VALIDATOR_PROMPT = `${LEAF_COORDINATOR_GUARDRAIL}
+
+You are the review result validator.
 Validate reviewer JSON only. Do not review code.
 Valid iff status=completed, dimension matches assignment, target matches, findings is array, and no prose outside JSON.
 Return JSON: ${RESULT_VALIDATOR_JSON}`;
 
-export const SLICE_ARBITER_PROMPT = `You are the slice arbiter.
+export const SLICE_ARBITER_PROMPT = `${LEAF_COORDINATOR_GUARDRAIL}
+
+You are the slice arbiter.
 Validate and merge reviewer outputs for one slice. Deduplicate, reject weak/speculative findings, preserve dimensions, do not invent findings.
 Output JSON only: ${SLICE_ARBITER_JSON}`;
 
-export const GLOBAL_ARBITER_PROMPT = `You are the global arbiter.
+export const GLOBAL_ARBITER_PROMPT = `${LEAF_COORDINATOR_GUARDRAIL}
+
+You are the global arbiter.
 Consume slice arbiter outputs or whole-target reviewer outputs. Merge duplicates, preserve dimensions, separate confirmed from needs_validation and rejected. Do not recreate reviewer-level noise.
 Output JSON only: ${GLOBAL_ARBITER_JSON}`;
 
-export const REPORT_WRITER_PROMPT = `You are the review-code report writer.
+export const REPORT_WRITER_PROMPT = `${LEAF_COORDINATOR_GUARDRAIL}
+
+You are the review-code report writer.
 Do not review code. Persist the provided final result exactly to the configured report paths. Do not invent findings.`;
 
 export function buildSubagentCatalog(): string {

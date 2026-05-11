@@ -5,7 +5,16 @@
  * Any schema evolution only requires updating this file.
  */
 
-/** Current schema version for handoff contracts. Bump on breaking changes. */
+/**
+ * Current schema version for handoff contracts.
+ *
+ * Version policy:
+ * - Bump MAJOR version on breaking schema changes (removed fields, changed types, new required fields).
+ * - MINOR version bumps are informational (new optional fields, documentation changes).
+ * - When bumping: update this constant, update all JSON schema templates, update handoff protocol builders,
+ *   and ensure the validator accepts the new version.
+ * - Old versions are rejected by validateSchemaVersion() with failureReason "schema-version-mismatch".
+ */
 export const SCHEMA_VERSION = "1";
 
 /** Expected JSON output for a single reviewer finding. */
@@ -38,6 +47,7 @@ export const REVIEWER_HANDOFF_JSON = `{
 
 /** Expected JSON output for the slice planner. */
 export const SLICE_PLANNER_JSON = `{
+  "schema_version": "${SCHEMA_VERSION}",
   "status": "completed",
   "slicing_mode": "none|module-based|risk-based|hybrid",
   "should_slice": true,
@@ -46,13 +56,13 @@ export const SLICE_PLANNER_JSON = `{
 }`;
 
 /** Expected JSON output for the slice plan validator. */
-export const SLICE_PLAN_VALIDATOR_JSON = `{"status":"completed","is_valid":true,"failure_reason":"","retry_recommended":false,"normalized_result":null}`;
+export const SLICE_PLAN_VALIDATOR_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","is_valid":true,"failure_reason":"","retry_recommended":false,"normalized_result":null}`;
 
 /** Expected JSON output for the review result validator. */
-export const RESULT_VALIDATOR_JSON = `{"status":"completed","assigned_dimension":"spec","slice_id":"","is_valid":true,"failure_reason":"","retry_recommended":false}`;
+export const RESULT_VALIDATOR_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","assigned_dimension":"spec","slice_id":"","is_valid":true,"failure_reason":"","retry_recommended":false}`;
 
 /** Expected JSON output for the slice arbiter. */
-export const SLICE_ARBITER_JSON = `{"status":"completed","slice_id":"slice-1","confirmed":[],"needs_validation":[],"rejected":[],"degraded":false,"missing_dimensions":[]}`;
+export const SLICE_ARBITER_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","slice_id":"slice-1","confirmed":[],"needs_validation":[],"rejected":[],"degraded":false,"missing_dimensions":[]}`;
 
 /** Expected JSON output for the global arbiter. */
-export const GLOBAL_ARBITER_JSON = `{"status":"completed","confirmed":[],"needs_validation":[],"rejected":[],"degraded_slices":[],"summary":{"total_slices":0,"total_confirmed":0}}`;
+export const GLOBAL_ARBITER_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","confirmed":[],"needs_validation":[],"rejected":[],"degraded_slices":[],"summary":{"total_slices":0,"total_confirmed":0}}`;
