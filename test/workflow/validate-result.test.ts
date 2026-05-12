@@ -171,6 +171,101 @@ describe("validateReviewerHandoff", () => {
     }
   });
 
+  it("accepts valid performance classifications", () => {
+    const handoff = createValidHandoff();
+    handoff.agent = "reviewer-performance";
+    handoff.dimension = "performance";
+    handoff.findings[0].classification = "provable-regression";
+    const filePath = createMockHandoffFile(formatHandoff(handoff));
+
+    const result = validateReviewerHandoff(filePath, { dimension: "performance" });
+
+    expect(result.isValid).toBe(true);
+  });
+
+  it("returns invalid-schema for invalid performance classifications", () => {
+    const handoff = createValidHandoff();
+    handoff.agent = "reviewer-performance";
+    handoff.dimension = "performance";
+    handoff.findings[0].classification = "provable regression";
+    const filePath = createMockHandoffFile(formatHandoff(handoff));
+
+    const result = validateReviewerHandoff(filePath, { dimension: "performance" });
+
+    expect(result.isValid).toBe(false);
+    if (!result.isValid) {
+      expect(result.failureReason).toBe("invalid-schema");
+      expect(result.retryRecommended).toBe(false);
+    }
+  });
+
+  it("accepts valid concurrency classifications", () => {
+    const handoff = createValidHandoff();
+    handoff.agent = "reviewer-concurrency";
+    handoff.dimension = "concurrency";
+    handoff.findings[0].classification = "race-condition";
+    const filePath = createMockHandoffFile(formatHandoff(handoff));
+
+    const result = validateReviewerHandoff(filePath, { dimension: "concurrency" });
+
+    expect(result.isValid).toBe(true);
+  });
+
+  it("returns invalid-schema for invalid concurrency classifications", () => {
+    const handoff = createValidHandoff();
+    handoff.agent = "reviewer-concurrency";
+    handoff.dimension = "concurrency";
+    handoff.findings[0].classification = "lost-update";
+    const filePath = createMockHandoffFile(formatHandoff(handoff));
+
+    const result = validateReviewerHandoff(filePath, { dimension: "concurrency" });
+
+    expect(result.isValid).toBe(false);
+    if (!result.isValid) {
+      expect(result.failureReason).toBe("invalid-schema");
+      expect(result.retryRecommended).toBe(false);
+    }
+  });
+
+  it("still accepts valid severity and confidence values", () => {
+    const handoff = createValidHandoff();
+    handoff.findings[0].severity = "high";
+    handoff.findings[0].confidence = "medium";
+    const filePath = createMockHandoffFile(formatHandoff(handoff));
+
+    const result = validateReviewerHandoff(filePath);
+
+    expect(result.isValid).toBe(true);
+  });
+
+  it("returns invalid-schema for invalid severity values", () => {
+    const handoff = createValidHandoff();
+    handoff.findings[0].severity = "blocker" as ReviewerHandoff["findings"][0]["severity"];
+    const filePath = createMockHandoffFile(formatHandoff(handoff));
+
+    const result = validateReviewerHandoff(filePath);
+
+    expect(result.isValid).toBe(false);
+    if (!result.isValid) {
+      expect(result.failureReason).toBe("invalid-schema");
+      expect(result.retryRecommended).toBe(false);
+    }
+  });
+
+  it("returns invalid-schema for invalid confidence values", () => {
+    const handoff = createValidHandoff();
+    handoff.findings[0].confidence = "certain" as ReviewerHandoff["findings"][0]["confidence"];
+    const filePath = createMockHandoffFile(formatHandoff(handoff));
+
+    const result = validateReviewerHandoff(filePath);
+
+    expect(result.isValid).toBe(false);
+    if (!result.isValid) {
+      expect(result.failureReason).toBe("invalid-schema");
+      expect(result.retryRecommended).toBe(false);
+    }
+  });
+
   it("returns partial-output for some findings missing required fields", () => {
     const handoff = createValidHandoff();
     handoff.findings = [

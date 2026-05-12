@@ -1,9 +1,14 @@
 import type { ReviewDimensionType } from "../config/schema.js";
 import {
+  CONCURRENCY_CLASSIFICATION_VALUES,
+  CONFIDENCE_VALUES,
   GLOBAL_ARBITER_JSON,
+  PERFORMANCE_CLASSIFICATION_VALUES,
+  REJECTION_REASON_VALUES,
   RESULT_VALIDATOR_JSON,
   REVIEWER_HANDOFF_JSON,
   SCHEMA_VERSION,
+  SEVERITY_VALUES,
   SLICE_ARBITER_JSON,
   SLICE_PLANNER_JSON,
   SLICE_PLAN_VALIDATOR_JSON,
@@ -242,7 +247,11 @@ function makeReviewerPrompt(dimension: ReviewDimensionType, focus: string, extra
 
 You are the ${dimension} reviewer.
 Review only ${focus}.
-${extra}Return findings with dimension=${dimension}.`;
+${extra}Return findings with dimension=${dimension}.
+
+Every finding MUST use severity from: ${SEVERITY_VALUES.join(", ")}.
+Every finding MUST use confidence from: ${CONFIDENCE_VALUES.join(", ")}.
+Use only values from these enums. If a finding does not match any classification, lower its confidence or drop it.`;
 }
 
 export const REVIEWER_PROMPTS: Record<ReviewDimensionType, string> = {
@@ -267,13 +276,16 @@ export const REVIEWER_PROMPTS: Record<ReviewDimensionType, string> = {
   performance: makeReviewerPrompt(
     "performance",
     "performance risk: algorithmic regressions, allocation churn, blocking IO in hot paths, N+1, repeated remote calls, cache misuse, lock contention, memory growth, tail latency",
-    "Every finding must classify as provable regression, likely regression, or benchmark-needed. "
+    `Every finding must classify as one of: ${PERFORMANCE_CLASSIFICATION_VALUES.join(", ")}.
+Use only values from this enum. If a finding does not match any classification, lower its confidence or drop it. `
   ),
 
   concurrency: makeReviewerPrompt(
     "concurrency",
     "race conditions, atomicity violations, ordering issues, idempotency gaps, retry amplification, deadlock/lock contention, stale reads, lost updates, distributed inconsistency, and duplicate processing",
-    "Every finding must include a concrete failure sequence. "
+    `Every finding must classify as one of: ${CONCURRENCY_CLASSIFICATION_VALUES.join(", ")}.
+Use only values from this enum. If a finding does not match any classification, lower its confidence or drop it.
+Every finding must include a concrete failure sequence. `
   ),
 };
 
@@ -317,12 +329,16 @@ export const SLICE_ARBITER_PROMPT = `${LEAF_COORDINATOR_GUARDRAIL}
 
 You are the slice arbiter.
 Validate and merge reviewer outputs for one slice. Deduplicate, reject weak/speculative findings, preserve dimensions, do not invent findings.
+Rejection reasons must be one of: ${REJECTION_REASON_VALUES.join(", ")}.
+Free-form rejection reasons are forbidden.
 Output JSON only: ${SLICE_ARBITER_JSON}`;
 
 export const GLOBAL_ARBITER_PROMPT = `${LEAF_COORDINATOR_GUARDRAIL}
 
 You are the global arbiter.
 Consume slice arbiter outputs or whole-target reviewer outputs. Merge duplicates, preserve dimensions, separate confirmed from needs_validation and rejected. Do not recreate reviewer-level noise.
+Rejection reasons must be one of: ${REJECTION_REASON_VALUES.join(", ")}.
+Free-form rejection reasons are forbidden.
 Output JSON only: ${GLOBAL_ARBITER_JSON}`;
 
 export const REPORT_WRITER_PROMPT = `${LEAF_COORDINATOR_GUARDRAIL}

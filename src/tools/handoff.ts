@@ -3,7 +3,7 @@ import path from "node:path";
 import type { OmreConfig } from "../config/schema.js";
 import { assertSafePath, writeFileAtomic, formatTimestamp } from "./fs-utils.js";
 import { redactSecrets } from "./secret-scanner.js";
-import { SCHEMA_VERSION } from "../agents/schemas.js";
+import { SCHEMA_VERSION, type ConfidenceLevel, type SeverityLevel } from "../agents/schemas.js";
 import { validateSchemaVersion } from "../workflow/validate-result.js";
 
 export interface HandoffPayload {
@@ -24,13 +24,13 @@ export interface HandoffPayload {
 
 export interface HandoffFinding {
   id: string;
-  severity: "critical" | "high" | "medium" | "low";
+  severity: SeverityLevel;
   file?: string;
   line?: number | string;
   title: string;
   description: string;
   evidence: string;
-  confidence: "high" | "medium" | "low";
+  confidence: ConfidenceLevel;
   classification: string;
   category?: string;
   impact?: string;

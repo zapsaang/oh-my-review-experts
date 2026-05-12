@@ -1,10 +1,15 @@
 import { describe, it, expect } from "vitest";
 import {
+  CONCURRENCY_CLASSIFICATION_VALUES,
+  CONFIDENCE_VALUES,
   GLOBAL_ARBITER_JSON,
+  PERFORMANCE_CLASSIFICATION_VALUES,
+  REJECTION_REASON_VALUES,
   RESULT_VALIDATOR_JSON,
   REVIEWER_FINDING_JSON,
   REVIEWER_HANDOFF_JSON,
   SCHEMA_VERSION,
+  SEVERITY_VALUES,
   SLICE_ARBITER_JSON,
   SLICE_PLANNER_JSON,
   SLICE_PLAN_VALIDATOR_JSON,
@@ -44,6 +49,9 @@ describe("JSON schema constants", () => {
     expect(parsed.status).toBe("completed");
     expect(parsed.slice_id).toBe("slice-1");
     expect(parsed.confirmed).toEqual([]);
+    expect(parsed.rejected).toEqual([
+      { id: "finding-1", reason: "duplicate|weak-evidence|speculative|out-of-scope|contradicted-by-code" },
+    ]);
     expect(parsed.degraded).toBe(false);
     expect(parsed.missing_dimensions).toEqual([]);
   });
@@ -52,9 +60,52 @@ describe("JSON schema constants", () => {
     const parsed = JSON.parse(GLOBAL_ARBITER_JSON);
     expect(parsed.status).toBe("completed");
     expect(parsed.confirmed).toEqual([]);
+    expect(parsed.rejected).toEqual([
+      { id: "finding-1", reason: "duplicate|weak-evidence|speculative|out-of-scope|contradicted-by-code" },
+    ]);
     expect(parsed.degraded_slices).toEqual([]);
     expect(parsed.missing_dimensions_global).toEqual([]);
     expect(parsed.summary).toEqual({ total_slices: 0, total_confirmed: 0 });
+  });
+
+  it("exports closed vocabulary arrays", () => {
+    expect(SEVERITY_VALUES).toEqual(["critical", "high", "medium", "low"]);
+    expect(CONFIDENCE_VALUES).toEqual(["high", "medium", "low"]);
+    expect(PERFORMANCE_CLASSIFICATION_VALUES).toEqual([
+      "provable-regression",
+      "likely-regression",
+      "benchmark-needed",
+    ]);
+    expect(CONCURRENCY_CLASSIFICATION_VALUES).toEqual([
+      "race-condition",
+      "atomicity-violation",
+      "ordering-issue",
+      "idempotency-gap",
+      "retry-amplification",
+      "deadlock",
+      "stale-read",
+      "distributed-inconsistency",
+    ]);
+    expect(REJECTION_REASON_VALUES).toEqual([
+      "duplicate",
+      "weak-evidence",
+      "speculative",
+      "out-of-scope",
+      "contradicted-by-code",
+    ]);
+  });
+
+  it("arbiter JSON examples use the rejection reason vocabulary", () => {
+    const expectedReason = REJECTION_REASON_VALUES.join("|");
+    expect(JSON.parse(SLICE_ARBITER_JSON).rejected[0].reason).toBe(expectedReason);
+    expect(JSON.parse(GLOBAL_ARBITER_JSON).rejected[0].reason).toBe(expectedReason);
+  });
+
+  it("excludes free-form arbiter rejection reasons", () => {
+    const reasons: readonly string[] = REJECTION_REASON_VALUES;
+
+    expect(reasons).toContain("duplicate");
+    expect(reasons).not.toContain("not-enough-evidence");
   });
 
   it("all JSON constants are non-empty strings", () => {
@@ -81,7 +132,7 @@ describe("JSON schema constants", () => {
     expect(parsed.description).toBe("…");
     expect(parsed.evidence).toBe("…");
     expect(parsed.confidence).toBe("high|medium|low");
-    expect(parsed.classification).toBe("injection");
+    expect(parsed.classification).toBe("injection|race-condition|provable-regression");
   });
 
   it("REVIEWER_HANDOFF_JSON is valid JSON with expected structure", () => {

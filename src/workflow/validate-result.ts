@@ -1,6 +1,18 @@
 import fs from "node:fs";
-import { SCHEMA_VERSION } from "../agents/schemas.js";
+import {
+  CONCURRENCY_CLASSIFICATION_VALUES,
+  CONFIDENCE_VALUES,
+  PERFORMANCE_CLASSIFICATION_VALUES,
+  SCHEMA_VERSION,
+  SEVERITY_VALUES,
+  type ConfidenceLevel,
+  type ConcurrencyClassification,
+  type PerformanceClassification,
+  type SeverityLevel,
+} from "../agents/schemas.js";
 import { parseHandoffJsonHeader } from "../tools/handoff.js";
+
+type ReviewerClassification = PerformanceClassification | ConcurrencyClassification | string;
 
 export interface ValidationResult {
   valid: boolean;
@@ -23,14 +35,14 @@ export interface ReviewerHandoff {
   slice_id: string;
   findings: Array<{
     id: string;
-    severity: "critical" | "high" | "medium" | "low";
+    severity: SeverityLevel;
     file: string;
     line: number | string;
     title: string;
     description: string;
     evidence: string;
-    confidence: "high" | "medium" | "low";
-    classification: string;
+    confidence: ConfidenceLevel;
+    classification: ReviewerClassification;
   }>;
   meta: { total_findings: number; notes: string };
 }
@@ -93,12 +105,24 @@ function hasProseOutsideJson(content: string): boolean {
   return false;
 }
 
-function isValidSeverity(value: unknown): value is "critical" | "high" | "medium" | "low" {
-  return value === "critical" || value === "high" || value === "medium" || value === "low";
+function isValueIn<T extends string>(value: unknown, values: readonly T[]): value is T {
+  return typeof value === "string" && values.includes(value as T);
 }
 
-function isValidConfidence(value: unknown): value is "high" | "medium" | "low" {
-  return value === "high" || value === "medium" || value === "low";
+function isValidSeverity(value: unknown): value is SeverityLevel {
+  return isValueIn(value, SEVERITY_VALUES);
+}
+
+function isValidConfidence(value: unknown): value is ConfidenceLevel {
+  return isValueIn(value, CONFIDENCE_VALUES);
+}
+
+function isValidPerformanceClassification(value: unknown): value is PerformanceClassification {
+  return isValueIn(value, PERFORMANCE_CLASSIFICATION_VALUES);
+}
+
+function isValidConcurrencyClassification(value: unknown): value is ConcurrencyClassification {
+  return isValueIn(value, CONCURRENCY_CLASSIFICATION_VALUES);
 }
 
 function isValidStatus(value: unknown): value is "completed" | "blocked" {
@@ -115,6 +139,16 @@ function isNumberOrString(value: unknown): value is number | string {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isValidClassificationForDimension(value: unknown, dimension: unknown): value is ReviewerClassification {
+  if (dimension === "performance") {
+    return isValidPerformanceClassification(value);
+  }
+  if (dimension === "concurrency") {
+    return isValidConcurrencyClassification(value);
+  }
+  return isString(value);
 }
 
 function validateSchemaShape(data: unknown): { valid: boolean; partial: boolean; reason?: string } {
@@ -178,10 +212,13 @@ function validateSchemaShape(data: unknown): { valid: boolean; partial: boolean;
 
     if (findingValid) {
       if (!isValidSeverity(finding.severity)) {
-        findingValid = false;
+        return { valid: false, partial: false, reason: "invalid-schema" };
       }
       if (!isValidConfidence(finding.confidence)) {
-        findingValid = false;
+        return { valid: false, partial: false, reason: "invalid-schema" };
+      }
+      if (!isValidClassificationForDimension(finding.classification, data.dimension)) {
+        return { valid: false, partial: false, reason: "invalid-schema" };
       }
     }
 
@@ -224,14 +261,14 @@ function normalizeHandoff(data: unknown): ReviewerHandoff {
       const finding = f as Record<string, unknown>;
       return {
         id: String(finding.id),
-        severity: finding.severity as "critical" | "high" | "medium" | "low",
+        severity: finding.severity as SeverityLevel,
         file: finding.file !== undefined ? String(finding.file) : "N/A",
         line: finding.line !== undefined ? (isNumberOrString(finding.line) ? finding.line : "N/A") : "N/A",
         title: String(finding.title),
         description: String(finding.description),
         evidence: String(finding.evidence),
-        confidence: finding.confidence as "high" | "medium" | "low",
-        classification: String(finding.classification),
+        confidence: finding.confidence as ConfidenceLevel,
+        classification: String(finding.classification) as ReviewerClassification,
       };
     }),
     meta: {

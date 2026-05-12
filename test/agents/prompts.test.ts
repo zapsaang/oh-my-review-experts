@@ -3,6 +3,8 @@ import {
   CONTRACT,
   REVIEWER_PROMPTS,
   COMPLETE_REVIEWER_PROMPTS,
+  SLICE_ARBITER_PROMPT,
+  GLOBAL_ARBITER_PROMPT,
   composePrompt,
   buildHandoffProtocol,
   buildMandatoryOutputPersistence,
@@ -33,6 +35,31 @@ describe("REVIEWER_PROMPTS", () => {
     for (const [dimension, prompt] of Object.entries(REVIEWER_PROMPTS)) {
       expect(prompt, `dimension ${dimension} should not contain CONTRACT`).not.toContain(CONTRACT.trim());
     }
+  });
+
+  it("includes severity enum instructions for all dimensions", () => {
+    for (const [dimension, prompt] of Object.entries(REVIEWER_PROMPTS)) {
+      expect(prompt, `dimension ${dimension} should contain severity enum`).toContain("severity from: critical, high, medium, low");
+    }
+  });
+
+  it("includes confidence enum instructions for all dimensions", () => {
+    for (const [dimension, prompt] of Object.entries(REVIEWER_PROMPTS)) {
+      expect(prompt, `dimension ${dimension} should contain confidence enum`).toContain("confidence from: high, medium, low");
+    }
+  });
+
+  it("includes performance classification enum for performance dimension", () => {
+    expect(REVIEWER_PROMPTS.performance).toContain("provable-regression");
+    expect(REVIEWER_PROMPTS.performance).toContain("likely-regression");
+    expect(REVIEWER_PROMPTS.performance).toContain("benchmark-needed");
+  });
+
+  it("includes concurrency classification enum for concurrency dimension", () => {
+    expect(REVIEWER_PROMPTS.concurrency).toContain("race-condition");
+    expect(REVIEWER_PROMPTS.concurrency).toContain("atomicity-violation");
+    expect(REVIEWER_PROMPTS.concurrency).toContain("deadlock");
+    expect(REVIEWER_PROMPTS.concurrency).toContain("distributed-inconsistency");
   });
 });
 
@@ -172,5 +199,33 @@ describe("buildSubagentCatalog", () => {
     expect(catalog).not.toContain("You are the slice arbiter");
     expect(catalog).not.toContain("You are the global arbiter");
     expect(catalog).not.toContain("You are the review-code report writer");
+  });
+});
+
+describe("SLICE_ARBITER_PROMPT", () => {
+  it("includes rejection reason enum", () => {
+    expect(SLICE_ARBITER_PROMPT).toContain("duplicate");
+    expect(SLICE_ARBITER_PROMPT).toContain("weak-evidence");
+    expect(SLICE_ARBITER_PROMPT).toContain("speculative");
+    expect(SLICE_ARBITER_PROMPT).toContain("out-of-scope");
+    expect(SLICE_ARBITER_PROMPT).toContain("contradicted-by-code");
+  });
+
+  it("forbids free-form rejection reasons", () => {
+    expect(SLICE_ARBITER_PROMPT).toContain("Free-form rejection reasons are forbidden");
+  });
+});
+
+describe("GLOBAL_ARBITER_PROMPT", () => {
+  it("includes rejection reason enum", () => {
+    expect(GLOBAL_ARBITER_PROMPT).toContain("duplicate");
+    expect(GLOBAL_ARBITER_PROMPT).toContain("weak-evidence");
+    expect(GLOBAL_ARBITER_PROMPT).toContain("speculative");
+    expect(GLOBAL_ARBITER_PROMPT).toContain("out-of-scope");
+    expect(GLOBAL_ARBITER_PROMPT).toContain("contradicted-by-code");
+  });
+
+  it("forbids free-form rejection reasons", () => {
+    expect(GLOBAL_ARBITER_PROMPT).toContain("Free-form rejection reasons are forbidden");
   });
 });
