@@ -65,4 +65,4 @@ export const RESULT_VALIDATOR_JSON = `{"schema_version": "${SCHEMA_VERSION}", "s
 export const SLICE_ARBITER_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","slice_id":"slice-1","confirmed":[],"needs_validation":[],"rejected":[],"degraded":false,"missing_dimensions":[]}`;
 
 /** Expected JSON output for the global arbiter. */
-export const GLOBAL_ARBITER_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","confirmed":[],"needs_validation":[],"rejected":[],"degraded_slices":[],"summary":{"total_slices":0,"total_confirmed":0}}`;
+export const GLOBAL_ARBITER_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","confirmed":[],"needs_validation":[],"rejected":[],"degraded_slices":[],"missing_dimensions_global":[],"summary":{"total_slices":0,"total_confirmed":0}}`;

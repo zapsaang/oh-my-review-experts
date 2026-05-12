@@ -23,8 +23,8 @@ export const tools = {
     const bundle = buildReviewCodePrompt({ ...input, args });
     return { prompt: bundle.prompt, estimatedTasks: bundle.estimatedTasks, files: bundle.files };
   },
-  omre_write_report: async (input: { markdown: string; json: unknown; cwd?: string }): Promise<{ written: string[] }> => {
-    const written = persistReport(input.markdown, input.json, input.cwd ?? process.cwd());
+  omre_write_report: async (input: { markdown: string; json: unknown; cwd?: string; degradedSlices?: Array<{ slice_id: string; missing_dimensions: string[] }>; missingDimensionsGlobal?: string[] }): Promise<{ written: string[] }> => {
+    const written = persistReport(input.markdown, input.json, input.cwd ?? process.cwd(), input.degradedSlices, input.missingDimensionsGlobal);
     return { written };
   },
   omre_write_handoff: async (input: { payload: HandoffPayload; cwd?: string; runId?: string }): Promise<{ filePath: string }> => {

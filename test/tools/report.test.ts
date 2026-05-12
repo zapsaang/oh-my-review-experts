@@ -72,4 +72,66 @@ describe("writeReport", () => {
     expect(files.some((f) => f.endsWith("-review.md"))).toBe(true);
     expect(files.some((f) => f.endsWith("-review.json"))).toBe(true);
   });
+
+  it("renders coverage warning when degraded slices present", () => {
+    const config = createTestConfig({ directory: "reports" });
+    const payload = {
+      target: "test",
+      markdown: "# Review Results\n\nNo issues found.",
+      json: { ok: true },
+      degradedSlices: [{ slice_id: "slice-2", missing_dimensions: ["security"] }],
+      missingDimensionsGlobal: ["security"],
+    };
+    writeReport(config, payload, tmpDir);
+    const md = fs.readFileSync(path.join(tmpDir, "reports", "latest.md"), "utf8");
+    expect(md.startsWith("## Coverage warning")).toBe(true);
+    expect(md).toContain("slice-2");
+    expect(md).toContain("security");
+    expect(md).toContain("# Review Results");
+  });
+
+  it("renders coverage warning when only missingDimensionsGlobal present", () => {
+    const config = createTestConfig({ directory: "reports" });
+    const payload = {
+      target: "test",
+      markdown: "# Review Results\n\nNo issues found.",
+      json: { ok: true },
+      degradedSlices: [],
+      missingDimensionsGlobal: ["performance"],
+    };
+    writeReport(config, payload, tmpDir);
+    const md = fs.readFileSync(path.join(tmpDir, "reports", "latest.md"), "utf8");
+    expect(md.startsWith("## Coverage warning")).toBe(true);
+    expect(md).toContain("performance");
+    expect(md).toContain("# Review Results");
+  });
+
+  it("does not render coverage warning when no degraded coverage", () => {
+    const config = createTestConfig({ directory: "reports" });
+    const payload = {
+      target: "test",
+      markdown: "# Review Results\n\nNo issues found.",
+      json: { ok: true },
+    };
+    writeReport(config, payload, tmpDir);
+    const md = fs.readFileSync(path.join(tmpDir, "reports", "latest.md"), "utf8");
+    expect(md.startsWith("# Review Results")).toBe(true);
+    expect(md).not.toContain("Coverage warning");
+  });
+
+  it("replaces 'No issues found' headline when coverage is degraded", () => {
+    const config = createTestConfig({ directory: "reports" });
+    const payload = {
+      target: "test",
+      markdown: "# Review Results\n\nNo issues found.",
+      json: { ok: true },
+      degradedSlices: [{ slice_id: "slice-1", missing_dimensions: ["security"] }],
+      missingDimensionsGlobal: ["security"],
+    };
+    writeReport(config, payload, tmpDir);
+    const md = fs.readFileSync(path.join(tmpDir, "reports", "latest.md"), "utf8");
+    expect(md).toContain("## Coverage warning");
+    expect(md).toContain("No confirmed issues found in covered dimensions");
+    expect(md).not.toContain("No issues found");
+  });
 });

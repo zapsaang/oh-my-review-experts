@@ -148,7 +148,7 @@ export function renderLocalDryRun(input: ReviewCodeInput = {}): string {
   return `# Review Code Dry Run\n\nEstimated tasks: ${plan.estimatedTasks}\n\nFiles:\n${formatFileList(files)}\n`;
 }
 
-export function persistReport(markdown: string, json: unknown, cwd = process.cwd()): string[] {
+export function persistReport(markdown: string, json: unknown, cwd = process.cwd(), degradedSlices?: Array<{ slice_id: string; missing_dimensions: string[] }>, missingDimensionsGlobal?: string[]): string[] {
   const config = loadConfig(cwd);
-  return writeReport(config, { target: "current-change", markdown, json }, cwd);
+  return writeReport(config, { target: "current-change", markdown, json, degradedSlices, missingDimensionsGlobal }, cwd);
 }

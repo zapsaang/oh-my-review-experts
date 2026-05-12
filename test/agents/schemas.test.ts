@@ -53,6 +53,7 @@ describe("JSON schema constants", () => {
     expect(parsed.status).toBe("completed");
     expect(parsed.confirmed).toEqual([]);
     expect(parsed.degraded_slices).toEqual([]);
+    expect(parsed.missing_dimensions_global).toEqual([]);
     expect(parsed.summary).toEqual({ total_slices: 0, total_confirmed: 0 });
   });
 

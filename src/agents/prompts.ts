@@ -223,6 +223,16 @@ The final report MUST mark each subagent's handoff status as:
 - handoff_missing — file does not exist
 - unreadable — JSON header missing, malformed, or does not parse
 
+### Degraded coverage propagation
+
+If any reviewer handoff fails validation after one retry, the arbiter MUST:
+1. Add the slice to \`degraded_slices\` with its \`slice_id\` and the \`missing_dimensions\` array.
+2. Add the missing dimension(s) to \`missing_dimensions_global\`.
+
+The report writer MUST render a \`## Coverage warning\` section at the top of the final Markdown report when either field is non-empty. The warning must list each degraded slice and its missing dimensions, plus any globally missing dimensions.
+
+When coverage is degraded, the report headline must NOT say "No issues found"; use "No confirmed issues found in covered dimensions" instead.
+
 Subagent chat output is an unreliable transport layer. The handoff file is the source of truth.
 `;
 }
