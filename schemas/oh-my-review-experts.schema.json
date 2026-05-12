@@ -149,6 +149,20 @@
         }
       }
     },
+    "arbitration": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Arbitration behavior settings.",
+      "required": ["hierarchicalThreshold"],
+      "properties": {
+        "hierarchicalThreshold": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32,
+          "description": "Enable hierarchical arbitration when slice count reaches or exceeds this threshold."
+        }
+      }
+    },
     "report": {
       "type": "object",
       "additionalProperties": false,

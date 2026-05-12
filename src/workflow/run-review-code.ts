@@ -76,6 +76,10 @@ export function buildReviewCodePrompt(input: ReviewCodeInput = {}): ReviewCodePr
   const reportWriterRule = buildReportWriterInputRule(handoffDir, runId);
   const subagentCatalog = buildSubagentCatalog();
 
+  const arbitrationInstructions = plan.useHierarchicalArbitration
+    ? `7. For each slice, invoke a slice-arbiter subagent consuming ONLY that slice's validated reviewer handoffs.\n8. After all slice-arbiters complete, invoke the global-arbiter consuming all slice-arbiter outputs.\n9. Render final output as Markdown.\n10. Also provide a final JSON object suitable for report persistence.`
+    : `7. Run slice-level arbitration, then global arbitration.\n8. Render final output as Markdown.\n9. Also provide a final JSON object suitable for report persistence.`;
+
   const prompt = `
 You are Oh My Review Experts, a runtime-first review-code workflow orchestrator.
 
@@ -86,6 +90,8 @@ Configuration summary:
 - compactMode: ${plan.compactMode}
 - estimatedTasks: ${plan.estimatedTasks}
 - maxEstimatedTasks: ${config.costGuardrail.maxEstimatedTasks}
+- useHierarchicalArbitration: ${plan.useHierarchicalArbitration}
+- hierarchicalThreshold: ${config.arbitration.hierarchicalThreshold}
 - reportEnabled: ${config.report.enabled}
 - handoffEnabled: ${config.handoff.enabled}
 
@@ -116,9 +122,7 @@ Execution requirements:
 4. Each reviewer subagent runs with its own context and returns findings via the handoff protocol.
 5. Before feeding reviewer output to the arbiter, call \`omre_validate_handoff\` on the handoff file. Do not feed reviewer output to the arbiter until \`omre_validate_handoff\` returns \`is_valid = true\`.
 6. If validation fails with retryRecommended=true, retry that reviewer once. If still invalid after retry, mark the dimension as degraded and proceed.
-7. Run slice-level arbitration, then global arbitration.
-8. Render final output as Markdown.
-9. Also provide a final JSON object suitable for report persistence.
+${arbitrationInstructions}
 
 ${handoffProtocol}
 

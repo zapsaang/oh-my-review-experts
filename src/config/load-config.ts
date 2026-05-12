@@ -173,6 +173,7 @@ export function defaultConfigJsonc(): string {
     slicing: defaults.slicing,
     partialRerun: defaults.partialRerun,
     costGuardrail: defaults.costGuardrail,
+    arbitration: defaults.arbitration,
     report: defaults.report,
     handoff: defaults.handoff,
     reviewers: defaults.reviewers,

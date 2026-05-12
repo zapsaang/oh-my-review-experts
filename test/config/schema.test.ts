@@ -74,6 +74,21 @@ describe("OmreConfigSchema", () => {
     expect(result.models.spec).toBeDefined();
   });
 
+  it("parses arbitration config with default hierarchicalThreshold", () => {
+    const result = OmreConfigSchema.parse({});
+    expect(result.arbitration.hierarchicalThreshold).toBe(3);
+  });
+
+  it("accepts custom arbitration config", () => {
+    const result = OmreConfigSchema.parse({ arbitration: { hierarchicalThreshold: 5 } });
+    expect(result.arbitration.hierarchicalThreshold).toBe(5);
+  });
+
+  it("rejects invalid hierarchicalThreshold", () => {
+    expect(() => OmreConfigSchema.parse({ arbitration: { hierarchicalThreshold: 0 } })).toThrow();
+    expect(() => OmreConfigSchema.parse({ arbitration: { hierarchicalThreshold: 33 } })).toThrow();
+  });
+
   it("uses DEFAULT_CONFIG as valid baseline", () => {
     expect(() => OmreConfigSchema.parse(DEFAULT_CONFIG)).not.toThrow();
   });

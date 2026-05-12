@@ -42,6 +42,22 @@ describe("buildReviewCodePrompt", () => {
     const bundle = buildReviewCodePrompt({ args: "", cwd: process.cwd() });
     expect(bundle.prompt).toContain("orchestrator");
   });
+
+  it("includes useHierarchicalArbitration in configuration summary", () => {
+    const bundle = buildReviewCodePrompt({ args: "", cwd: process.cwd() });
+    expect(bundle.prompt).toContain("useHierarchicalArbitration:");
+    expect(bundle.prompt).toContain("hierarchicalThreshold:");
+  });
+
+  it("includes exactly one arbitration instruction path", () => {
+    const bundle = buildReviewCodePrompt({ args: "", cwd: process.cwd() });
+    const afterExecution = bundle.prompt.split("Execution requirements:")[1] ?? "";
+    const beforeDiff = afterExecution.split("Unified diff follows")[0] ?? "";
+    const hasDirectGlobal = beforeDiff.includes("Run slice-level arbitration, then global arbitration.");
+    const hasPerSlice = beforeDiff.includes("For each slice, invoke a slice-arbiter");
+    expect(hasDirectGlobal || hasPerSlice).toBe(true);
+    expect(hasDirectGlobal && hasPerSlice).toBe(false);
+  });
 });
 
 describe("renderLocalDryRun", () => {

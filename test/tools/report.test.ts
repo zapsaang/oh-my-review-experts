@@ -25,6 +25,7 @@ function createTestConfig(overrides: Partial<OmreConfig["report"]> = {}): OmreCo
     slicing: { enabled: true, maxSlices: 4, skipDocsOnly: true, skipTestOnlyHeavyReview: true, forceWholeTargetAboveSlices: 12 },
     partialRerun: { enabled: true, maxRetriesPerTask: 1 },
     costGuardrail: { enabled: true, maxEstimatedTasks: 24, compactModeThreshold: 20, hardStopThreshold: 60 },
+    arbitration: { hierarchicalThreshold: 3 },
     report: {
       enabled: true,
       directory: ".omre/reports",

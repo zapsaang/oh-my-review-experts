@@ -161,6 +161,70 @@ describe("estimatePlan", () => {
     expect(plan.slices.length).toBeGreaterThanOrEqual(1);
     expect(plan.slices[0].slice_id).not.toBe("whole-target");
   });
+
+  it("returns useHierarchicalArbitration=true when slices equal threshold", () => {
+    const files = ["src/auth/login.ts", "src/payment/process.ts", "src/user/profile.ts"];
+    const config = makeConfig({
+      arbitration: { hierarchicalThreshold: 3 },
+      costGuardrail: { compactModeThreshold: 100 },
+    });
+    const plan = estimatePlan(files, config);
+    expect(plan.compactMode).toBe(false);
+    expect(plan.useHierarchicalArbitration).toBe(true);
+    expect(plan.slices.length).toBe(3);
+  });
+
+  it("returns useHierarchicalArbitration=false when slices below threshold", () => {
+    const files = ["src/auth/login.ts", "src/payment/process.ts"];
+    const config = makeConfig({ arbitration: { hierarchicalThreshold: 3 } });
+    const plan = estimatePlan(files, config);
+    expect(plan.useHierarchicalArbitration).toBe(false);
+    expect(plan.slices.length).toBe(2);
+  });
+
+  it("returns useHierarchicalArbitration=false for single slice", () => {
+    const files = ["src/auth/login.ts"];
+    const config = makeConfig({ arbitration: { hierarchicalThreshold: 3 } });
+    const plan = estimatePlan(files, config);
+    expect(plan.useHierarchicalArbitration).toBe(false);
+    expect(plan.slices.length).toBe(1);
+  });
+
+  it("returns useHierarchicalArbitration=false when threshold exceeds slice count", () => {
+    const files = ["src/a.ts", "src/b.ts", "src/c.ts", "src/d.ts", "src/e.ts"];
+    const config = makeConfig({
+      slicing: { maxSlices: 10 },
+      arbitration: { hierarchicalThreshold: 10 },
+    });
+    const plan = estimatePlan(files, config);
+    expect(plan.useHierarchicalArbitration).toBe(false);
+    expect(plan.slices.length).toBe(5);
+  });
+
+  it("returns useHierarchicalArbitration=true when slices exceed threshold", () => {
+    const files = ["src/a/a.ts", "src/b/b.ts", "src/c/c.ts", "src/d/d.ts"];
+    const config = makeConfig({
+      slicing: { maxSlices: 10 },
+      arbitration: { hierarchicalThreshold: 3 },
+      costGuardrail: { compactModeThreshold: 1000 },
+    });
+    const plan = estimatePlan(files, config);
+    expect(plan.slices.length).toBeGreaterThanOrEqual(4);
+    expect(plan.compactMode).toBe(false);
+    expect(plan.useHierarchicalArbitration).toBe(true);
+  });
+
+  it("returns useHierarchicalArbitration=false when compactMode overrides threshold", () => {
+    const files = ["src/auth/login.ts", "src/payment/process.ts", "src/user/profile.ts"];
+    const config = makeConfig({
+      arbitration: { hierarchicalThreshold: 3 },
+      costGuardrail: { enabled: true, compactModeThreshold: 1 },
+    });
+    const plan = estimatePlan(files, config);
+    expect(plan.slices.length).toBe(3);
+    expect(plan.compactMode).toBe(true);
+    expect(plan.useHierarchicalArbitration).toBe(false);
+  });
 });
 
 describe("security", () => {

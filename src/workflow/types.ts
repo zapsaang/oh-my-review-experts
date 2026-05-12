@@ -20,4 +20,5 @@ export interface EstimatedPlan {
   selectedReviewers: Record<string, ReviewDimensionType[]>;
   estimatedTasks: number;
   compactMode: boolean;
+  useHierarchicalArbitration: boolean;
 }

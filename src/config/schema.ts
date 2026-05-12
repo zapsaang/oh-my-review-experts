@@ -100,6 +100,9 @@ export const OmreConfigSchema = z.object({
     compactModeThreshold: z.number().int().min(1).max(1000).default(20),
     hardStopThreshold: z.number().int().min(1).max(1000).default(60),
   }).default({}),
+  arbitration: z.object({
+    hierarchicalThreshold: z.number().int().min(1).max(32).default(3),
+  }).default({}),
   report: z.object({
     enabled: z.boolean().default(true),
     // SECURITY: directory must be a relative path without ".." segments to prevent path traversal.

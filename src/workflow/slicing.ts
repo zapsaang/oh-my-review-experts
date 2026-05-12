@@ -74,5 +74,6 @@ export function estimatePlan(files: string[], config: OmreConfig): EstimatedPlan
     estimatedTasks += reviewers.length * 2 + 1;
   }
   const compactMode = config.costGuardrail.enabled && estimatedTasks > config.costGuardrail.compactModeThreshold;
-  return { slices, selectedReviewers, estimatedTasks, compactMode };
+  const useHierarchicalArbitration = !compactMode && slices.length >= config.arbitration.hierarchicalThreshold;
+  return { slices, selectedReviewers, estimatedTasks, compactMode, useHierarchicalArbitration };
 }
