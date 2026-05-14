@@ -2,242 +2,594 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/zapsaang/oh-my-review-experts/main/schemas/oh-my-review-experts.schema.json",
   "title": "Oh My Review Experts Config",
+  "description": "Configuration schema for the oh-my-review-experts OpenCode plugin.",
   "type": "object",
-  "additionalProperties": false,
-  "$defs": {
-    "reviewDimension": {
-      "type": "string",
-      "enum": ["spec", "quality", "security", "performance", "concurrency"]
-    },
-    "sliceType": {
-      "type": "string",
-      "enum": ["business-module", "migration", "api-contract", "dependency-change", "infra-change", "shared-library", "test-only", "docs-only"]
-    },
-    "positiveInteger": {
-      "type": "integer",
-      "minimum": 1
-    }
-  },
   "properties": {
     "enabled": {
-      "type": "boolean",
-      "description": "Master switch to enable or disable the plugin."
+      "description": "Globally enable or disable the review plugin.",
+      "default": true,
+      "type": "boolean"
     },
     "command": {
+      "description": "Slash command registration settings.",
+      "default": {
+        "enabled": true,
+        "name": "review-code",
+        "aliases": [
+          "rc"
+        ],
+        "injection": "both"
+      },
       "type": "object",
-      "additionalProperties": false,
-      "description": "Slash-command injection settings.",
       "properties": {
         "enabled": {
-          "type": "boolean",
-          "description": "Whether to intercept /review-code commands."
+          "description": "Enable the /review-code slash command.",
+          "default": true,
+          "type": "boolean"
         },
         "name": {
+          "description": "Slash command name. Alphanumeric, underscore, or hyphen only. Forbidden names: __proto__, constructor, prototype.",
+          "default": "review-code",
           "type": "string",
-          "description": "Primary command name.",
-          "minLength": 1,
-          "maxLength": 64,
-          "pattern": "^[a-zA-Z0-9_-]+$"
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "not": {
+            "enum": [
+              "__proto__",
+              "constructor",
+              "prototype"
+            ]
+          }
         },
         "aliases": {
+          "description": "Alternative names for the slash command.",
+          "default": [
+            "rc"
+          ],
           "type": "array",
-          "description": "Alternative command names.",
           "items": {
             "type": "string",
-            "minLength": 1,
-            "maxLength": 64,
-            "pattern": "^[a-zA-Z0-9_-]+$"
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "not": {
+              "enum": [
+                "__proto__",
+                "constructor",
+                "prototype"
+              ]
+            }
           }
         },
         "injection": {
-          "enum": ["hook", "tool", "both", "disabled"],
-          "description": "How to inject the command into the runtime."
+          "description": "How the command is wired: 'both' registers via config hook and intercepts execution; 'hook' same as both; 'disabled' mutes the plugin; 'tool' disables slash commands but keeps plugin tools available.",
+          "default": "both",
+          "type": "string",
+          "enum": [
+            "hook",
+            "tool",
+            "both",
+            "disabled"
+          ]
         }
-      }
+      },
+      "additionalProperties": false
     },
     "models": {
+      "description": "Model assignments for each agent role in the review pipeline.",
+      "default": {
+        "orchestrator": "minimax-cn/MiniMax-M2.7",
+        "spec": "minimax-cn/MiniMax-M2.7",
+        "quality": "minimax-cn/MiniMax-M2.7",
+        "security": "minimax-cn/MiniMax-M2.7",
+        "performance": "minimax-cn/MiniMax-M2.7",
+        "concurrency": "minimax-cn/MiniMax-M2.7",
+        "slicePlanner": "minimax-cn/MiniMax-M2.7",
+        "validator": "minimax-cn/MiniMax-M2.7",
+        "sliceArbiter": "minimax-cn/MiniMax-M2.7",
+        "globalArbiter": "minimax-cn/MiniMax-M2.7",
+        "reportWriter": "minimax-cn/MiniMax-M2.7"
+      },
       "type": "object",
-      "additionalProperties": false,
-      "description": "Model identifiers for each workflow role.",
       "properties": {
-        "orchestrator": { "type": "string", "description": "Model for workflow orchestration." },
-        "spec": { "type": "string", "description": "Model for spec compliance reviewer." },
-        "quality": { "type": "string", "description": "Model for code quality reviewer." },
-        "security": { "type": "string", "description": "Model for security reviewer." },
-        "performance": { "type": "string", "description": "Model for performance reviewer." },
-        "concurrency": { "type": "string", "description": "Model for concurrency reviewer." },
-        "slicePlanner": { "type": "string", "description": "Model for slice planner." },
-        "validator": { "type": "string", "description": "Model for result validator." },
-        "sliceArbiter": { "type": "string", "description": "Model for slice arbiter." },
-        "globalArbiter": { "type": "string", "description": "Model for global arbiter." },
-        "reportWriter": { "type": "string", "description": "Model for report writer." }
-      }
+        "orchestrator": {
+          "description": "Model for the orchestrator agent that coordinates the review pipeline.",
+          "default": "minimax-cn/MiniMax-M2.7",
+          "type": "string"
+        },
+        "spec": {
+          "description": "Model for the spec compliance reviewer.",
+          "default": "minimax-cn/MiniMax-M2.7",
+          "type": "string"
+        },
+        "quality": {
+          "description": "Model for the code quality reviewer.",
+          "default": "minimax-cn/MiniMax-M2.7",
+          "type": "string"
+        },
+        "security": {
+          "description": "Model for the security reviewer.",
+          "default": "minimax-cn/MiniMax-M2.7",
+          "type": "string"
+        },
+        "performance": {
+          "description": "Model for the performance reviewer.",
+          "default": "minimax-cn/MiniMax-M2.7",
+          "type": "string"
+        },
+        "concurrency": {
+          "description": "Model for the concurrency reviewer.",
+          "default": "minimax-cn/MiniMax-M2.7",
+          "type": "string"
+        },
+        "slicePlanner": {
+          "description": "Model for the slice planner agent that groups changed files into coherent slices.",
+          "default": "minimax-cn/MiniMax-M2.7",
+          "type": "string"
+        },
+        "validator": {
+          "description": "Model for the validator agent that checks reviewer output structure.",
+          "default": "minimax-cn/MiniMax-M2.7",
+          "type": "string"
+        },
+        "sliceArbiter": {
+          "description": "Model for the slice arbiter that merges per-slice findings.",
+          "default": "minimax-cn/MiniMax-M2.7",
+          "type": "string"
+        },
+        "globalArbiter": {
+          "description": "Model for the global arbiter that deduplicates across slices.",
+          "default": "minimax-cn/MiniMax-M2.7",
+          "type": "string"
+        },
+        "reportWriter": {
+          "description": "Model for the report writer agent that produces the final markdown report.",
+          "default": "minimax-cn/MiniMax-M2.7",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
     },
     "slicing": {
+      "description": "File classification and grouping settings.",
+      "default": {
+        "enabled": true,
+        "maxSlices": 4,
+        "skipDocsOnly": true,
+        "skipTestOnlyHeavyReview": true,
+        "forceWholeTargetAboveSlices": 12
+      },
       "type": "object",
-      "additionalProperties": false,
-      "description": "Heuristic diff-slicing settings.",
       "properties": {
         "enabled": {
-          "type": "boolean",
-          "description": "Enable automatic slicing."
+          "description": "Enable the file slicing engine that groups changed files into coherent review slices.",
+          "default": true,
+          "type": "boolean"
         },
         "maxSlices": {
+          "description": "Maximum number of slices to generate. Range: 1-32.",
+          "default": 4,
           "type": "integer",
           "minimum": 1,
-          "maximum": 32,
-          "description": "Maximum number of slices to generate."
+          "maximum": 32
         },
         "skipDocsOnly": {
-          "type": "boolean",
-          "description": "Omit docs-only slices from review."
+          "description": "Skip heavy review for docs-only slices.",
+          "default": true,
+          "type": "boolean"
         },
         "skipTestOnlyHeavyReview": {
-          "type": "boolean",
-          "description": "Reduce reviewer set for test-only slices."
+          "description": "Skip heavy review for test-only slices.",
+          "default": true,
+          "type": "boolean"
         },
         "forceWholeTargetAboveSlices": {
+          "description": "When the estimated number of slices exceeds this threshold, review the entire target as one unit instead of slicing. Range: 1-100.",
+          "default": 12,
           "type": "integer",
           "minimum": 1,
-          "description": "Force whole-target mode when estimated slices exceed this threshold."
+          "maximum": 100
         }
-      }
+      },
+      "additionalProperties": false
     },
     "partialRerun": {
+      "description": "Partial rerun settings for failed reviewer tasks.",
+      "default": {
+        "enabled": true,
+        "maxRetriesPerTask": 1
+      },
       "type": "object",
-      "additionalProperties": false,
-      "description": "Partial rerun policy for malformed reviewer outputs.",
       "properties": {
         "enabled": {
-          "type": "boolean",
-          "description": "Enable partial rerun."
+          "description": "Enable partial rerun: when a reviewer fails, re-run only that task instead of the whole pipeline.",
+          "default": true,
+          "type": "boolean"
         },
         "maxRetriesPerTask": {
+          "description": "Maximum retry attempts per failed task. Range: 0-1.",
+          "default": 1,
           "type": "integer",
           "minimum": 0,
-          "maximum": 1,
-          "description": "Maximum retry attempts per reviewer task. Must not exceed 1 per review run contract."
+          "maximum": 1
         }
-      }
+      },
+      "additionalProperties": false
     },
     "costGuardrail": {
+      "description": "Cost guardrail settings to prevent accidental high-cost reviews.",
+      "default": {
+        "enabled": true,
+        "maxEstimatedTasks": 24,
+        "compactModeThreshold": 20,
+        "hardStopThreshold": 60
+      },
       "type": "object",
-      "additionalProperties": false,
-      "description": "Cost control thresholds.",
       "properties": {
         "enabled": {
-          "type": "boolean",
-          "description": "Enable cost guardrails."
+          "description": "Enable cost estimation and guardrails before launching the review pipeline.",
+          "default": true,
+          "type": "boolean"
         },
         "maxEstimatedTasks": {
+          "description": "Maximum estimated tasks before switching to compact mode. Range: 1-1000.",
+          "default": 24,
           "type": "integer",
           "minimum": 1,
-          "maximum": 1000,
-          "description": "Soft maximum for estimated reviewer tasks."
+          "maximum": 1000
         },
         "compactModeThreshold": {
+          "description": "Estimated task threshold for compact mode (reduced reviewer matrix). Range: 1-1000.",
+          "default": 20,
           "type": "integer",
           "minimum": 1,
-          "maximum": 1000,
-          "description": "Threshold to enable compact review mode."
+          "maximum": 1000
         },
         "hardStopThreshold": {
+          "description": "Absolute maximum estimated tasks; pipeline halts if exceeded. Range: 1-1000.",
+          "default": 60,
           "type": "integer",
           "minimum": 1,
-          "maximum": 1000,
-          "description": "Hard stop threshold for estimated tasks."
+          "maximum": 1000
         }
-      }
+      },
+      "additionalProperties": false
     },
     "arbitration": {
+      "description": "Arbitration strategy settings for merging reviewer findings.",
+      "default": {
+        "hierarchicalThreshold": 3
+      },
       "type": "object",
-      "additionalProperties": false,
-      "description": "Arbitration behavior settings.",
-      "required": ["hierarchicalThreshold"],
       "properties": {
         "hierarchicalThreshold": {
+          "description": "Number of slices above which hierarchical arbitration is used instead of flat merging. Range: 1-32.",
+          "default": 3,
           "type": "integer",
           "minimum": 1,
-          "maximum": 32,
-          "description": "Enable hierarchical arbitration when slice count reaches or exceeds this threshold."
+          "maximum": 32
         }
-      }
+      },
+      "additionalProperties": false
     },
     "report": {
-      "type": "object",
-      "additionalProperties": false,
       "description": "Report output settings.",
+      "default": {
+        "enabled": true,
+        "directory": ".omre/reports",
+        "latestMarkdown": "latest.md",
+        "latestJson": "latest.json",
+        "timestamped": true
+      },
+      "type": "object",
       "properties": {
         "enabled": {
-          "type": "boolean",
-          "description": "Enable report generation."
+          "description": "Enable report generation and persistence.",
+          "default": true,
+          "type": "boolean"
         },
         "directory": {
+          "description": "Directory for report output. Must be a safe relative path (no .., no absolute paths).",
+          "default": ".omre/reports",
           "type": "string",
-          "description": "SECURITY: Must be a safe relative path. No absolute paths, no .. segments.",
           "pattern": "^(?!\\/)((?!\\.\\.)[a-zA-Z0-9_\\-\\.\\/])+$"
         },
         "latestMarkdown": {
+          "description": "Filename for the latest markdown report.",
+          "default": "latest.md",
           "type": "string",
-          "description": "SECURITY: Must be a safe filename. No path separators, no .. segments.",
           "pattern": "^(?!.*\\.\\.)[a-zA-Z0-9_\\-\\.]+$"
         },
         "latestJson": {
+          "description": "Filename for the latest JSON report.",
+          "default": "latest.json",
           "type": "string",
-          "description": "SECURITY: Must be a safe filename. No path separators, no .. segments.",
           "pattern": "^(?!.*\\.\\.)[a-zA-Z0-9_\\-\\.]+$"
         },
         "timestamped": {
-          "type": "boolean",
-          "description": "Also write timestamped history files."
+          "description": "Generate timestamped history copies alongside latest.md/latest.json.",
+          "default": true,
+          "type": "boolean"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "handoff": {
+      "description": "Handoff protocol settings for structured subagent output.",
+      "default": {
+        "enabled": true,
+        "directory": ".omre/handoffs"
+      },
       "type": "object",
-      "additionalProperties": false,
-      "description": "Subagent handoff file settings.",
       "properties": {
         "enabled": {
-          "type": "boolean",
-          "description": "Enable handoff file persistence for subagent results."
+          "description": "Enable the handoff protocol for structured subagent communication.",
+          "default": true,
+          "type": "boolean"
         },
         "directory": {
+          "description": "Directory for handoff files. Must be a safe relative path (no .., no absolute paths).",
+          "default": ".omre/handoffs",
           "type": "string",
-          "description": "SECURITY: Must be a safe relative path. No absolute paths, no .. segments.",
           "pattern": "^(?!\\/)((?!\\.\\.)[a-zA-Z0-9_\\-\\.\\/])+$"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "reviewers": {
+      "description": "Reviewer dimension assignment settings.",
+      "default": {
+        "default": [
+          "spec",
+          "quality",
+          "security",
+          "performance",
+          "concurrency"
+        ],
+        "bySliceType": {
+          "api-contract": [
+            "spec",
+            "security",
+            "concurrency"
+          ],
+          "migration": [
+            "spec",
+            "performance",
+            "concurrency"
+          ],
+          "business-module": [
+            "spec",
+            "security",
+            "performance",
+            "concurrency"
+          ],
+          "shared-library": [
+            "spec",
+            "quality",
+            "security",
+            "concurrency"
+          ],
+          "dependency-change": [
+            "security",
+            "performance"
+          ],
+          "infra-change": [
+            "security",
+            "performance"
+          ],
+          "test-only": [
+            "spec",
+            "quality"
+          ],
+          "docs-only": []
+        }
+      },
       "type": "object",
-      "additionalProperties": false,
-      "description": "Reviewer dimension assignment.",
       "properties": {
         "default": {
+          "description": "Default reviewer dimensions applied to all slices.",
+          "default": [
+            "spec",
+            "quality",
+            "security",
+            "performance",
+            "concurrency"
+          ],
           "type": "array",
-          "description": "Default reviewers for slices without a specific mapping.",
-          "items": { "$ref": "#/$defs/reviewDimension" }
+          "items": {
+            "type": "string",
+            "enum": [
+              "spec",
+              "quality",
+              "security",
+              "performance",
+              "concurrency"
+            ]
+          }
         },
         "bySliceType": {
-          "type": "object",
-          "description": "Per-slice-type reviewer overrides.",
-          "additionalProperties": {
-            "type": "array",
-            "items": { "$ref": "#/$defs/reviewDimension" }
+          "description": "Reviewer dimensions per slice type. Unknown slice types are rejected by design.",
+          "default": {
+            "api-contract": [
+              "spec",
+              "security",
+              "concurrency"
+            ],
+            "migration": [
+              "spec",
+              "performance",
+              "concurrency"
+            ],
+            "business-module": [
+              "spec",
+              "security",
+              "performance",
+              "concurrency"
+            ],
+            "shared-library": [
+              "spec",
+              "quality",
+              "security",
+              "concurrency"
+            ],
+            "dependency-change": [
+              "security",
+              "performance"
+            ],
+            "infra-change": [
+              "security",
+              "performance"
+            ],
+            "test-only": [
+              "spec",
+              "quality"
+            ],
+            "docs-only": []
           },
+          "type": "object",
           "properties": {
-            "business-module": { "type": "array", "items": { "$ref": "#/$defs/reviewDimension" } },
-            "migration": { "type": "array", "items": { "$ref": "#/$defs/reviewDimension" } },
-            "api-contract": { "type": "array", "items": { "$ref": "#/$defs/reviewDimension" } },
-            "dependency-change": { "type": "array", "items": { "$ref": "#/$defs/reviewDimension" } },
-            "infra-change": { "type": "array", "items": { "$ref": "#/$defs/reviewDimension" } },
-            "shared-library": { "type": "array", "items": { "$ref": "#/$defs/reviewDimension" } },
-            "test-only": { "type": "array", "items": { "$ref": "#/$defs/reviewDimension" } },
-            "docs-only": { "type": "array", "items": { "$ref": "#/$defs/reviewDimension" } }
-          }
+            "business-module": {
+              "default": [
+                "spec",
+                "security",
+                "performance",
+                "concurrency"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "spec",
+                  "quality",
+                  "security",
+                  "performance",
+                  "concurrency"
+                ]
+              }
+            },
+            "migration": {
+              "default": [
+                "spec",
+                "performance",
+                "concurrency"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "spec",
+                  "quality",
+                  "security",
+                  "performance",
+                  "concurrency"
+                ]
+              }
+            },
+            "api-contract": {
+              "default": [
+                "spec",
+                "security",
+                "concurrency"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "spec",
+                  "quality",
+                  "security",
+                  "performance",
+                  "concurrency"
+                ]
+              }
+            },
+            "dependency-change": {
+              "default": [
+                "security",
+                "performance"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "spec",
+                  "quality",
+                  "security",
+                  "performance",
+                  "concurrency"
+                ]
+              }
+            },
+            "infra-change": {
+              "default": [
+                "security",
+                "performance"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "spec",
+                  "quality",
+                  "security",
+                  "performance",
+                  "concurrency"
+                ]
+              }
+            },
+            "shared-library": {
+              "default": [
+                "spec",
+                "quality",
+                "security",
+                "concurrency"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "spec",
+                  "quality",
+                  "security",
+                  "performance",
+                  "concurrency"
+                ]
+              }
+            },
+            "test-only": {
+              "default": [
+                "spec",
+                "quality"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "spec",
+                  "quality",
+                  "security",
+                  "performance",
+                  "concurrency"
+                ]
+              }
+            },
+            "docs-only": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "spec",
+                  "quality",
+                  "security",
+                  "performance",
+                  "concurrency"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     }
-  }
+  },
+  "additionalProperties": false
 }

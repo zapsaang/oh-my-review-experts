@@ -38,7 +38,7 @@ function createTestConfig(overrides: Partial<OmreConfig["handoff"]> = {}): OmreC
       directory: ".omre/handoffs",
       ...overrides,
     },
-    reviewers: { default: ["spec", "quality"], bySliceType: {} },
+    reviewers: { default: ["spec", "quality"], bySliceType: { "business-module": [], "migration": [], "api-contract": [], "dependency-change": [], "infra-change": [], "shared-library": [], "test-only": [], "docs-only": [] } },
   };
 }
 
@@ -766,5 +766,35 @@ describe("parseHandoffJsonHeader", () => {
     const data = result.data as Record<string, unknown>;
     expect(data.schema_version).toBe("1");
     expect(data.findings).toEqual([]);
+  });
+
+  it("returns success:true for valid JSON header with mismatched schema_version", () => {
+    const content = `
+\`\`\`json
+{
+  "schema_version": "999",
+  "task_id": "task-1",
+  "agent": "reviewer-security",
+  "dimension": "security",
+  "status": "completed",
+  "target": { "kind": "working-tree", "value": "auth review" },
+  "slice_id": "slice-1",
+  "findings": [],
+  "meta": { "total_findings": 0, "notes": "" }
+}
+\`\`\`
+
+# Review Handoff
+
+## Metadata
+
+- Agent: reviewer-security
+`;
+    const result = parseHandoffJsonHeader(content);
+    expect(result.success).toBe(true);
+    expect(result.error).toBeNull();
+    expect(result.data).not.toBeNull();
+    const data = result.data as Record<string, unknown>;
+    expect(data.schema_version).toBe("999");
   });
 });

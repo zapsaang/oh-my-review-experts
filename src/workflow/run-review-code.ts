@@ -51,9 +51,9 @@ function stripEchoFlag(args: string): { cleaned: string; isEchoMode: boolean } {
   return { cleaned, isEchoMode: true };
 }
 
-export function buildReviewCodePrompt(input: ReviewCodeInput = {}): ReviewCodePromptBundle {
+export function buildReviewCodePrompt(input: ReviewCodeInput = {}, trusted = false): ReviewCodePromptBundle {
   const cwd = input.cwd ?? process.cwd();
-  const config = loadConfig(cwd);
+  const config = loadConfig(cwd, trusted);
   // Capture git state in a tight sequence for best-effort consistency.
   const files = getChangedFiles(cwd);
   const rawDiff = getUnifiedDiff(cwd, files);
@@ -77,8 +77,8 @@ export function buildReviewCodePrompt(input: ReviewCodeInput = {}): ReviewCodePr
   const subagentCatalog = buildSubagentCatalog();
 
   const arbitrationInstructions = plan.useHierarchicalArbitration
-    ? `7. For each slice, invoke a slice-arbiter subagent consuming ONLY that slice's validated reviewer handoffs.\n8. After all slice-arbiters complete, invoke the global-arbiter consuming all slice-arbiter outputs.\n9. Render final output as Markdown.\n10. Also provide a final JSON object suitable for report persistence.`
-    : `7. Run slice-level arbitration, then global arbitration.\n8. Render final output as Markdown.\n9. Also provide a final JSON object suitable for report persistence.`;
+    ? `7. For each slice, invoke a slice-arbiter subagent consuming ONLY that slice's validated reviewer handoffs.\n8. After all slice-arbiters complete, invoke the global-arbiter consuming all slice-arbiter outputs.\n9. Render final output as Markdown.\n10. Also provide a final JSON object suitable for report persistence.\n11. Call \`omre_write_report\` tool with the final Markdown and JSON to persist the report to the configured directory.`
+    : `7. Run slice-level arbitration, then global arbitration.\n8. Render final output as Markdown.\n9. Also provide a final JSON object suitable for report persistence.\n10. Call \`omre_write_report\` tool with the final Markdown and JSON to persist the report to the configured directory.`;
 
   const prompt = `
 You are Oh My Review Experts, a runtime-first review-code workflow orchestrator.
@@ -94,6 +94,12 @@ Configuration summary:
 - hierarchicalThreshold: ${config.arbitration.hierarchicalThreshold}
 - reportEnabled: ${config.report.enabled}
 - handoffEnabled: ${config.handoff.enabled}
+
+Available tools:
+- omre_write_report: Persist the final review report to ${config.report.directory}
+- omre_write_handoff: Write reviewer handoff files  
+- omre_validate_handoff: Validate handoff file structure
+- omre_build_review_code_prompt: Build review prompt for current changes
 
 Changed files:
 ${formatFileList(files)}
@@ -144,15 +150,15 @@ ${prompt}
   return { prompt, estimatedTasks: plan.estimatedTasks, files, runId };
 }
 
-export function renderLocalDryRun(input: ReviewCodeInput = {}): string {
+export function renderLocalDryRun(input: ReviewCodeInput = {}, trusted = false): string {
   const cwd = input.cwd ?? process.cwd();
-  const config = loadConfig(cwd);
+  const config = loadConfig(cwd, trusted);
   const files = getChangedFiles(cwd);
   const plan = estimatePlan(files, config);
   return `# Review Code Dry Run\n\nEstimated tasks: ${plan.estimatedTasks}\n\nFiles:\n${formatFileList(files)}\n`;
 }
 
-export function persistReport(markdown: string, json: unknown, cwd = process.cwd(), degradedSlices?: Array<{ slice_id: string; missing_dimensions: string[] }>, missingDimensionsGlobal?: string[]): string[] {
-  const config = loadConfig(cwd);
+export function persistReport(markdown: string, json: unknown, cwd = process.cwd(), degradedSlices?: Array<{ slice_id: string; missing_dimensions: string[] }>, missingDimensionsGlobal?: string[], trusted = false): string[] {
+  const config = loadConfig(cwd, trusted);
   return writeReport(config, { target: "current-change", markdown, json, degradedSlices, missingDimensionsGlobal }, cwd);
 }

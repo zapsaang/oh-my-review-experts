@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { OmreConfigSchema, DEFAULT_CONFIG, ReviewDimension, SliceType } from "../../src/config/schema.js";
+import { OmreConfigSchema, DEFAULT_CONFIG, ReviewDimension, SliceType, sanitizeDefaultModel } from "../../src/config/schema.js";
 
 describe("OmreConfigSchema", () => {
   it("parses empty object with defaults", () => {
@@ -92,6 +92,37 @@ describe("OmreConfigSchema", () => {
   it("uses DEFAULT_CONFIG as valid baseline", () => {
     expect(() => OmreConfigSchema.parse(DEFAULT_CONFIG)).not.toThrow();
   });
+
+  it("returns isolated defaults across parse calls", () => {
+    const config1 = OmreConfigSchema.parse({});
+    config1.command.aliases.push("hack");
+    config1.reviewers.bySliceType["business-module"].push("concurrency");
+
+    const config2 = OmreConfigSchema.parse({});
+    expect(config2.command.aliases).toEqual(["rc"]);
+    expect(config2.reviewers.bySliceType["business-module"]).toEqual([
+      "spec", "security", "performance", "concurrency"
+    ]);
+  });
+
+  it("preserves default reviewers for omitted slice types in partial config", () => {
+    const config = OmreConfigSchema.parse({
+      reviewers: {
+        bySliceType: { "docs-only": [] }
+      }
+    });
+
+    expect(config.reviewers.bySliceType["docs-only"]).toEqual([]);
+    expect(config.reviewers.bySliceType["business-module"]).toEqual([
+      "spec", "security", "performance", "concurrency"
+    ]);
+    expect(config.reviewers.bySliceType["migration"]).toEqual([
+      "spec", "performance", "concurrency"
+    ]);
+    expect(config.reviewers.bySliceType["test-only"]).toEqual([
+      "spec", "quality"
+    ]);
+  });
 });
 
 describe("ReviewDimension enum", () => {
@@ -111,5 +142,91 @@ describe("SliceType enum", () => {
     expect(values).toContain("business-module");
     expect(values).toContain("docs-only");
     expect(values).toContain("test-only");
+  });
+});
+
+describe("sanitizeDefaultModel", () => {
+  it("returns fallback for undefined", () => {
+    expect(sanitizeDefaultModel(undefined)).toBe("minimax-cn/MiniMax-M2.7");
+  });
+
+  it("returns fallback for empty string", () => {
+    expect(sanitizeDefaultModel("")).toBe("minimax-cn/MiniMax-M2.7");
+  });
+
+  it("strips control characters", () => {
+    expect(sanitizeDefaultModel("model\x01name")).toBe("modelname");
+    expect(sanitizeDefaultModel("model\x7fname")).toBe("modelname");
+  });
+
+  it("strips quotes and backslashes", () => {
+    expect(sanitizeDefaultModel('model"quoted"')).toBe("modelquoted");
+    expect(sanitizeDefaultModel("model'quoted'")).toBe("modelquoted");
+    expect(sanitizeDefaultModel("model\\backslash")).toBe("modelbackslash");
+  });
+
+  it("returns fallback when all characters are stripped", () => {
+    expect(sanitizeDefaultModel('\x00"\x01\\')).toBe("minimax-cn/MiniMax-M2.7");
+  });
+
+  it("returns clean string unchanged", () => {
+    expect(sanitizeDefaultModel("custom-model-v2")).toBe("custom-model-v2");
+  });
+});
+
+describe("Forbidden command names", () => {
+  it("rejects command name constructor with custom code", () => {
+    const result = OmreConfigSchema.safeParse({ command: { name: "constructor" } });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path.includes("name"));
+      expect(issue).toBeDefined();
+      expect(issue!.path).toContain("name");
+      expect(issue!.code).toBe("custom");
+    }
+  });
+
+  it("rejects command name prototype with custom code", () => {
+    const result = OmreConfigSchema.safeParse({ command: { name: "prototype" } });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path.includes("name"));
+      expect(issue).toBeDefined();
+      expect(issue!.path).toContain("name");
+      expect(issue!.code).toBe("custom");
+    }
+  });
+
+  it("rejects forbidden alias __proto__ with custom code", () => {
+    const result = OmreConfigSchema.safeParse({ command: { aliases: ["__proto__"] } });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path.includes("aliases"));
+      expect(issue).toBeDefined();
+      expect(issue!.path).toContain("aliases");
+      expect(issue!.code).toBe("custom");
+    }
+  });
+
+  it("rejects forbidden alias constructor with custom code", () => {
+    const result = OmreConfigSchema.safeParse({ command: { aliases: ["rc", "constructor"] } });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path.includes("aliases"));
+      expect(issue).toBeDefined();
+      expect(issue!.path).toContain("aliases");
+      expect(issue!.code).toBe("custom");
+    }
+  });
+
+  it("rejects forbidden alias prototype with custom code", () => {
+    const result = OmreConfigSchema.safeParse({ command: { aliases: ["prototype"] } });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path.includes("aliases"));
+      expect(issue).toBeDefined();
+      expect(issue!.path).toContain("aliases");
+      expect(issue!.code).toBe("custom");
+    }
   });
 });

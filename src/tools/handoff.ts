@@ -4,7 +4,6 @@ import type { OmreConfig } from "../config/schema.js";
 import { assertSafePath, writeFileAtomic, formatTimestamp } from "./fs-utils.js";
 import { redactSecrets } from "./secret-scanner.js";
 import { SCHEMA_VERSION, type ConfidenceLevel, type SeverityLevel } from "../agents/schemas.js";
-import { validateSchemaVersion } from "../workflow/validate-result.js";
 
 export interface HandoffPayload {
   schemaVersion?: string;
@@ -172,6 +171,16 @@ export interface HandoffJsonHeaderResult {
   error: string | null;
 }
 
+/**
+ * Parses the raw JSON fence at the top of a handoff markdown file.
+ *
+ * This function is a **raw JSON fence parser only** — it does NOT validate
+ * schema_version. Version enforcement is intentionally delegated to
+ * validateReviewerHandoff (src/workflow/validate-result.ts), which calls
+ * validateSchemaVersion immediately after parsing. This separation keeps
+ * the parser simple and allows the validator to apply consistent policy
+ * across all handoff consumers.
+ */
 export function parseHandoffJsonHeader(content: string): HandoffJsonHeaderResult {
   const stripped = content.startsWith("\uFEFF") ? content.slice(1) : content;
   const normalized = stripped.replace(/\r\n/g, "\n");
@@ -194,14 +203,6 @@ export function parseHandoffJsonHeader(content: string): HandoffJsonHeaderResult
 
   try {
     const parsed = JSON.parse(jsonBlock);
-    const versionCheck = validateSchemaVersion(parsed);
-    if (!versionCheck.valid) {
-      return {
-        success: false,
-        data: parsed,
-        error: `Schema version mismatch: expected ${SCHEMA_VERSION}, got ${(parsed as Record<string, unknown>).schema_version}. ${versionCheck.failureReason}`,
-      };
-    }
     return { success: true, data: parsed, error: null };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

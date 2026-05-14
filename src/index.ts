@@ -121,6 +121,8 @@ const OhMyReviewExperts: Plugin = async (input) => {
         output.parts.push(textPart)
       }
     },
+
+    tool: tools,
   }
   return hooks
 }

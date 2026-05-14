@@ -82,7 +82,7 @@ export function injectReviewCodePrompt(input: InjectReviewCodeInput): string | u
     args = args.slice(0, MAX_ARGS_LENGTH) + "\n[WARNING: User guidance truncated due to excessive length]";
   }
   args = validateAndSanitizeArgs(args);
-  return buildReviewCodePrompt({ args, cwd }).prompt;
+  return buildReviewCodePrompt({ args, cwd }, input.trusted ?? false).prompt;
 }
 
 export function maybeInjectReviewCodePrompt(text: string, cwd = process.cwd()): string | undefined {

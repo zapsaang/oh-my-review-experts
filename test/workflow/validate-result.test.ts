@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, expectTypeOf } from "vitest";
+import { z } from "zod";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -6,7 +7,11 @@ import {
   validateSchemaVersion,
   validateReviewerHandoff,
   type ReviewerHandoff,
+  type ReviewerFinding,
   type ExpectedValues,
+  ReviewerFindingSchema,
+  ReviewerHandoffSchema,
+  NormalizedReviewerHandoffSchema,
 } from "../../src/workflow/validate-result.js";
 import { SCHEMA_VERSION } from "../../src/agents/schemas.js";
 
@@ -374,6 +379,193 @@ describe("validateReviewerHandoff", () => {
       expect(result.failureReason).toBe("missing-fence");
       expect(result.retryRecommended).toBe(true);
     }
+  });
+});
+
+describe("ReviewerFindingSchema defaults", () => {
+  it("applies default 'N/A' to omitted file field", () => {
+    const raw = {
+      id: "sec-1",
+      severity: "critical",
+      line: 42,
+      title: "Hardcoded secret",
+      description: "API key is hardcoded",
+      evidence: "const API_KEY = 'sk-...'",
+      confidence: "high",
+      classification: "injection",
+    };
+    const result = ReviewerFindingSchema.safeParse(raw);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.file).toBe("N/A");
+    }
+  });
+
+  it("applies default 'N/A' to omitted line field", () => {
+    const raw = {
+      id: "sec-1",
+      severity: "critical",
+      title: "Hardcoded secret",
+      description: "API key is hardcoded",
+      evidence: "const API_KEY = 'sk-...'",
+      confidence: "high",
+      classification: "injection",
+    };
+    const result = ReviewerFindingSchema.safeParse(raw);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.line).toBe("N/A");
+    }
+  });
+});
+
+describe("NormalizedReviewerHandoffSchema validation", () => {
+  it("reports invalid_type for missing meta.total_findings", () => {
+    const raw: Record<string, unknown> = {
+      schema_version: SCHEMA_VERSION,
+      task_id: "task-123",
+      agent: "reviewer-security",
+      dimension: "security",
+      status: "completed",
+      target: { kind: "working-tree", value: "src/auth.ts" },
+      slice_id: "slice-1",
+      findings: [],
+      meta: { notes: "no findings" },
+    };
+    const result = NormalizedReviewerHandoffSchema.safeParse(raw);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues[0];
+      expect(issue.path).toContain("meta");
+      expect(issue.path).toContain("total_findings");
+      expect(issue.code).toBe("invalid_type");
+    }
+  });
+});
+
+describe("ReviewerFindingSchema direct validation", () => {
+  const validFinding = {
+    id: "sec-1",
+    severity: "critical" as const,
+    file: "src/auth.ts",
+    line: 42,
+    title: "Hardcoded secret",
+    description: "API key is hardcoded",
+    evidence: "const API_KEY = 'sk-...'",
+    confidence: "high" as const,
+    classification: "injection",
+  };
+
+  it("safeParse succeeds for valid input and preserves severity/confidence", () => {
+    const result = ReviewerFindingSchema.safeParse(validFinding);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.severity).toBe("critical");
+      expect(result.data.confidence).toBe("high");
+      expect(result.data.id).toBe("sec-1");
+    }
+  });
+
+  it("safeParse({}) fails with issues for required fields", () => {
+    const result = ReviewerFindingSchema.safeParse({});
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const stringPaths = ["id", "title", "description", "evidence", "classification"];
+      for (const path of stringPaths) {
+        const issue = result.error.issues.find((i) => i.path.length === 1 && i.path[0] === path);
+        expect(issue).toBeDefined();
+        expect(issue!.code).toBe("invalid_type");
+      }
+      const enumPaths = ["severity", "confidence"];
+      for (const path of enumPaths) {
+        const issue = result.error.issues.find((i) => i.path.length === 1 && i.path[0] === path);
+        expect(issue).toBeDefined();
+        expect(issue!.code).toBe("invalid_value");
+      }
+    }
+  });
+
+  it("safeParse rejects bogus severity with invalid_value at path severity", () => {
+    const result = ReviewerFindingSchema.safeParse({ ...validFinding, severity: "BOGUS" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path[0] === "severity");
+      expect(issue).toBeDefined();
+      expect(issue!.path).toEqual(["severity"]);
+      expect(issue!.code).toBe("invalid_value");
+    }
+  });
+});
+
+describe("ReviewerHandoffSchema direct validation", () => {
+  const validHandoff = {
+    schema_version: SCHEMA_VERSION,
+    task_id: "task-123",
+    agent: "reviewer-security",
+    dimension: "security",
+    status: "completed" as const,
+    target: { kind: "working-tree", value: "src/auth.ts" },
+    slice_id: "slice-1",
+    findings: [],
+    meta: { total_findings: 1, notes: "" },
+  };
+
+  it("safeParse fails with invalid_type for missing meta", () => {
+    const { meta: _meta, ...missingMeta } = validHandoff;
+    const result = ReviewerHandoffSchema.safeParse(missingMeta);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path[0] === "meta");
+      expect(issue).toBeDefined();
+      expect(issue!.path).toEqual(["meta"]);
+      expect(issue!.code).toBe("invalid_type");
+    }
+  });
+});
+
+describe("NormalizedReviewerHandoffSchema direct validation", () => {
+  const validHandoff = {
+    schema_version: SCHEMA_VERSION,
+    task_id: "task-123",
+    agent: "reviewer-security",
+    dimension: "security",
+    status: "completed" as const,
+    target: { kind: "working-tree", value: "src/auth.ts" },
+    slice_id: "slice-1",
+    findings: [
+      {
+        id: "sec-1",
+        severity: "critical" as const,
+        file: "src/auth.ts",
+        line: 42,
+        title: "Hardcoded secret",
+        description: "API key is hardcoded",
+        evidence: "const API_KEY = 'sk-...'",
+        confidence: "high" as const,
+        classification: "injection",
+      },
+    ],
+    meta: { total_findings: 1, notes: "" },
+  };
+
+  it("safeParse succeeds for valid handoff and returns typed findings", () => {
+    const result = NormalizedReviewerHandoffSchema.safeParse(validHandoff);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.findings).toHaveLength(1);
+      expect(result.data.findings[0].severity).toBe("critical");
+      expect(result.data.findings[0].confidence).toBe("high");
+    }
+  });
+});
+
+describe("Type equivalence", () => {
+  it("ReviewerFinding equals z.infer of ReviewerFindingSchema", () => {
+    expectTypeOf<ReviewerFinding>().toEqualTypeOf<z.infer<typeof ReviewerFindingSchema>>();
+  });
+
+  it("ReviewerHandoff equals z.infer of NormalizedReviewerHandoffSchema", () => {
+    expectTypeOf<ReviewerHandoff>().toEqualTypeOf<z.infer<typeof NormalizedReviewerHandoffSchema>>();
   });
 });
 

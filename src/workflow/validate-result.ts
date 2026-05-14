@@ -1,18 +1,46 @@
 import fs from "node:fs";
+import { z } from "zod";
 import {
   CONCURRENCY_CLASSIFICATION_VALUES,
   CONFIDENCE_VALUES,
   PERFORMANCE_CLASSIFICATION_VALUES,
   SCHEMA_VERSION,
   SEVERITY_VALUES,
-  type ConfidenceLevel,
   type ConcurrencyClassification,
   type PerformanceClassification,
-  type SeverityLevel,
 } from "../agents/schemas.js";
 import { parseHandoffJsonHeader } from "../tools/handoff.js";
 
-type ReviewerClassification = PerformanceClassification | ConcurrencyClassification | string;
+export const ReviewerFindingSchema = z.object({
+  id: z.string(),
+  severity: z.enum(SEVERITY_VALUES),
+  file: z.string().default("N/A"),
+  line: z.union([z.number(), z.string()]).default("N/A"),
+  title: z.string(),
+  description: z.string(),
+  evidence: z.string(),
+  confidence: z.enum(CONFIDENCE_VALUES),
+  classification: z.string(),
+});
+
+export const ReviewerHandoffSchema = z.object({
+  schema_version: z.string(),
+  task_id: z.string(),
+  agent: z.string(),
+  dimension: z.string(),
+  status: z.enum(["completed", "blocked"]),
+  target: z.object({ kind: z.string(), value: z.string() }),
+  slice_id: z.string(),
+  findings: z.array(z.unknown()),
+  meta: z.object({ total_findings: z.number(), notes: z.string() }),
+});
+
+export const NormalizedReviewerHandoffSchema = ReviewerHandoffSchema.extend({
+  findings: z.array(ReviewerFindingSchema),
+});
+
+export type ReviewerFinding = z.infer<typeof ReviewerFindingSchema>;
+export type ReviewerHandoff = z.infer<typeof NormalizedReviewerHandoffSchema>;
 
 export interface ValidationResult {
   valid: boolean;
@@ -23,28 +51,6 @@ export interface ExpectedValues {
   dimension?: string;
   target?: { kind: string; value: string };
   sliceId?: string;
-}
-
-export interface ReviewerHandoff {
-  schema_version: string;
-  task_id: string;
-  agent: string;
-  dimension: string;
-  status: "completed" | "blocked";
-  target: { kind: string; value: string };
-  slice_id: string;
-  findings: Array<{
-    id: string;
-    severity: SeverityLevel;
-    file: string;
-    line: number | string;
-    title: string;
-    description: string;
-    evidence: string;
-    confidence: ConfidenceLevel;
-    classification: ReviewerClassification;
-  }>;
-  meta: { total_findings: number; notes: string };
 }
 
 export type FailureReason =
@@ -105,177 +111,59 @@ function hasProseOutsideJson(content: string): boolean {
   return false;
 }
 
-function isValueIn<T extends string>(value: unknown, values: readonly T[]): value is T {
-  return typeof value === "string" && values.includes(value as T);
-}
-
-function isValidSeverity(value: unknown): value is SeverityLevel {
-  return isValueIn(value, SEVERITY_VALUES);
-}
-
-function isValidConfidence(value: unknown): value is ConfidenceLevel {
-  return isValueIn(value, CONFIDENCE_VALUES);
-}
-
-function isValidPerformanceClassification(value: unknown): value is PerformanceClassification {
-  return isValueIn(value, PERFORMANCE_CLASSIFICATION_VALUES);
-}
-
-function isValidConcurrencyClassification(value: unknown): value is ConcurrencyClassification {
-  return isValueIn(value, CONCURRENCY_CLASSIFICATION_VALUES);
-}
-
-function isValidStatus(value: unknown): value is "completed" | "blocked" {
-  return value === "completed" || value === "blocked";
-}
-
-function isString(value: unknown): value is string {
-  return typeof value === "string";
-}
-
-function isNumberOrString(value: unknown): value is number | string {
-  return typeof value === "number" || typeof value === "string";
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isValidClassificationForDimension(value: unknown, dimension: unknown): value is ReviewerClassification {
+function isValidClassificationForDimension(value: string, dimension: string): boolean {
   if (dimension === "performance") {
-    return isValidPerformanceClassification(value);
+    return PERFORMANCE_CLASSIFICATION_VALUES.includes(value as PerformanceClassification);
   }
   if (dimension === "concurrency") {
-    return isValidConcurrencyClassification(value);
+    return CONCURRENCY_CLASSIFICATION_VALUES.includes(value as ConcurrencyClassification);
   }
-  return isString(value);
+  return true;
+}
+
+function validateFindings(findings: unknown[], dimension: string): { valid: boolean; partial: boolean } {
+  let hasValid = false;
+  let hasInvalid = false;
+
+  for (const finding of findings) {
+    const result = ReviewerFindingSchema.safeParse(finding);
+    if (result.success && isValidClassificationForDimension(result.data.classification, dimension)) {
+      hasValid = true;
+    } else {
+      hasInvalid = true;
+    }
+  }
+
+  if (hasInvalid && hasValid) {
+    return { valid: false, partial: true };
+  }
+  if (hasInvalid && !hasValid) {
+    return { valid: false, partial: false };
+  }
+  return { valid: true, partial: false };
 }
 
 function validateSchemaShape(data: unknown): { valid: boolean; partial: boolean; reason?: string } {
-  if (!isObject(data)) {
+  const topLevelResult = ReviewerHandoffSchema.safeParse(data);
+  if (!topLevelResult.success) {
     return { valid: false, partial: false, reason: "invalid-schema" };
   }
 
-  const requiredFields = [
-    "schema_version",
-    "task_id",
-    "agent",
-    "dimension",
-    "status",
-    "target",
-    "slice_id",
-    "findings",
-    "meta",
-  ];
-
-  for (const field of requiredFields) {
-    if (!(field in data)) {
-      return { valid: false, partial: false, reason: "invalid-schema" };
-    }
-  }
-
-  if (!isValidStatus(data.status)) {
-    return { valid: false, partial: false, reason: "invalid-schema" };
-  }
-
-  if (!isObject(data.target)) {
-    return { valid: false, partial: false, reason: "invalid-schema" };
-  }
-  if (!("kind" in data.target) || !("value" in data.target)) {
-    return { valid: false, partial: false, reason: "invalid-schema" };
-  }
-  if (!isString(data.target.kind) || !isString(data.target.value)) {
-    return { valid: false, partial: false, reason: "invalid-schema" };
-  }
-
-  if (!Array.isArray(data.findings)) {
-    return { valid: false, partial: false, reason: "invalid-schema" };
-  }
-
-  const findingRequiredFields = ["id", "severity", "title", "description", "evidence", "confidence", "classification"];
-  let hasValidFindings = false;
-  let hasInvalidFindings = false;
-
-  for (const finding of data.findings) {
-    if (!isObject(finding)) {
-      hasInvalidFindings = true;
-      continue;
-    }
-
-    let findingValid = true;
-    for (const field of findingRequiredFields) {
-      if (!(field in finding)) {
-        findingValid = false;
-        break;
-      }
-    }
-
-    if (findingValid) {
-      if (!isValidSeverity(finding.severity)) {
-        return { valid: false, partial: false, reason: "invalid-schema" };
-      }
-      if (!isValidConfidence(finding.confidence)) {
-        return { valid: false, partial: false, reason: "invalid-schema" };
-      }
-      if (!isValidClassificationForDimension(finding.classification, data.dimension)) {
-        return { valid: false, partial: false, reason: "invalid-schema" };
-      }
-    }
-
-    if (findingValid) {
-      hasValidFindings = true;
-    } else {
-      hasInvalidFindings = true;
-    }
-  }
-
-  if (hasInvalidFindings && hasValidFindings) {
-    return { valid: false, partial: true, reason: "partial-output" };
-  }
-
-  if (hasInvalidFindings && !hasValidFindings) {
-    return { valid: false, partial: false, reason: "invalid-schema" };
-  }
-
-  if (!isObject(data.meta)) {
-    return { valid: false, partial: false, reason: "invalid-schema" };
-  }
-  if (!("total_findings" in data.meta) || !("notes" in data.meta)) {
-    return { valid: false, partial: false, reason: "invalid-schema" };
+  const validated = topLevelResult.data;
+  const findingsResult = validateFindings(validated.findings, validated.dimension);
+  if (!findingsResult.valid) {
+    return {
+      valid: false,
+      partial: findingsResult.partial,
+      reason: findingsResult.partial ? "partial-output" : "invalid-schema",
+    };
   }
 
   return { valid: true, partial: false };
 }
 
 function normalizeHandoff(data: unknown): ReviewerHandoff {
-  const obj = data as Record<string, unknown>;
-  return {
-    schema_version: String(obj.schema_version),
-    task_id: String(obj.task_id),
-    agent: String(obj.agent),
-    dimension: String(obj.dimension),
-    status: obj.status as "completed" | "blocked",
-    target: obj.target as { kind: string; value: string },
-    slice_id: String(obj.slice_id),
-    findings: (obj.findings as unknown[]).map((f) => {
-      const finding = f as Record<string, unknown>;
-      return {
-        id: String(finding.id),
-        severity: finding.severity as SeverityLevel,
-        file: finding.file !== undefined ? String(finding.file) : "N/A",
-        line: finding.line !== undefined ? (isNumberOrString(finding.line) ? finding.line : "N/A") : "N/A",
-        title: String(finding.title),
-        description: String(finding.description),
-        evidence: String(finding.evidence),
-        confidence: finding.confidence as ConfidenceLevel,
-        classification: String(finding.classification) as ReviewerClassification,
-      };
-    }),
-    meta: {
-      total_findings: Number((obj.meta as Record<string, unknown>).total_findings),
-      notes: String((obj.meta as Record<string, unknown>).notes),
-    },
-  };
+  return NormalizedReviewerHandoffSchema.parse(data);
 }
 
 export function validateReviewerHandoff(filePath: string, expected?: ExpectedValues): ValidationOutcome {
@@ -304,10 +192,12 @@ export function validateReviewerHandoff(filePath: string, expected?: ExpectedVal
     if (error.includes("JSON parse error")) {
       return { isValid: false, failureReason: "invalid-json", retryRecommended: true };
     }
-    if (error.includes("Schema version mismatch")) {
-      return { isValid: false, failureReason: "invalid-schema", retryRecommended: false };
-    }
     return { isValid: false, failureReason: "invalid-json", retryRecommended: true };
+  }
+
+  const versionResult = validateSchemaVersion(parseResult.data);
+  if (!versionResult.valid) {
+    return { isValid: false, failureReason: "invalid-schema", retryRecommended: false };
   }
 
   const shapeCheck = validateSchemaShape(parseResult.data);

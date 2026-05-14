@@ -200,7 +200,7 @@ Full schema:
 - `"both"` *(default)* — Commands registered via the `config` hook, execution intercepted via `command.execute.before`. Recommended.
 - `"hook"` — Same as `"both"`.
 - `"disabled"` — No command registration or interception. Useful for temporarily muting the plugin.
-- `"tool"` — Reserved. Disables slash commands; plugin tools are not yet exposed in `hooks.tool` due to a Zod version conflict upstream. Effectively disables all entry points today.
+- `"tool"` — Disables slash commands; plugin tools (`omre_write_handoff`, `omre_write_report`, etc.) remain available via `hooks.tool`.
 
 ---
 

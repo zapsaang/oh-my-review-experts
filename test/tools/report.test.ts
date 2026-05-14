@@ -35,7 +35,7 @@ function createTestConfig(overrides: Partial<OmreConfig["report"]> = {}): OmreCo
       ...overrides,
     },
     handoff: { enabled: true, directory: ".omre/handoffs" },
-    reviewers: { default: ["spec", "quality"], bySliceType: {} },
+    reviewers: { default: ["spec", "quality"], bySliceType: { "business-module": [], "migration": [], "api-contract": [], "dependency-change": [], "infra-change": [], "shared-library": [], "test-only": [], "docs-only": [] } },
   };
 }
 

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import path from "node:path";
 import { parseReviewCodeCommand, validateAndSanitizeArgs, maybeInjectReviewCodePrompt, injectReviewCodePrompt } from "../../src/hooks/command-injection.js";
 import { DEFAULT_CONFIG } from "../../src/config/schema.js";
 
@@ -111,5 +112,26 @@ describe("injectReviewCodePrompt (command-keyed)", () => {
       .toThrow("prompt injection");
   });
 
+  it("accepts absolute cwd when trusted", () => {
+    const absolutePath = path.resolve(process.cwd(), "src");
+    const result = injectReviewCodePrompt({ command: "review-code", args: "", cwd: absolutePath, trusted: true });
+    expect(result).toBeDefined();
+    expect(result).toContain("Oh My Review Experts");
+  });
 
+  it("rejects absolute cwd when not trusted", () => {
+    const absolutePath = path.resolve(process.cwd(), "src");
+    expect(() => injectReviewCodePrompt({ command: "review-code", args: "", cwd: absolutePath, trusted: false }))
+      .toThrow("Absolute paths are not allowed");
+  });
+
+  it("rejects root cwd when not trusted", () => {
+    expect(() => injectReviewCodePrompt({ command: "review-code", args: "", cwd: "/", trusted: false }))
+      .toThrow("Absolute paths are not allowed");
+  });
+
+  it("rejects path traversal cwd when not trusted", () => {
+    expect(() => injectReviewCodePrompt({ command: "review-code", args: "", cwd: "../../etc", trusted: false }))
+      .toThrow("Path traversal is not allowed");
+  });
 });
