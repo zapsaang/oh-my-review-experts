@@ -46,13 +46,7 @@ All subagent results MUST be written to:
 
 ${handoffDir}/${runId}/
 
-File naming convention:
-
-{timestamp}-{agent-name}-{scope}.md
-
-Example:
-
-${handoffDir}/${runId}/20260507-183012-123-reviewer-security-auth.md
+**YOU MUST use the \`omre_write_handoff\` tool to write handoff files. Do NOT use the \`write\` tool directly.** The \`omre_write_handoff\` tool handles file naming and location automatically.
 
 ### Subagent Requirements
 
@@ -116,80 +110,7 @@ Upon receiving a subagent reply, the primary agent MUST:
 * Subagent outputting complete review results only in chat
 * Subagent writing complete results to temporary context
 * Subagent overwriting other subagent results with the same filename
-`;
-}
-
-export function buildMandatoryOutputPersistence(handoffDir: string, runId: string): string {
-  return `
-## Mandatory Output Persistence
-
-You are a review subagent. Your complete review results MUST be written to a local handoff file:
-
-${handoffDir}/${runId}/{timestamp}-{agent-name}-{scope}.md
-
-Your final chat reply MUST only return the file path and at most 3 summary bullet points.
-
-The handoff file MUST begin with a machine-readable JSON contract inside a markdown fence, followed by the human-readable Markdown body.
-
-### JSON Header (machine-readable contract)
-
-The FIRST thing in the file MUST be a fenced JSON block that parses with JSON.parse:
-
-\`\`\`json
-${REVIEWER_HANDOFF_JSON}
-\`\`\`
-
-Rules for the JSON header:
-- "schema_version" MUST be "${SCHEMA_VERSION}".
-- "task_id" MUST be your subagent task ID.
-- "agent" MUST be your agent name (e.g., reviewer-security).
-- "dimension" MUST be your review dimension (e.g., security).
-- "status" MUST be "completed" or "blocked".
-- "target.kind" MUST be "working-tree".
-- "target.value" MUST be a one-sentence summary of what was reviewed.
-- "slice_id" MUST be the slice identifier you were assigned, or "whole-target" if no slicing was used.
-- "findings" MUST be an array. If there are no findings, use an empty array [] .
-- Every finding MUST have: id, severity (critical|high|medium|low), file, line (number or "N/A"), title, description, evidence, confidence (high|medium|low), classification.
-- "meta.total_findings" MUST match findings.length.
-- "meta.notes" MAY contain free-form text.
-
-### Markdown Body (human-readable narrative)
-
-After the JSON fence, continue with the standard Markdown sections:
-
-# Review Handoff
-
-## Metadata
-
-- Agent:
-- Scope:
-- Timestamp:
-- Status: completed|blocked
-- Confidence: high|medium|low
-
-## Files Inspected
-
-- \`path/to/file\`
-
-## Findings
-
-### Finding 1
-
-- Severity: critical|high|medium|low
-- Category:
-- File:
-- Lines:
-- Evidence:
-- Impact:
-- Recommendation:
-
-## Suggested Fixes
-
-## Open Questions
-
-## Notes for Primary Agent
-
-The orchestrator reads the JSON header first for mechanical validation. The Markdown body is for humans and fallback prose.
+* Subagent using the \`write\` tool directly to create handoff files instead of \`omre_write_handoff\`
 `;
 }
 

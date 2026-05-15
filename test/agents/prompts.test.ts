@@ -7,7 +7,6 @@ import {
   GLOBAL_ARBITER_PROMPT,
   composePrompt,
   buildHandoffProtocol,
-  buildMandatoryOutputPersistence,
   buildReportWriterInputRule,
   buildSubagentCatalog,
 } from "../../src/agents/prompts.js";
@@ -120,31 +119,16 @@ describe("buildHandoffProtocol", () => {
     const prompt = buildHandoffProtocol("custom/handoffs", "run-001");
     expect(prompt).toContain("custom/handoffs/run-001/");
   });
-});
 
-describe("buildMandatoryOutputPersistence", () => {
-  it("includes runId and directory", () => {
-    const prompt = buildMandatoryOutputPersistence(".omre/handoffs", "run-001");
-    expect(prompt).toContain("run-001");
-    expect(prompt).toContain(".omre/handoffs/run-001/");
-    expect(prompt).toContain("Mandatory Output Persistence");
+  it("mandates omre_write_handoff tool usage", () => {
+    const prompt = buildHandoffProtocol(".omre/handoffs", "run-001");
+    expect(prompt).toContain("omre_write_handoff");
+    expect(prompt).toMatch(/MUST|must/);
   });
 
-  it("requires a JSON header block", () => {
-    const prompt = buildMandatoryOutputPersistence(".omre/handoffs", "run-001");
-    expect(prompt).toContain("```json");
-    expect(prompt).toContain("schema_version");
-    expect(prompt).toContain("findings");
-    expect(prompt).toContain("JSON.parse");
-  });
-
-  it("includes Markdown body section after JSON header rules", () => {
-    const prompt = buildMandatoryOutputPersistence(".omre/handoffs", "run-001");
-    expect(prompt).toContain("# Review Handoff");
-    expect(prompt).toContain("## Metadata");
-    expect(prompt).toContain("## Findings");
-    expect(prompt).toContain("## Suggested Fixes");
-    expect(prompt).toContain("## Open Questions");
+  it("does not contain file naming convention for direct writes", () => {
+    const prompt = buildHandoffProtocol(".omre/handoffs", "run-001");
+    expect(prompt).not.toContain("File naming convention");
   });
 });
 

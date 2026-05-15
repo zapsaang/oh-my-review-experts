@@ -150,9 +150,15 @@ export function writeHandoff(
   assertSafePath(dir, resolvedCwd, "handoff.directory");
   fs.mkdirSync(dir, { recursive: true });
 
+  // Scope truncation keeps total filename under ~90 chars:
+  // timestamp(19) + "-" + agent(≤20) + "-" + scope(35) + ".md"(3) + separators(2) ≈ 80.
+  // POSIX NAME_MAX is 255; this leaves generous headroom.
+  const MAX_SCOPE_LENGTH = 35;
   const ts = formatTimestamp();
   const safeAgentName = payload.agent.replace(/[^a-zA-Z0-9_-]/g, "-");
-  const safeScope = (payload.scope ?? payload.dimension).replace(/[^a-zA-Z0-9_-]/g, "-");
+  const safeScope = (payload.scope ?? payload.dimension)
+    .replace(/[^a-zA-Z0-9_-]/g, "-")
+    .slice(0, MAX_SCOPE_LENGTH);
   const filename = `${ts}-${safeAgentName}-${safeScope}.md`;
   const filePath = path.join(dir, filename);
 

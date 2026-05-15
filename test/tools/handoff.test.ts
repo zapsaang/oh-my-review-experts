@@ -443,6 +443,90 @@ MIIEpQIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MhgwMbRvI0MBZhpJ
     expect(content).not.toContain("BEGIN RSA PRIVATE KEY");
     expect(content).toContain("[REDACTED_PRIVATE_KEY]");
   });
+
+  it("truncates long scope names in filename", () => {
+    const config = createTestConfig({ directory: "handoffs" });
+    const longScope = "aura-daemon-core-changes--collectors-memory-linux-rs--collectors-meta-rs";
+    const filePath = writeHandoff(
+      config,
+      {
+        agent: "security-reviewer",
+        dimension: "security",
+        scope: longScope,
+        status: "completed",
+        filesInspected: ["src/test.ts"],
+        findings: [],
+      },
+      tmpDir,
+    );
+
+    const filename = path.basename(filePath);
+    const scopePart = filename.replace(/^\d{8}-\d{6}-\d{3}-security-reviewer-/, "").replace(/\.md$/, "");
+    expect(scopePart.length).toBeLessThanOrEqual(35);
+    expect(filename).toContain("security-reviewer");
+    expect(filename).not.toContain(longScope);
+  });
+
+  it("does not truncate scope at exactly 35 chars", () => {
+    const config = createTestConfig({ directory: "handoffs" });
+    const exactScope = "a".repeat(35);
+    const filePath = writeHandoff(
+      config,
+      {
+        agent: "test",
+        dimension: "quality",
+        scope: exactScope,
+        status: "completed",
+        filesInspected: ["src/test.ts"],
+        findings: [],
+      },
+      tmpDir,
+    );
+
+    const filename = path.basename(filePath);
+    const scopePart = filename.replace(/^\d{8}-\d{6}-\d{3}-test-/, "").replace(/\.md$/, "");
+    expect(scopePart).toBe(exactScope);
+  });
+
+  it("truncates scope at 36 chars to 35", () => {
+    const config = createTestConfig({ directory: "handoffs" });
+    const overScope = "a".repeat(36);
+    const filePath = writeHandoff(
+      config,
+      {
+        agent: "test",
+        dimension: "quality",
+        scope: overScope,
+        status: "completed",
+        filesInspected: ["src/test.ts"],
+        findings: [],
+      },
+      tmpDir,
+    );
+
+    const filename = path.basename(filePath);
+    const scopePart = filename.replace(/^\d{8}-\d{6}-\d{3}-test-/, "").replace(/\.md$/, "");
+    expect(scopePart.length).toBe(35);
+    expect(scopePart).toBe("a".repeat(35));
+  });
+
+  it("falls back to dimension when scope is empty", () => {
+    const config = createTestConfig({ directory: "handoffs" });
+    const filePath = writeHandoff(
+      config,
+      {
+        agent: "test",
+        dimension: "quality",
+        status: "completed",
+        filesInspected: ["src/test.ts"],
+        findings: [],
+      },
+      tmpDir,
+    );
+
+    const filename = path.basename(filePath);
+    expect(filename).toContain("quality");
+  });
 });
 
 describe("readHandoffs", () => {
