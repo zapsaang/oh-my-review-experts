@@ -226,6 +226,44 @@ describe("writeHandoff", () => {
     expect(content).toContain("[REDACTED_AWS_ACCESS_KEY_ID]");
   });
 
+  it("redacts secrets in finding.category, finding.impact, and finding.recommendation", () => {
+    const config = createTestConfig({ directory: "handoffs" });
+    const ghToken = "ghp_abcdefghijklmnopqrstuvwxyz1234567890abcd";
+    const awsKey = "AKIAIOSFODNN7EXAMPLE";
+    const apiKey = "sk-1234567890abcdef1234567890abcdef";
+    const filePath = writeHandoff(
+      config,
+      {
+        agent: "security-reviewer",
+        dimension: "security",
+        scope: "auth-module",
+        status: "completed",
+        findings: [
+          {
+            id: "sec-1",
+            severity: "high",
+            classification: "secret-leak",
+            file: "src/auth.ts",
+            line: 45,
+            title: "Token leak",
+            description: "Token in code",
+            evidence: "see file",
+            confidence: "high",
+            category: `leak: ${ghToken}`,
+            impact: `Compromised: ${awsKey}`,
+            recommendation: `Rotate immediately: ${apiKey}`,
+          },
+        ],
+      },
+      tmpDir,
+    );
+
+    const content = fs.readFileSync(filePath, "utf8");
+    expect(content).not.toContain(ghToken);
+    expect(content).not.toContain(awsKey);
+    expect(content).not.toContain(apiKey);
+  });
+
   it("redacts GitHub PAT in JSON header and preserves JSON validity", () => {
     const config = createTestConfig({ directory: "handoffs" });
     const token = "ghp_abcdefghijklmnopqrstuvwxyz1234567890abcd";

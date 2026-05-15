@@ -45,17 +45,23 @@ function buildJsonHeader(payload: HandoffPayload): Record<string, unknown> {
     status: payload.status,
     target: payload.target ?? { kind: "working-tree", value: payload.scope ?? "" },
     slice_id: payload.sliceId ?? "whole-target",
-    findings: payload.findings.map((f) => ({
-      id: f.id,
-      severity: f.severity,
-      file: f.file ?? "N/A",
-      line: f.line ?? "N/A",
-      title: redactSecrets(f.title),
-      description: redactSecrets(f.description),
-      evidence: redactSecrets(f.evidence),
-      confidence: f.confidence,
-      classification: f.classification,
-    })),
+    findings: payload.findings.map((f) => {
+      const base: Record<string, unknown> = {
+        id: f.id,
+        severity: f.severity,
+        file: f.file ?? "N/A",
+        line: f.line ?? "N/A",
+        title: redactSecrets(f.title),
+        description: redactSecrets(f.description),
+        evidence: redactSecrets(f.evidence),
+        confidence: f.confidence,
+        classification: f.classification,
+      };
+      if (f.category !== undefined) base.category = redactSecrets(f.category);
+      if (f.impact !== undefined) base.impact = redactSecrets(f.impact);
+      if (f.recommendation !== undefined) base.recommendation = redactSecrets(f.recommendation);
+      return base;
+    }),
     meta: {
       total_findings: payload.findings.length,
       notes: payload.notesForPrimary ? redactSecrets(payload.notesForPrimary) : "",

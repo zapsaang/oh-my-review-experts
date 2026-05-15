@@ -310,3 +310,173 @@ describe("plugin factory integration", () => {
     expect((hooks as Record<string, unknown>).name).toBeUndefined();
   });
 });
+
+function buildHandoffJson(overrides: Record<string, unknown> = {}): string {
+  const base = {
+    schema_version: "1",
+    task_id: "task-123",
+    agent: "reviewer-security",
+    dimension: "security",
+    status: "completed",
+    target: { kind: "working-tree", value: "src/auth.ts" },
+    slice_id: "slice-1",
+    findings: [
+      {
+        id: "sec-1",
+        severity: "critical",
+        file: "src/auth.ts",
+        line: 42,
+        title: "Hardcoded secret",
+        description: "API key is hardcoded",
+        evidence: "const API_KEY = 'sk-...'",
+        confidence: "high",
+        classification: "injection",
+      },
+    ],
+    meta: { total_findings: 1, notes: "" },
+    ...overrides,
+  };
+  return "```json\n" + JSON.stringify(base, null, 2) + "\n```";
+}
+
+function withTempCwd<T>(fn: (cwd: string) => Promise<T>): Promise<T> {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-"));
+  return fn(tmp).finally(() => {
+    try {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    } catch {
+      void 0;
+    }
+  });
+}
+
+describe("omre_validate_handoff chat fallback", () => {
+  it("returns source=file when filePath validates", async () => {
+    await withTempCwd(async (cwd) => {
+      const filePath = path.join(cwd, "handoff.md");
+      fs.writeFileSync(filePath, buildHandoffJson(), "utf-8");
+
+      const args = parseToolArgs(tools.omre_validate_handoff, {
+        filePath,
+        cwd,
+      });
+      const result = await tools.omre_validate_handoff.execute(args, mockContext(cwd));
+      const parsed = JSON.parse(result as string);
+
+      expect(parsed.isValid).toBe(true);
+      expect(parsed.source).toBe("file");
+    });
+  });
+
+  it("falls back to chatContent when file is missing", async () => {
+    await withTempCwd(async (cwd) => {
+      const args = parseToolArgs(tools.omre_validate_handoff, {
+        filePath: path.join(cwd, "does-not-exist.md"),
+        chatContent: buildHandoffJson(),
+        cwd,
+      });
+      const result = await tools.omre_validate_handoff.execute(args, mockContext(cwd));
+      const parsed = JSON.parse(result as string);
+
+      expect(parsed.isValid).toBe(true);
+      expect(parsed.source).toBe("chat");
+    });
+  });
+
+  it("prefers file when both file and chat are valid", async () => {
+    await withTempCwd(async (cwd) => {
+      const filePath = path.join(cwd, "handoff.md");
+      fs.writeFileSync(filePath, buildHandoffJson({ task_id: "from-file" }), "utf-8");
+
+      const args = parseToolArgs(tools.omre_validate_handoff, {
+        filePath,
+        chatContent: buildHandoffJson({ task_id: "from-chat" }),
+        cwd,
+      });
+      const result = await tools.omre_validate_handoff.execute(args, mockContext(cwd));
+      const parsed = JSON.parse(result as string);
+
+      expect(parsed.isValid).toBe(true);
+      expect(parsed.source).toBe("file");
+      expect(parsed.normalized.task_id).toBe("from-file");
+    });
+  });
+
+  it("returns isValid=false with source=none when both file and chat fail", async () => {
+    await withTempCwd(async (cwd) => {
+      const args = parseToolArgs(tools.omre_validate_handoff, {
+        filePath: path.join(cwd, "does-not-exist.md"),
+        chatContent: "no fence here, just prose",
+        cwd,
+      });
+      const result = await tools.omre_validate_handoff.execute(args, mockContext(cwd));
+      const parsed = JSON.parse(result as string);
+
+      expect(parsed.isValid).toBe(false);
+      expect(parsed.source).toBe("none");
+      expect(parsed.retryRecommended).toBe(true);
+    });
+  });
+
+  it("works with chatContent only (no filePath provided)", async () => {
+    await withTempCwd(async (cwd) => {
+      const args = parseToolArgs(tools.omre_validate_handoff, {
+        chatContent: buildHandoffJson(),
+        cwd,
+      });
+      const result = await tools.omre_validate_handoff.execute(args, mockContext(cwd));
+      const parsed = JSON.parse(result as string);
+
+      expect(parsed.isValid).toBe(true);
+      expect(parsed.source).toBe("chat");
+    });
+  });
+
+  it("returns retryRecommended when neither filePath nor chatContent is provided", async () => {
+    await withTempCwd(async (cwd) => {
+      const args = parseToolArgs(tools.omre_validate_handoff, { cwd });
+      const result = await tools.omre_validate_handoff.execute(args, mockContext(cwd));
+      const parsed = JSON.parse(result as string);
+
+      expect(parsed.isValid).toBe(false);
+      expect(parsed.source).toBe("none");
+      expect(parsed.retryRecommended).toBe(true);
+    });
+  });
+
+  it("preserves a fence located beyond the prefix truncation limit (smart truncation)", async () => {
+    await withTempCwd(async (cwd) => {
+      const handoffJson = buildHandoffJson({ task_id: "near-boundary" });
+      const padding = "x".repeat(52_000);
+      const chatContent = padding + "\n\n" + handoffJson;
+
+      const args = parseToolArgs(tools.omre_validate_handoff, {
+        chatContent,
+        cwd,
+      });
+      const result = await tools.omre_validate_handoff.execute(args, mockContext(cwd));
+      const parsed = JSON.parse(result as string);
+
+      expect(parsed.isValid).toBe(true);
+      expect(parsed.source).toBe("chat");
+      expect(parsed.normalized.task_id).toBe("near-boundary");
+    });
+  });
+
+  it("truncates safely when fence body exceeds the limit and reports failure", async () => {
+    await withTempCwd(async (cwd) => {
+      const giantFiller = "y".repeat(60_000);
+      const chatContent = "```json\n{ \"schema_version\": \"1\", \"junk\": \"" + giantFiller + "\"\n```";
+
+      const args = parseToolArgs(tools.omre_validate_handoff, {
+        chatContent,
+        cwd,
+      });
+      const result = await tools.omre_validate_handoff.execute(args, mockContext(cwd));
+      const parsed = JSON.parse(result as string);
+
+      expect(parsed.isValid).toBe(false);
+      expect(parsed.source).toBe("none");
+    });
+  });
+});

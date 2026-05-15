@@ -7,6 +7,7 @@ import pc from "picocolors"
 import { modify, parse as parseJsonc, applyEdits } from "jsonc-parser"
 import { defaultConfigJsonc, findConfigFiles, loadConfig } from "./config/load-config.js"
 import { renderLocalDryRun } from "./workflow/run-review-code.js"
+import { checkOmrePermissions, checkOpencodeConfig } from "./tools/doctor.js"
 import { VERSION } from "./version.js"
 
 const PLUGIN_NAME = "oh-my-review-experts"
@@ -188,19 +189,6 @@ program.command("install")
     }
   })
 
-function checkOpencodeConfig(configFile: string): { pluginRegistered: boolean } {
-  const text = readFileSafe(configFile)
-  if (!text) return { pluginRegistered: false }
-  const parsed = parseJsonc(text)
-  if (parsed === undefined || typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    return { pluginRegistered: false }
-  }
-  const root = parsed as Record<string, unknown>
-  const pluginArray = Array.isArray(root.plugin) ? root.plugin : Array.isArray(root.plugins) ? root.plugins : []
-  const pluginRegistered = (pluginArray as string[]).includes(PLUGIN_NAME)
-  return { pluginRegistered }
-}
-
 program.command("doctor")
   .description("Check plugin configuration")
   .action(() => {
@@ -241,6 +229,29 @@ program.command("doctor")
         console.log(pc.yellow("  tool mode (commands not registered via config hook)"))
       } else {
         console.log(pc.green("  commands registered at runtime via config hook"))
+      }
+
+      console.log("\nSubagent permissions:")
+      const projectWarnings = projectStatus.permissionWarnings
+      const globalWarnings = globalStatus.permissionWarnings
+
+      if (!projectStatus.exists && !globalStatus.exists) {
+        console.log(pc.yellow("  no opencode.json found; cannot verify omre_* permissions"))
+      } else {
+        if (projectStatus.exists) {
+          if (projectWarnings.length === 0) {
+            console.log(pc.green(`  ${projectConfig}: omre_* permissions OK (opencode.json only; agent frontmatter not inspected)`))
+          } else {
+            for (const w of projectWarnings) console.log(pc.yellow(`  ${projectConfig}: ${w}`))
+          }
+        }
+        if (globalStatus.exists) {
+          if (globalWarnings.length === 0) {
+            console.log(pc.green(`  ${globalConfig}: omre_* permissions OK (opencode.json only; agent frontmatter not inspected)`))
+          } else {
+            for (const w of globalWarnings) console.log(pc.yellow(`  ${globalConfig}: ${w}`))
+          }
+        }
       }
     } catch (err) {
       console.error(pc.red(`doctor failed: ${err instanceof Error ? err.message : String(err)}`))

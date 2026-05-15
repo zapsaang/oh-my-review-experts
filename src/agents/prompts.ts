@@ -94,6 +94,18 @@ SUMMARY:
 - ...
 \`\`\`
 
+### Chat Fallback (recovery only, do NOT use as primary channel)
+
+If the \`omre_write_handoff\` tool call fails, throws, or you cannot confirm the
+file was written successfully, you MUST also include the complete handoff JSON
+header inside a \`\`\`json fence in your final chat reply, immediately AFTER the
+\`HANDOFF_FILE\`/\`STATUS\`/\`SUMMARY\` block. Use the same schema as the file's
+JSON header. The primary agent will recover from chat only when the file is
+genuinely missing or invalid.
+
+This is a recovery hatch, not a license to skip the file. Always attempt
+\`omre_write_handoff\` first.
+
 ### Primary Agent Requirements
 
 Upon receiving a subagent reply, the primary agent MUST:
@@ -102,12 +114,12 @@ Upon receiving a subagent reply, the primary agent MUST:
 2. Read that file
 3. Summarize the final review report based on the file contents
 4. When subagent chat output conflicts with the handoff file, the handoff file takes precedence
-5. When the handoff file is missing, mark that subagent as \`handoff_missing\` and request regeneration
+5. When the handoff file is missing or fails validation, call \`omre_validate_handoff\` with both \`filePath\` and \`chatContent\` (the subagent's full final reply). The tool tries the file first and falls back to parsing the chat fence. Only if the result has \`source: "none"\` should you mark the subagent as \`handoff_missing\` and request regeneration.
 
 ### Prohibited Behaviors
 
-* Primary agent directly using subagent chat output to generate the final report
-* Subagent outputting complete review results only in chat
+* Primary agent directly using subagent chat output prose (i.e. anything outside the \`\`\`json fence) as a data source
+* Subagent skipping \`omre_write_handoff\` and emitting only chat output
 * Subagent writing complete results to temporary context
 * Subagent overwriting other subagent results with the same filename
 * Subagent using the \`write\` tool directly to create handoff files instead of \`omre_write_handoff\`

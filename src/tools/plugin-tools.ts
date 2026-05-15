@@ -1,13 +1,32 @@
 import type { ToolContext } from "@opencode-ai/plugin";
 import path from "node:path";
 import { z } from "zod";
-import { SEVERITY_VALUES, CONFIDENCE_VALUES } from "../agents/schemas.js";
+import { UnifiedFindingSchema } from "../agents/schemas.js";
 import { buildReviewCodePrompt, persistReport, renderLocalDryRun } from "../workflow/run-review-code.js";
 import { loadConfig } from "../config/load-config.js";
 import { validateAndSanitizeArgs, MAX_ARGS_LENGTH } from "../hooks/command-injection.js";
 import { writeHandoff, type HandoffPayload } from "./handoff.js";
-import { validateReviewerHandoff, type ExpectedValues } from "../workflow/validate-result.js";
+import { validateReviewerHandoff, validateHandoffFromChat } from "../workflow/validate-result.js";
 import { assertSafePath } from "./fs-utils.js";
+
+/**
+ * Maximum chatContent size accepted by omre_validate_handoff. Chat replies
+ * over this size are truncated before parsing to bound memory and parser
+ * cost. Truncation is "smart": we locate the first ```json fence and keep
+ * up to MAX_CHAT_CONTENT_LENGTH starting at the fence, so a valid handoff
+ * sitting beyond a large prose preamble is preserved. The handoff JSON
+ * header is small (≤ a few KB), so 50KB is generous headroom for any
+ * realistic header plus surrounding code.
+ */
+export const MAX_CHAT_CONTENT_LENGTH = 50_000;
+
+function truncateChatContentForFence(content: string): string {
+  if (content.length <= MAX_CHAT_CONTENT_LENGTH) return content;
+  const fenceStart = content.indexOf("```json");
+  const start = fenceStart >= 0 ? fenceStart : 0;
+  const window = content.slice(start, start + MAX_CHAT_CONTENT_LENGTH);
+  return window + "\n[TRUNCATED]";
+}
 
 interface ToolDefinition<Args extends z.ZodRawShape> {
   description: string;
@@ -22,11 +41,6 @@ function tool<Args extends z.ZodRawShape>(input: ToolDefinition<Args>): ToolDefi
   return input;
 }
 
-/**
- * Resolve the effective cwd and whether it should be trusted.
- * User-provided `input.cwd` is untrusted (must pass assertSafeCwd).
- * OpenCode-provided `context.directory` and `process.cwd()` are trusted.
- */
 function resolveCwd(
   inputCwd: string | undefined,
   contextDir: string | undefined
@@ -37,20 +51,11 @@ function resolveCwd(
   return { cwd: contextDir ?? process.cwd(), trusted: true };
 }
 
-export const HandoffFindingSchema = z.object({
-  id: z.string(),
-  severity: z.enum(SEVERITY_VALUES),
-  file: z.string().optional(),
-  line: z.union([z.number(), z.string()]).optional(),
-  title: z.string(),
-  description: z.string(),
-  evidence: z.string(),
-  confidence: z.enum(CONFIDENCE_VALUES),
-  classification: z.string(),
-  category: z.string().optional(),
-  impact: z.string().optional(),
-  recommendation: z.string().optional(),
-}).loose();
+/**
+ * @deprecated Use `UnifiedFindingSchema` from `src/agents/schemas.js` instead.
+ * This re-export exists for backward compatibility with existing tests/consumers.
+ */
+export const HandoffFindingSchema = UnifiedFindingSchema;
 
 export const tools = {
   omre_build_review_code_prompt: tool({
@@ -172,9 +177,11 @@ export const tools = {
   }),
 
   omre_validate_handoff: tool({
-    description: "Validate a reviewer handoff file for structural correctness",
+    description:
+      "Validate a reviewer handoff for structural correctness. Tries the file at filePath first; if missing or invalid, falls back to parsing chatContent. Returns { isValid, source: 'file'|'chat'|'none', ... }.",
     args: {
-      filePath: z.string(),
+      filePath: z.string().optional(),
+      chatContent: z.string().optional(),
       cwd: z.string().optional(),
       expected: z.object({
         dimension: z.string().optional(),
@@ -186,18 +193,47 @@ export const tools = {
       const { cwd, trusted } = resolveCwd(input.cwd, context.directory);
       const resolvedCwd = path.resolve(cwd);
 
-      // When cwd is user-provided, validate it doesn't escape the project directory.
       if (!trusted) {
         const trustedBase = path.resolve(context.directory ?? process.cwd());
         assertSafePath(resolvedCwd, trustedBase, "omre_validate_handoff cwd");
       }
 
-      const resolvedPath = input.filePath.startsWith("/")
-        ? input.filePath
-        : path.resolve(resolvedCwd, input.filePath);
-      assertSafePath(resolvedPath, resolvedCwd, "omre_validate_handoff");
-      const result = validateReviewerHandoff(resolvedPath, input.expected);
-      return JSON.stringify(result);
+      if (!input.filePath && !input.chatContent) {
+        return JSON.stringify({
+          isValid: false,
+          failureReason: "missing-output",
+          retryRecommended: true,
+          source: "none",
+        });
+      }
+
+      let fileOutcome: ReturnType<typeof validateReviewerHandoff> | undefined;
+      if (input.filePath) {
+        const resolvedPath = input.filePath.startsWith("/")
+          ? input.filePath
+          : path.resolve(resolvedCwd, input.filePath);
+        assertSafePath(resolvedPath, resolvedCwd, "omre_validate_handoff");
+        fileOutcome = validateReviewerHandoff(resolvedPath, input.expected);
+        if (fileOutcome.isValid) {
+          return JSON.stringify({ ...fileOutcome, source: "file" });
+        }
+      }
+
+      if (input.chatContent) {
+        const chat = truncateChatContentForFence(input.chatContent);
+        const chatOutcome = validateHandoffFromChat(chat, input.expected);
+        if (chatOutcome.isValid) {
+          return JSON.stringify({ ...chatOutcome, source: "chat" });
+        }
+        return JSON.stringify({
+          isValid: false,
+          failureReason: "missing-output",
+          retryRecommended: true,
+          source: "none",
+        });
+      }
+
+      return JSON.stringify({ ...fileOutcome!, source: "file" });
     },
   }),
 };

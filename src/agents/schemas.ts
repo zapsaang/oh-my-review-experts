@@ -5,6 +5,8 @@
  * Any schema evolution only requires updating this file.
  */
 
+import { z } from "zod";
+
 /**
  * Current schema version for handoff contracts.
  *
@@ -16,6 +18,14 @@
  * - Old versions are rejected by validateSchemaVersion() with failureReason "schema-version-mismatch".
  */
 export const SCHEMA_VERSION = "1";
+
+/**
+ * Regex matching accepted schema_version values for the current major.
+ *
+ * Accepts "1" and "1.<minor>" so MINOR bumps remain backward compatible.
+ * Update this when bumping the MAJOR version (e.g. /^2(\.\d+)?$/ for v2).
+ */
+export const SCHEMA_VERSION_PATTERN = /^1(\.\d+)?$/;
 
 export const SEVERITY_VALUES = ["critical", "high", "medium", "low"] as const;
 export type SeverityLevel = (typeof SEVERITY_VALUES)[number];
@@ -50,6 +60,115 @@ export const REJECTION_REASON_VALUES = [
   "contradicted-by-code",
 ] as const;
 export type RejectionReason = (typeof REJECTION_REASON_VALUES)[number];
+
+/**
+ * Single source of truth for finding shape. Used by both write side
+ * (omre_write_handoff input schema) and read side (handoff validator).
+ *
+ * Relaxed-but-safe rules:
+ * - file/line default to "N/A" so omitting them is non-fatal.
+ * - severity/confidence use .catch() to downgrade unknown values instead of failing.
+ * - .loose() preserves extra fields (recommendation, impact, category, ...) the LLM may add.
+ * - Extra-field warnings are emitted by validate-result.ts, not enforced here.
+ */
+export const UnifiedFindingSchema = z.looseObject({
+  id: z.string(),
+  severity: z.enum(SEVERITY_VALUES).catch("medium"),
+  file: z.string().default("N/A"),
+  line: z.union([z.number(), z.string()]).default("N/A"),
+  title: z.string(),
+  description: z.string(),
+  evidence: z.string(),
+  confidence: z.enum(CONFIDENCE_VALUES).catch("low"),
+  classification: z.string(),
+});
+export type UnifiedFinding = z.infer<typeof UnifiedFindingSchema>;
+
+/**
+ * Top-level handoff envelope. findings is z.unknown() at this level so
+ * partial-output diagnosis (some valid, some invalid) can run before
+ * the strict per-finding parse in NormalizedUnifiedHandoffSchema.
+ */
+export const UnifiedHandoffSchema = z.object({
+  schema_version: z.string().regex(SCHEMA_VERSION_PATTERN),
+  task_id: z.string(),
+  agent: z.string(),
+  dimension: z.string(),
+  status: z.enum(["completed", "blocked"]),
+  target: z.object({ kind: z.string(), value: z.string() }),
+  slice_id: z.string(),
+  findings: z.array(z.unknown()),
+  meta: z.object({
+    total_findings: z.number(),
+    notes: z.string().default(""),
+  }),
+});
+export type UnifiedHandoff = z.infer<typeof UnifiedHandoffSchema>;
+
+/**
+ * Same shape as UnifiedHandoffSchema, but findings are fully validated
+ * against UnifiedFindingSchema. Use this for the final normalized output
+ * after partial-output diagnosis has passed.
+ */
+export const NormalizedUnifiedHandoffSchema = UnifiedHandoffSchema.extend({
+  findings: z.array(UnifiedFindingSchema),
+});
+export type NormalizedUnifiedHandoff = z.infer<typeof NormalizedUnifiedHandoffSchema>;
+
+/**
+ * Generates a representative example object from a Zod schema for use in prompts.
+ *
+ * Rendering rules:
+ * - object → recursively expanded; loose objects render same as strict (extras invisible).
+ * - enum   → "value1|value2|..." pipe-separated string.
+ * - union  → first option's example.
+ * - default/catch/optional → unwrapped to inner type's example.
+ * - array  → single-element array containing element example.
+ * - string → "string", number → 0, boolean → true.
+ *
+ * Depth-limited at 10 to defend against accidental cyclic schemas.
+ */
+export function zodToExample(schema: unknown, depth = 0): unknown {
+  if (depth > 10) return "...";
+  if (!schema || typeof schema !== "object") return "unknown";
+
+  const def = (schema as { _zod?: { def?: { type?: string; innerType?: unknown } } })._zod?.def;
+  const type = def?.type;
+
+  if (type === "object") {
+    const shape = (schema as { shape?: Record<string, unknown> }).shape ?? {};
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(shape)) {
+      result[key] = zodToExample(value, depth + 1);
+    }
+    return result;
+  }
+
+  if (type === "enum") {
+    const options = (schema as { options?: readonly string[] }).options ?? [];
+    return options.join("|");
+  }
+
+  if (type === "union") {
+    const options = (schema as { options?: readonly unknown[] }).options ?? [];
+    return options.length > 0 ? zodToExample(options[0], depth + 1) : "unknown";
+  }
+
+  if (type === "default" || type === "catch" || type === "optional" || type === "nullable") {
+    return zodToExample(def?.innerType, depth + 1);
+  }
+
+  if (type === "array") {
+    const element = (schema as { element?: unknown }).element;
+    return [zodToExample(element, depth + 1)];
+  }
+
+  if (type === "string") return "string";
+  if (type === "number") return 0;
+  if (type === "boolean") return true;
+
+  return "unknown";
+}
 
 /** Expected JSON output for a single reviewer finding. */
 export const REVIEWER_FINDING_JSON = `{
