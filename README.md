@@ -132,6 +132,7 @@ Full schema:
   "$schema": "https://raw.githubusercontent.com/zapsaang/oh-my-review-experts/main/schemas/oh-my-review-experts.schema.json",
   "enabled": true,
   "command": {
+    "enabled": true,
     "name": "review-code",
     "aliases": ["rc"],
     "injection": "both"
@@ -165,6 +166,9 @@ Full schema:
     "maxEstimatedTasks": 24,
     "compactModeThreshold": 20,
     "hardStopThreshold": 60
+  },
+  "arbitration": {
+    "hierarchicalThreshold": 3
   },
   "report": {
     "enabled": true,
@@ -245,10 +249,14 @@ Written with `writeFileAtomicOverwrite` (temp + rename) for `latest.*`, and `O_E
 
 Each handoff carries: agent name, scope, files inspected, findings with evidence, risk level, suggested fixes, confidence, and open questions. The orchestrator reads these files to build the final report; subagent chat output is treated as a status receipt only.
 
-The plugin exposes two tools for programmatic use:
+The plugin exposes six tools for programmatic use:
 
-- `omre_write_handoff` — persist a reviewer's findings
-- `omre_write_report` — persist the final report
+- `omre_build_review_code_prompt` — assemble the review prompt bundle for the current changes
+- `omre_dry_run` — render the plan without invoking any model
+- `omre_config` — load the merged OMRE configuration for the current project
+- `omre_write_handoff` — persist a reviewer's findings to `.omre/handoffs/{runId}/`
+- `omre_write_report` — persist the final report to `.omre/reports/`
+- `omre_validate_handoff` — validate a reviewer handoff (file first, chat-fence fallback)
 
 ---
 
