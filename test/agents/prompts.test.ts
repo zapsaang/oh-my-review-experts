@@ -3,10 +3,13 @@ import {
   CONTRACT,
   CHAT_JSON_CONTRACT,
   FILE_HANDOFF_CONTRACT,
+  GLOBAL_ARBITER_PROMPT,
   REVIEWER_PROMPTS,
   COMPLETE_REVIEWER_PROMPTS,
+  RESULT_VALIDATOR_PROMPT,
   SLICE_ARBITER_PROMPT,
-  GLOBAL_ARBITER_PROMPT,
+  SLICE_PLANNER_PROMPT,
+  SLICE_PLAN_VALIDATOR_PROMPT,
   composePrompt,
   buildHandoffProtocol,
   buildReportWriterInputRule,
@@ -275,5 +278,27 @@ describe("GLOBAL_ARBITER_PROMPT", () => {
 
   it("forbids free-form rejection reasons", () => {
     expect(GLOBAL_ARBITER_PROMPT).toContain("Free-form rejection reasons are forbidden");
+  });
+});
+
+describe("Coordinator prompt snapshots", () => {
+  it("SLICE_PLANNER_PROMPT remains stable", () => {
+    expect(SLICE_PLANNER_PROMPT).toMatchSnapshot();
+  });
+
+  it("SLICE_PLAN_VALIDATOR_PROMPT remains stable", () => {
+    expect(SLICE_PLAN_VALIDATOR_PROMPT).toMatchSnapshot();
+  });
+
+  it("RESULT_VALIDATOR_PROMPT remains stable", () => {
+    expect(RESULT_VALIDATOR_PROMPT).toMatchSnapshot();
+  });
+
+  it("SLICE_ARBITER_PROMPT remains stable", () => {
+    expect(SLICE_ARBITER_PROMPT).toMatchSnapshot();
+  });
+
+  it("GLOBAL_ARBITER_PROMPT remains stable", () => {
+    expect(GLOBAL_ARBITER_PROMPT).toMatchSnapshot();
   });
 });

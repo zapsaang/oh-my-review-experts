@@ -222,16 +222,6 @@ export const REVIEWER_HANDOFF_JSON = `{
   "meta": { "total_findings": 1, "notes": "" }
 }`;
 
-/** Expected JSON output for the slice planner. */
-export const SLICE_PLANNER_JSON = `{
-  "schema_version": "${SCHEMA_VERSION}",
-  "status": "completed",
-  "slicing_mode": "none|module-based|risk-based|hybrid",
-  "should_slice": true,
-  "reason": "short explanation",
-  "slices": [{ "slice_id": "slice-1", "slice_type": "business-module", "title": "...", "files": ["path"] }]
-}`;
-
 /**
  * Slice planner output schema. Field order mirrors the legacy
  * `SLICE_PLANNER_JSON` template so prompt rendering stays byte-stable.
@@ -253,8 +243,8 @@ export const SlicePlannerSchema = z.looseObject({
 });
 export type SlicePlanner = z.infer<typeof SlicePlannerSchema>;
 
-/** Expected JSON output for the slice plan validator. */
-export const SLICE_PLAN_VALIDATOR_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","is_valid":true,"failure_reason":"","retry_recommended":false,"normalized_result":null}`;
+/** Prompt-facing JSON example for the slice planner, derived from `SlicePlannerSchema`. */
+export const SLICE_PLANNER_JSON = JSON.stringify(zodToExample(SlicePlannerSchema), null, 2);
 
 /**
  * Slice plan validator output schema. `normalized_result` is `unknown |
@@ -271,8 +261,12 @@ export const SlicePlanValidatorSchema = z.looseObject({
 });
 export type SlicePlanValidator = z.infer<typeof SlicePlanValidatorSchema>;
 
-/** Expected JSON output for the review result validator. */
-export const RESULT_VALIDATOR_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","assigned_dimension":"spec","slice_id":"","is_valid":true,"failure_reason":"","retry_recommended":false}`;
+/** Prompt-facing JSON example for the slice plan validator, derived from `SlicePlanValidatorSchema`. */
+export const SLICE_PLAN_VALIDATOR_JSON = JSON.stringify(
+  zodToExample(SlicePlanValidatorSchema),
+  null,
+  2,
+);
 
 /**
  * Review result validator output schema. `assigned_dimension` reuses the
@@ -292,8 +286,8 @@ export const ResultValidatorSchema = z.looseObject({
 });
 export type ResultValidator = z.infer<typeof ResultValidatorSchema>;
 
-/** Expected JSON output for the slice arbiter. */
-export const SLICE_ARBITER_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","slice_id":"slice-1","confirmed":[],"needs_validation":[],"rejected":[{"id":"finding-1","reason":"${REJECTION_REASON_VALUES.join("|")}"}],"degraded":false,"missing_dimensions":[]}`;
+/** Prompt-facing JSON example for the review result validator, derived from `ResultValidatorSchema`. */
+export const RESULT_VALIDATOR_JSON = JSON.stringify(zodToExample(ResultValidatorSchema), null, 2);
 
 /**
  * Slice arbiter output schema. confirmed/needs_validation reuse
@@ -317,8 +311,8 @@ export const SliceArbiterSchema = z.looseObject({
 });
 export type SliceArbiter = z.infer<typeof SliceArbiterSchema>;
 
-/** Expected JSON output for the global arbiter. */
-export const GLOBAL_ARBITER_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","confirmed":[],"needs_validation":[],"rejected":[{"id":"finding-1","reason":"${REJECTION_REASON_VALUES.join("|")}"}],"degraded_slices":[],"missing_dimensions_global":[],"summary":{"total_slices":0,"total_confirmed":0}}`;
+/** Prompt-facing JSON example for the slice arbiter, derived from `SliceArbiterSchema`. */
+export const SLICE_ARBITER_JSON = JSON.stringify(zodToExample(SliceArbiterSchema), null, 2);
 
 /**
  * Global arbiter output schema. Aggregates per-slice arbiter outputs and
@@ -349,3 +343,6 @@ export const GlobalArbiterSchema = z.looseObject({
   }),
 });
 export type GlobalArbiter = z.infer<typeof GlobalArbiterSchema>;
+
+/** Prompt-facing JSON example for the global arbiter, derived from `GlobalArbiterSchema`. */
+export const GLOBAL_ARBITER_JSON = JSON.stringify(zodToExample(GlobalArbiterSchema), null, 2);

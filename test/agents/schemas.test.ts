@@ -27,7 +27,7 @@ import {
 
 describe("JSON schema constants", () => {
   it("SLICE_PLANNER_JSON contains expected fields", () => {
-    expect(SLICE_PLANNER_JSON).toContain('"status": "completed"');
+    expect(SLICE_PLANNER_JSON).toContain('"status"');
     expect(SLICE_PLANNER_JSON).toContain('"slicing_mode"');
     expect(SLICE_PLANNER_JSON).toContain('"should_slice"');
     expect(SLICE_PLANNER_JSON).toContain('"reason"');
@@ -38,43 +38,43 @@ describe("JSON schema constants", () => {
     expect(SLICE_PLANNER_JSON).toContain('"files"');
   });
 
-  it("SLICE_PLAN_VALIDATOR_JSON is valid compact JSON", () => {
+  it("SLICE_PLAN_VALIDATOR_JSON parses as JSON with expected fields", () => {
     const parsed = JSON.parse(SLICE_PLAN_VALIDATOR_JSON);
-    expect(parsed.status).toBe("completed");
+    expect(parsed.status).toBe("completed|blocked");
     expect(parsed.is_valid).toBe(true);
-    expect(parsed.retry_recommended).toBe(false);
+    expect(parsed.retry_recommended).toBe(true);
     expect(parsed.normalized_result).toBeNull();
   });
 
-  it("RESULT_VALIDATOR_JSON is valid compact JSON", () => {
+  it("RESULT_VALIDATOR_JSON parses as JSON with expected fields", () => {
     const parsed = JSON.parse(RESULT_VALIDATOR_JSON);
-    expect(parsed.status).toBe("completed");
-    expect(parsed.assigned_dimension).toBe("spec");
+    expect(parsed.status).toBe("completed|blocked");
+    expect(parsed.assigned_dimension).toBe("spec|quality|security|performance|concurrency");
     expect(parsed.is_valid).toBe(true);
-    expect(parsed.retry_recommended).toBe(false);
+    expect(parsed.retry_recommended).toBe(true);
   });
 
-  it("SLICE_ARBITER_JSON is valid compact JSON", () => {
+  it("SLICE_ARBITER_JSON parses as JSON with expected fields", () => {
     const parsed = JSON.parse(SLICE_ARBITER_JSON);
-    expect(parsed.status).toBe("completed");
-    expect(parsed.slice_id).toBe("slice-1");
-    expect(parsed.confirmed).toEqual([]);
+    expect(parsed.status).toBe("completed|blocked");
+    expect(parsed.slice_id).toBe("string");
+    expect(Array.isArray(parsed.confirmed)).toBe(true);
     expect(parsed.rejected).toEqual([
-      { id: "finding-1", reason: "duplicate|weak-evidence|speculative|out-of-scope|contradicted-by-code" },
+      { id: "string", reason: "duplicate|weak-evidence|speculative|out-of-scope|contradicted-by-code" },
     ]);
-    expect(parsed.degraded).toBe(false);
-    expect(parsed.missing_dimensions).toEqual([]);
+    expect(parsed.degraded).toBe(true);
+    expect(Array.isArray(parsed.missing_dimensions)).toBe(true);
   });
 
-  it("GLOBAL_ARBITER_JSON is valid compact JSON", () => {
+  it("GLOBAL_ARBITER_JSON parses as JSON with expected fields", () => {
     const parsed = JSON.parse(GLOBAL_ARBITER_JSON);
-    expect(parsed.status).toBe("completed");
-    expect(parsed.confirmed).toEqual([]);
+    expect(parsed.status).toBe("completed|blocked");
+    expect(Array.isArray(parsed.confirmed)).toBe(true);
     expect(parsed.rejected).toEqual([
-      { id: "finding-1", reason: "duplicate|weak-evidence|speculative|out-of-scope|contradicted-by-code" },
+      { id: "string", reason: "duplicate|weak-evidence|speculative|out-of-scope|contradicted-by-code" },
     ]);
-    expect(parsed.degraded_slices).toEqual([]);
-    expect(parsed.missing_dimensions_global).toEqual([]);
+    expect(Array.isArray(parsed.degraded_slices)).toBe(true);
+    expect(Array.isArray(parsed.missing_dimensions_global)).toBe(true);
     expect(parsed.summary).toEqual({ total_slices: 0, total_confirmed: 0 });
   });
 
