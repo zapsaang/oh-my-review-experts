@@ -66,6 +66,40 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
     }
   });
 
+  it("returns the resolved taskId when payload omits task_id", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-resolved-task-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".omre", "config.json"),
+        JSON.stringify({ handoff: { enabled: true, directory: ".omre/handoffs" } }),
+        "utf8",
+      );
+
+      const payload = {
+        agent: "reviewer-spec",
+        dimension: "spec",
+        status: "completed" as const,
+        findings: [],
+      };
+
+      const input = parseToolArgs(tools.omre_write_handoff, { payload, runId: "run-2b" });
+      const result = await tools.omre_write_handoff.execute(input, mockContext(tmpDir));
+      const parsed = JSON.parse(result as string);
+
+      expect(parsed.ok).toBe(true);
+      expect(typeof parsed.taskId).toBe("string");
+      expect(parsed.taskId.length).toBeGreaterThan(0);
+      expect(parsed.taskId).toContain("run-2b");
+      expect(parsed.taskId).toContain("reviewer-spec");
+
+      const written = fs.readFileSync(parsed.filePath, "utf8");
+      expect(written).toContain(`"task_id": "${parsed.taskId}"`);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it("returns { ok: false, errors } when handoff is disabled (no throw)", async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-disabled-"));
     try {
