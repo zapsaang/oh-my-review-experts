@@ -89,48 +89,6 @@ function ensurePluginInOpencodeConfig(configFile: string, maxRetries = 3): boole
   return false
 }
 
-function ensureCommandInOpencodeConfig(configFile: string, maxRetries = 3): { added: string[]; skipped: string[] } {
-  ensureDir(path.dirname(configFile))
-  const commandsToRegister: Record<string, { template: string; description: string }> = {
-    "review-code": { template: "Triggering oh-my-review-experts workflow...", description: "Run Oh My Review Experts code review" },
-    "rc": { template: "Triggering oh-my-review-experts workflow...", description: "Alias for /review-code" },
-  }
-  const result = { added: [] as string[], skipped: [] as string[] }
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    const text = readFileSafe(configFile) ?? "{}\n"
-    const parsed = parseJsonc(text)
-    if (parsed === undefined || typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      throw new Error(`Invalid JSONC in ${configFile}: expected object`)
-    }
-    const root = parsed as Record<string, unknown>
-    const existingCommands = (root.command as Record<string, unknown>) ?? {}
-    let changed = false
-    let newText = text
-    for (const [cmd, def] of Object.entries(commandsToRegister)) {
-      if (existingCommands[cmd]) {
-        result.skipped.push(cmd)
-        continue
-      }
-      const edits = modify(newText, ["command", cmd], def, { formattingOptions: { insertSpaces: true, tabSize: 2 } })
-      newText = applyEdits(newText, edits)
-      result.added.push(cmd)
-      changed = true
-    }
-    if (!changed) return result
-    const tmpFile = `${configFile}.tmp.${Date.now()}.${attempt}`
-    try {
-      fs.writeFileSync(tmpFile, newText, "utf8")
-      fs.renameSync(tmpFile, configFile)
-      return result
-    } catch (err) {
-      try { fs.unlinkSync(tmpFile) } catch { }
-      if (attempt < maxRetries - 1) continue
-      throw new Error(`Failed to update ${configFile}: ${err instanceof Error ? err.message : String(err)}`)
-    }
-  }
-  return result
-}
-
 function getOpencodeConfigPath(global: boolean): string {
   return global
     ? path.join(os.homedir(), ".config", "opencode", "opencode.json")
