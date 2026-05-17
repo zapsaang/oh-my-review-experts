@@ -2,7 +2,13 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { checkOmrePermissions, checkOpencodeConfig } from "../../src/tools/doctor.js";
+import type { Config } from "@opencode-ai/plugin";
+import { checkAgentRegistration, checkOmrePermissions, checkOpencodeConfig } from "../../src/tools/doctor.js";
+import { AGENT_NAMES } from "../../src/agents/registry.js";
+import pluginModule from "../../src/index.js";
+import { clearLoadConfigCache } from "../../src/config/load-config.js";
+
+const OhMyReviewExperts = pluginModule.server;
 
 describe("checkOmrePermissions", () => {
   it("returns no warnings when omre_* is explicitly allowed", () => {
@@ -141,5 +147,54 @@ describe("checkOpencodeConfig", () => {
         expect(status.pluginRegistered).toBe(true);
       },
     );
+  });
+});
+
+describe("[step 18] checkAgentRegistration", () => {
+  function stubPluginInput(directory: string) {
+    return {
+      client: {
+        app: {
+          log: async () => undefined,
+        },
+      } as any,
+      project: {} as any,
+      directory,
+      worktree: directory,
+      experimental_workspace: { register: () => {} },
+      serverUrl: new URL("http://localhost"),
+      $: {} as any,
+    };
+  }
+
+  it("reports zero registered when config has no agent map", () => {
+    const result = checkAgentRegistration({} as Config);
+    expect(result.expected).toBe(11);
+    expect(result.registered).toBe(0);
+    expect([...result.missing].sort()).toEqual([...AGENT_NAMES].sort());
+  });
+
+  it("reports a partial registration when only one agent is present", () => {
+    const config = {
+      agent: {
+        "reviewer-spec": { mode: "subagent" },
+      },
+    } as unknown as Config;
+    const result = checkAgentRegistration(config);
+    expect(result.expected).toBe(11);
+    expect(result.registered).toBe(1);
+    expect(result.missing).not.toContain("reviewer-spec");
+    expect(result.missing.length).toBe(10);
+  });
+
+  it("reports 11/11 after the plugin's config hook runs on an empty config", async () => {
+    clearLoadConfigCache();
+    const hooks = await OhMyReviewExperts(stubPluginInput(process.cwd()));
+    const config = {} as Config;
+    await hooks.config!(config);
+    const result = checkAgentRegistration(config);
+    expect(result.expected).toBe(11);
+    expect(result.registered).toBe(11);
+    expect(result.missing).toEqual([]);
   });
 });

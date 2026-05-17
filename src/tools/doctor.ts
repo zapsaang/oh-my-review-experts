@@ -21,6 +21,8 @@
  */
 import fs from "node:fs";
 import { parse as parseJsonc } from "jsonc-parser";
+import type { Config } from "@opencode-ai/plugin";
+import { AGENT_NAMES } from "../agents/registry.js";
 
 const PLUGIN_NAME = "oh-my-review-experts";
 
@@ -104,4 +106,18 @@ export function checkOpencodeConfig(filePath: string): OpencodeConfigStatus {
   const pluginRegistered = (pluginArray as unknown[]).includes(PLUGIN_NAME);
   const permissionWarnings = checkOmrePermissions(parsed);
   return { exists: true, pluginRegistered, permissionWarnings };
+}
+
+export interface AgentRegistrationStatus {
+  registered: number;
+  expected: number;
+  missing: string[];
+}
+
+export function checkAgentRegistration(config: Config): AgentRegistrationStatus {
+  const expected = AGENT_NAMES.length;
+  const agentMap = (config.agent ?? {}) as Record<string, unknown>;
+  const missing = AGENT_NAMES.filter((name) => !agentMap[name]);
+  const registered = expected - missing.length;
+  return { registered, expected, missing: [...missing] };
 }

@@ -5,9 +5,11 @@ import path from "node:path"
 import { Command } from "commander"
 import pc from "picocolors"
 import { modify, parse as parseJsonc, applyEdits } from "jsonc-parser"
+import type { Config } from "@opencode-ai/plugin"
 import { defaultConfigJsonc, findConfigFiles, loadConfig } from "./config/load-config.js"
 import { renderLocalDryRun } from "./workflow/run-review-code.js"
-import { checkOmrePermissions, checkOpencodeConfig } from "./tools/doctor.js"
+import { checkAgentRegistration, checkOpencodeConfig } from "./tools/doctor.js"
+import { registerAgents } from "./agents/registry.js"
 import { VERSION } from "./version.js"
 
 const PLUGIN_NAME = "oh-my-review-experts"
@@ -251,6 +253,20 @@ program.command("doctor")
           } else {
             for (const w of globalWarnings) console.log(pc.yellow(`  ${globalConfig}: ${w}`))
           }
+        }
+      }
+
+      console.log("\nSubagent registration:")
+      const probeConfig: Config = {}
+      registerAgents(probeConfig, activeConfig)
+      const agentStatus = checkAgentRegistration(probeConfig)
+      const agentLine = `agents: ${agentStatus.registered}/${agentStatus.expected} registered`
+      if (agentStatus.registered === agentStatus.expected) {
+        console.log(pc.green(`  ${agentLine}`))
+      } else {
+        console.log(pc.yellow(`  ${agentLine}`))
+        if (agentStatus.missing.length > 0) {
+          console.log(pc.yellow(`  missing: ${agentStatus.missing.join(", ")}`))
         }
       }
     } catch (err) {
