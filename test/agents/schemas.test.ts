@@ -8,6 +8,7 @@ import {
   RESULT_VALIDATOR_JSON,
   REVIEWER_FINDING_JSON,
   REVIEWER_HANDOFF_JSON,
+  ResultValidatorSchema,
   SCHEMA_VERSION,
   SEVERITY_VALUES,
   SLICE_ARBITER_JSON,
@@ -547,5 +548,36 @@ describe("SlicePlanValidatorSchema", () => {
     expect(example).toHaveProperty("failure_reason");
     expect(example).toHaveProperty("retry_recommended");
     expect(example).toHaveProperty("normalized_result");
+  });
+});
+
+describe("ResultValidatorSchema", () => {
+  it("accepts the legacy example shape", () => {
+    const example = {
+      schema_version: "1",
+      status: "completed",
+      assigned_dimension: "spec",
+      slice_id: "",
+      is_valid: true,
+      failure_reason: "",
+      retry_recommended: false,
+    };
+    const result = ResultValidatorSchema.safeParse(example);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty input", () => {
+    expect(ResultValidatorSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("zodToExample renders all expected top-level keys", () => {
+    const example = zodToExample(ResultValidatorSchema) as Record<string, unknown>;
+    expect(example).toHaveProperty("schema_version");
+    expect(example).toHaveProperty("status");
+    expect(example).toHaveProperty("assigned_dimension");
+    expect(example).toHaveProperty("slice_id");
+    expect(example).toHaveProperty("is_valid");
+    expect(example).toHaveProperty("failure_reason");
+    expect(example).toHaveProperty("retry_recommended");
   });
 });

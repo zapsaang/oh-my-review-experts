@@ -267,6 +267,24 @@ export type SlicePlanValidator = z.infer<typeof SlicePlanValidatorSchema>;
 /** Expected JSON output for the review result validator. */
 export const RESULT_VALIDATOR_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","assigned_dimension":"spec","slice_id":"","is_valid":true,"failure_reason":"","retry_recommended":false}`;
 
+/**
+ * Review result validator output schema. `assigned_dimension` reuses the
+ * five reviewer dimensions; the validator confirms the reviewer addressed
+ * the dimension it was actually assigned.
+ */
+export const ResultValidatorSchema = z.looseObject({
+  schema_version: z.string().regex(SCHEMA_VERSION_PATTERN),
+  status: z.enum(["completed", "blocked"]).catch("blocked"),
+  assigned_dimension: z
+    .enum(["spec", "quality", "security", "performance", "concurrency"])
+    .catch("spec"),
+  slice_id: z.string(),
+  is_valid: z.boolean(),
+  failure_reason: z.string(),
+  retry_recommended: z.boolean(),
+});
+export type ResultValidator = z.infer<typeof ResultValidatorSchema>;
+
 /** Expected JSON output for the slice arbiter. */
 export const SLICE_ARBITER_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","slice_id":"slice-1","confirmed":[],"needs_validation":[],"rejected":[{"id":"finding-1","reason":"${REJECTION_REASON_VALUES.join("|")}"}],"degraded":false,"missing_dimensions":[]}`;
 
