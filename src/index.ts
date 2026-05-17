@@ -2,6 +2,7 @@ import type { Plugin, Hooks, Config, PluginModule } from "@opencode-ai/plugin"
 import { injectReviewCodePrompt } from "./hooks/command-injection.js"
 import { tools } from "./tools/plugin-tools.js"
 import { loadConfig } from "./config/load-config.js"
+import { registerAgents } from "./agents/registry.js"
 import { VERSION } from "./version.js"
 
 export { buildReviewCodePrompt, persistReport, renderLocalDryRun } from "./workflow/run-review-code.js"
@@ -92,8 +93,23 @@ const OhMyReviewExperts: Plugin = async (input) => {
             hookName: "config",
           })
         }
+
+        const omreConfig = loadConfig(input.directory, true)
+        const { registered: agentNames, skipped: agentSkipped } = registerAgents(config, omreConfig)
+        if (agentNames.length > 0) {
+          await log("info", "Subagents registered via config hook", {
+            agents: agentNames,
+            hookName: "config",
+          })
+        }
+        for (const name of agentSkipped) {
+          await log("info", "Subagent registration skipped (user override present)", {
+            agent: name,
+            hookName: "config",
+          })
+        }
       } catch (err) {
-        await log("error", "Failed to register commands", {
+        await log("error", "Failed to register commands or agents", {
           error: err instanceof Error ? err.message : String(err),
           hookName: "config",
         })
