@@ -3,6 +3,7 @@ import {
   CONCURRENCY_CLASSIFICATION_VALUES,
   CONFIDENCE_VALUES,
   GLOBAL_ARBITER_JSON,
+  GlobalArbiterSchema,
   PERFORMANCE_CLASSIFICATION_VALUES,
   REJECTION_REASON_VALUES,
   RESULT_VALIDATOR_JSON,
@@ -613,5 +614,38 @@ describe("SliceArbiterSchema", () => {
     expect(example).toHaveProperty("rejected");
     expect(example).toHaveProperty("degraded");
     expect(example).toHaveProperty("missing_dimensions");
+  });
+});
+
+describe("GlobalArbiterSchema", () => {
+  it("accepts the legacy example shape", () => {
+    const example = {
+      schema_version: "1",
+      status: "completed",
+      confirmed: [],
+      needs_validation: [],
+      rejected: [{ id: "finding-1", reason: "duplicate" }],
+      degraded_slices: [],
+      missing_dimensions_global: [],
+      summary: { total_slices: 0, total_confirmed: 0 },
+    };
+    const result = GlobalArbiterSchema.safeParse(example);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty input", () => {
+    expect(GlobalArbiterSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("zodToExample renders all expected top-level keys", () => {
+    const example = zodToExample(GlobalArbiterSchema) as Record<string, unknown>;
+    expect(example).toHaveProperty("schema_version");
+    expect(example).toHaveProperty("status");
+    expect(example).toHaveProperty("confirmed");
+    expect(example).toHaveProperty("needs_validation");
+    expect(example).toHaveProperty("rejected");
+    expect(example).toHaveProperty("degraded_slices");
+    expect(example).toHaveProperty("missing_dimensions_global");
+    expect(example).toHaveProperty("summary");
   });
 });

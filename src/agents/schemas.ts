@@ -312,3 +312,33 @@ export type SliceArbiter = z.infer<typeof SliceArbiterSchema>;
 
 /** Expected JSON output for the global arbiter. */
 export const GLOBAL_ARBITER_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","confirmed":[],"needs_validation":[],"rejected":[{"id":"finding-1","reason":"${REJECTION_REASON_VALUES.join("|")}"}],"degraded_slices":[],"missing_dimensions_global":[],"summary":{"total_slices":0,"total_confirmed":0}}`;
+
+/**
+ * Global arbiter output schema. Aggregates per-slice arbiter outputs and
+ * preserves degraded-slice metadata so the report writer can render the
+ * coverage warning section.
+ */
+export const GlobalArbiterSchema = z.looseObject({
+  schema_version: z.string().regex(SCHEMA_VERSION_PATTERN),
+  status: z.enum(["completed", "blocked"]).catch("blocked"),
+  confirmed: z.array(UnifiedFindingSchema),
+  needs_validation: z.array(UnifiedFindingSchema),
+  rejected: z.array(
+    z.object({
+      id: z.string(),
+      reason: z.enum(REJECTION_REASON_VALUES).catch("speculative"),
+    }),
+  ),
+  degraded_slices: z.array(
+    z.object({
+      slice_id: z.string(),
+      missing_dimensions: z.array(z.string()),
+    }),
+  ),
+  missing_dimensions_global: z.array(z.string()),
+  summary: z.object({
+    total_slices: z.number(),
+    total_confirmed: z.number(),
+  }),
+});
+export type GlobalArbiter = z.infer<typeof GlobalArbiterSchema>;
