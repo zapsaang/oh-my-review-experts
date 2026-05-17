@@ -197,6 +197,44 @@ describe("registry: tool-flag uniqueness", () => {
   });
 });
 
+describe("registry: coordinator chat-only output contract [L3 fix]", () => {
+  function coordinatorSlot(name: string): Record<string, unknown> {
+    const config = freshConfig();
+    registerAgents(config, freshOmreConfig());
+    return (config.agent as Record<string, unknown>)[name] as Record<string, unknown>;
+  }
+
+  const COORDINATOR_NAMES_FOR_CHAT = COORDINATOR_AGENTS
+    .filter((a) => a.name !== "report-writer")
+    .map((a) => a.name);
+
+  it.each(COORDINATOR_NAMES_FOR_CHAT)(
+    "%s prompt declares the chat-only contract (no fence, no outside-JSON prose)",
+    (name) => {
+      const prompt = String(coordinatorSlot(name).prompt ?? "");
+      expect(prompt, name).toContain("Output exactly one JSON object as your entire chat reply");
+      expect(prompt, name).toContain("Do not wrap in markdown fences");
+      expect(prompt, name).toContain("Do not emit any text outside the JSON");
+    },
+  );
+
+  it.each(COORDINATOR_NAMES_FOR_CHAT)(
+    "%s prompt explicitly tells the agent it has no write tool",
+    (name) => {
+      const prompt = String(coordinatorSlot(name).prompt ?? "");
+      const hasWriteTool = (COORDINATOR_AGENTS.find((a) => a.name === name)?.toolsAllow ?? [])
+        .some((t) => t === "omre_write_handoff" || t === "omre_write_report");
+      if (hasWriteTool) return;
+      expect(prompt, name).toMatch(/do not (call|use|invoke)\s+omre_write_handoff/i);
+    },
+  );
+
+  it("report-writer prompt does NOT declare chat-only (it persists via omre_write_report)", () => {
+    const prompt = String(coordinatorSlot("report-writer").prompt ?? "");
+    expect(prompt).not.toContain("Output exactly one JSON object as your entire chat reply");
+  });
+});
+
 describe("registry: behavioral guarantees", () => {
   it("[step 12] user override at config.agent[name] is preserved (skip-on-conflict)", () => {
     const userEntry = { prompt: "USER_OVERRIDE_MARKER" };

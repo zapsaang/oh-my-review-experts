@@ -308,50 +308,68 @@ export const COMPLETE_REVIEWER_PROMPTS: Record<ReviewDimensionType, string> = {
   concurrency: composePrompt("concurrency"),
 };
 
-export const SLICE_PLANNER_PROMPT = `${LEAF_COORDINATOR_GUARDRAIL}
+const COORDINATOR_CHAT_DIRECTIVE = `### Output channel (critical)
 
+Output exactly one JSON object as your entire chat reply.
+Do not wrap in markdown fences.
+Do not emit any text outside the JSON.
+You do not have any handoff write tool. Do not call omre_write_handoff. Do not call omre_write_report.`;
+
+function makeCoordinatorPrompt(role: string): string {
+  return `${CHAT_JSON_CONTRACT.trim()}
+
+${LEAF_COORDINATOR_GUARDRAIL}
+
+${role.trim()}
+
+${COORDINATOR_CHAT_DIRECTIVE}`;
+}
+
+export const SLICE_PLANNER_PROMPT = makeCoordinatorPrompt(`
 You are the diff slice planner.
 Do not review code. Partition a code change into coherent review slices.
 Prefer module/bounded-context boundaries and isolate high-risk files: migrations, API/schema contracts, dependency manifests, infra/deployment config.
 Allowed slice_type values: business-module, migration, api-contract, dependency-change, infra-change, shared-library, test-only, docs-only.
 Output JSON exactly:
 ${SLICE_PLANNER_JSON}
-Rules: use reason not reasoning; files must be string arrays; no prose outside JSON.`;
+Rules: use reason not reasoning; files must be string arrays; no prose outside JSON.
+`);
 
-export const SLICE_PLAN_VALIDATOR_PROMPT = `${LEAF_COORDINATOR_GUARDRAIL}
-
+export const SLICE_PLAN_VALIDATOR_PROMPT = makeCoordinatorPrompt(`
 You are the slice plan validator.
 Validate slice planner JSON. Do not review code.
 Valid iff status=completed, should_slice boolean, slicing_mode in none/module-based/risk-based/hybrid, reason string, slices array, every slice has slice_id, allowed slice_type, title, and files as non-empty string array.
-Return JSON: ${SLICE_PLAN_VALIDATOR_JSON}`;
+Return JSON: ${SLICE_PLAN_VALIDATOR_JSON}
+`);
 
-export const RESULT_VALIDATOR_PROMPT = `${LEAF_COORDINATOR_GUARDRAIL}
-
+export const RESULT_VALIDATOR_PROMPT = makeCoordinatorPrompt(`
 You are the review result validator.
 Validate reviewer JSON only. Do not review code.
 Valid iff status=completed, dimension matches assignment, target matches, findings is array, and no prose outside JSON.
-Return JSON: ${RESULT_VALIDATOR_JSON}`;
+Return JSON: ${RESULT_VALIDATOR_JSON}
+`);
 
-export const SLICE_ARBITER_PROMPT = `${LEAF_COORDINATOR_GUARDRAIL}
-
+export const SLICE_ARBITER_PROMPT = makeCoordinatorPrompt(`
 You are the slice arbiter.
 Validate and merge reviewer outputs for one slice. Deduplicate, reject weak/speculative findings, preserve dimensions, do not invent findings.
 Rejection reasons must be one of: ${REJECTION_REASON_VALUES.join(", ")}.
 Free-form rejection reasons are forbidden.
-Output JSON only: ${SLICE_ARBITER_JSON}`;
+Output JSON only: ${SLICE_ARBITER_JSON}
+`);
 
-export const GLOBAL_ARBITER_PROMPT = `${LEAF_COORDINATOR_GUARDRAIL}
-
+export const GLOBAL_ARBITER_PROMPT = makeCoordinatorPrompt(`
 You are the global arbiter.
 Consume slice arbiter outputs or whole-target reviewer outputs. Merge duplicates, preserve dimensions, separate confirmed from needs_validation and rejected. Do not recreate reviewer-level noise.
 Rejection reasons must be one of: ${REJECTION_REASON_VALUES.join(", ")}.
 Free-form rejection reasons are forbidden.
-Output JSON only: ${GLOBAL_ARBITER_JSON}`;
+Output JSON only: ${GLOBAL_ARBITER_JSON}
+`);
 
 export const REPORT_WRITER_PROMPT = `${LEAF_COORDINATOR_GUARDRAIL}
 
 You are the review-code report writer.
-Do not review code. Persist the provided final result exactly to the configured report paths. Do not invent findings.`;
+Do not review code. Persist the provided final result exactly to the configured report paths. Do not invent findings.
+You have one write tool, omre_write_report. Call it once with the final markdown and JSON. Do not call any other write tool.`;
 
 export function buildSubagentCatalog(): string {
   return `
