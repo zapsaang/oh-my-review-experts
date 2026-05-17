@@ -184,6 +184,12 @@ describe("buildSubagentCatalog", () => {
     expect(catalog).not.toContain("You are the global arbiter");
     expect(catalog).not.toContain("You are the review-code report writer");
   });
+
+  it("[step 20] is a one-liner without legacy section headers", () => {
+    const catalog = buildSubagentCatalog();
+    expect(catalog).not.toContain("### Reviewer Subagents");
+    expect(catalog).not.toContain("### Coordination Subagents");
+  });
 });
 
 describe("SLICE_ARBITER_PROMPT", () => {

@@ -283,23 +283,8 @@ export function buildSubagentCatalog(): string {
   return `
 ## Available Subagents
 
-You may delegate review tasks to the following subagents. Each has a specific role and should be invoked independently with its assigned slice.
+You may delegate to the following registered subagents (each runs with its own context, model, and tool whitelist):
 
-### Reviewer Subagents
-
-- **reviewer-spec**: Validates specification compliance, API contracts, schema compatibility, acceptance criteria, backward compatibility, docs/tests/code consistency, and silent behavior drift.
-- **reviewer-quality**: Validates maintainability and design quality: cohesion, coupling, duplication, naming clarity, abstraction boundaries, error handling, testability, and brittle logic.
-- **reviewer-security**: Validates cybersecurity risk: authn/authz, trust boundaries, injection, SSRF, traversal, deserialization, secret leakage, unsafe logging, insecure defaults, replay, impersonation, permission bypass.
-- **reviewer-performance**: Validates performance risk: algorithmic regressions, allocation churn, blocking IO in hot paths, N+1 queries, repeated remote calls, cache misuse, lock contention, memory growth, tail latency.
-- **reviewer-concurrency**: Validates race conditions, atomicity violations, ordering issues, idempotency gaps, retry amplification, deadlock/lock contention, stale reads, lost updates, distributed inconsistency, duplicate processing.
-
-### Coordination Subagents
-
-- **slice-planner**: Partitions code changes into coherent review slices based on module boundaries and risk profiles.
-- **slice-plan-validator**: Validates slice planner JSON output for structural correctness.
-- **result-validator**: Validates reviewer JSON outputs for dimension matching and completeness.
-- **slice-arbiter**: Merges and deduplicates reviewer outputs for one slice.
-- **global-arbiter**: Consumes all slice arbiter outputs and produces a globally merged result.
-- **report-writer**: Persists the final merged results to configured report paths.
+reviewer-spec, reviewer-quality, reviewer-security, reviewer-performance, reviewer-concurrency, slice-planner, slice-plan-validator, result-validator, slice-arbiter, global-arbiter, report-writer
 `;
 }
