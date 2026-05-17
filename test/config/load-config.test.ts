@@ -187,11 +187,16 @@ describe("defaultConfigJsonc", () => {
     expect(jsonc).toContain('"$schema"');
   });
 
-  it("matches DEFAULT_CONFIG values", () => {
+  it("matches DEFAULT_CONFIG values, except for the deprecated models.orchestrator which is intentionally omitted from the scaffold", () => {
     const jsonc = defaultConfigJsonc();
     const parsed = JSON.parse(jsonc);
     const { $schema: _, ...configForComparison } = parsed;
-    expect(configForComparison).toEqual(DEFAULT_CONFIG);
+    const { models: scaffoldModels, ...scaffoldRest } = configForComparison;
+    const { models: defaultModels, ...defaultRest } = DEFAULT_CONFIG;
+    const { orchestrator: _orchestrator, ...activeDefaultModels } = defaultModels;
+    expect(scaffoldModels).toEqual(activeDefaultModels);
+    expect(scaffoldRest).toEqual(defaultRest);
+    expect(scaffoldModels).not.toHaveProperty("orchestrator");
   });
 
   it("is idempotent", () => {

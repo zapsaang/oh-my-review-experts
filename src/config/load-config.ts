@@ -165,11 +165,15 @@ export function loadConfig(cwd = process.cwd(), trusted = false): OmreConfig {
 
 export function defaultConfigJsonc(): string {
   const defaults = OmreConfigSchema.parse({});
+  // models.orchestrator is deprecated (no consumer; orchestrator runs as the
+  // user's primary agent). Omit it from the scaffold so fresh configs do not
+  // advertise an inactive field. Existing configs with the field still parse.
+  const { orchestrator: _orchestrator, ...activeModels } = defaults.models;
   const config = {
     $schema: "https://raw.githubusercontent.com/zapsaang/oh-my-review-experts/main/schemas/oh-my-review-experts.schema.json",
     enabled: defaults.enabled,
     command: defaults.command,
-    models: defaults.models,
+    models: activeModels,
     slicing: defaults.slicing,
     partialRerun: defaults.partialRerun,
     costGuardrail: defaults.costGuardrail,
