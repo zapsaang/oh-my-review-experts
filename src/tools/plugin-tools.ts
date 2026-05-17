@@ -107,7 +107,8 @@ export const tools = {
   }),
 
   omre_write_handoff: tool({
-    description: "Write a reviewer handoff file to the configured handoff directory",
+    description:
+      "Write a reviewer handoff file to the configured handoff directory. Returns { ok: true, filePath } on success, { ok: false, errors: string[] } on failure (no throws).",
     args: {
       payload: z.object({
         schema_version: z.string().optional(),
@@ -128,26 +129,31 @@ export const tools = {
       runId: z.string().optional(),
     },
     async execute(input, context) {
-      const { cwd, trusted } = resolveCwd(input.cwd, context.directory);
-      const config = loadConfig(cwd, trusted);
-      const p = input.payload;
-      const payload: HandoffPayload = {
-        schemaVersion: p.schema_version,
-        taskId: p.task_id,
-        agent: p.agent,
-        dimension: p.dimension,
-        scope: p.scope,
-        status: p.status,
-        target: p.target,
-        sliceId: p.slice_id,
-        filesInspected: p.files_inspected,
-        findings: p.findings,
-        suggestedFixes: p.suggested_fixes,
-        openQuestions: p.open_questions,
-        notesForPrimary: p.notes_for_primary,
-      };
-      const filePath = writeHandoff(config, payload, cwd, input.runId);
-      return JSON.stringify({ filePath });
+      try {
+        const { cwd, trusted } = resolveCwd(input.cwd, context.directory);
+        const config = loadConfig(cwd, trusted);
+        const p = input.payload;
+        const payload: HandoffPayload = {
+          schemaVersion: p.schema_version,
+          taskId: p.task_id,
+          agent: p.agent,
+          dimension: p.dimension,
+          scope: p.scope,
+          status: p.status,
+          target: p.target,
+          sliceId: p.slice_id,
+          filesInspected: p.files_inspected,
+          findings: p.findings,
+          suggestedFixes: p.suggested_fixes,
+          openQuestions: p.open_questions,
+          notesForPrimary: p.notes_for_primary,
+        };
+        const filePath = writeHandoff(config, payload, cwd, input.runId);
+        return JSON.stringify({ ok: true, filePath });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        return JSON.stringify({ ok: false, errors: [message] });
+      }
     },
   }),
 

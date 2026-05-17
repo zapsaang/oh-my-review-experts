@@ -34,6 +34,101 @@ function parseToolArgs<T extends z.ZodRawShape>(
   return parsed.data;
 }
 
+describe("omre_write_handoff result shape [L4 fix]", () => {
+  it("returns { ok: true, filePath } on success", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-ok-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".omre", "config.json"),
+        JSON.stringify({ handoff: { enabled: true, directory: ".omre/handoffs" } }),
+        "utf8",
+      );
+
+      const payload = {
+        agent: "spec",
+        dimension: "spec",
+        status: "completed" as const,
+        findings: [],
+      };
+
+      const input = parseToolArgs(tools.omre_write_handoff, { payload });
+      const result = await tools.omre_write_handoff.execute(input, mockContext(tmpDir));
+      const parsed = JSON.parse(result as string);
+
+      expect(parsed.ok).toBe(true);
+      expect(typeof parsed.filePath).toBe("string");
+      expect(parsed.filePath).toContain(".omre/handoffs");
+      expect(parsed.errors).toBeUndefined();
+      expect(fs.existsSync(parsed.filePath)).toBe(true);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns { ok: false, errors } when handoff is disabled (no throw)", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-disabled-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".omre", "config.json"),
+        JSON.stringify({ handoff: { enabled: false, directory: ".omre/handoffs" } }),
+        "utf8",
+      );
+
+      const payload = {
+        agent: "spec",
+        dimension: "spec",
+        status: "completed" as const,
+        findings: [],
+      };
+
+      const input = parseToolArgs(tools.omre_write_handoff, { payload });
+      const result = await tools.omre_write_handoff.execute(input, mockContext(tmpDir));
+      const parsed = JSON.parse(result as string);
+
+      expect(parsed.ok).toBe(false);
+      expect(Array.isArray(parsed.errors)).toBe(true);
+      expect(parsed.errors.length).toBeGreaterThan(0);
+      expect(parsed.errors.join(" ")).toMatch(/disabled/i);
+      expect(parsed.filePath).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns { ok: false, errors } on rejected handoff directory (no throw)", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-traversal-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".omre", "config.json"),
+        JSON.stringify({ handoff: { enabled: true, directory: "../../../etc" } }),
+        "utf8",
+      );
+
+      const payload = {
+        agent: "spec",
+        dimension: "spec",
+        status: "completed" as const,
+        findings: [],
+      };
+
+      const input = parseToolArgs(tools.omre_write_handoff, { payload });
+      const result = await tools.omre_write_handoff.execute(input, mockContext(tmpDir));
+      const parsed = JSON.parse(result as string);
+
+      expect(parsed.ok).toBe(false);
+      expect(Array.isArray(parsed.errors)).toBe(true);
+      expect(parsed.errors.length).toBeGreaterThan(0);
+      expect(parsed.errors.join(" ")).toMatch(/handoff\.directory|path traversal/i);
+      expect(parsed.filePath).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("plugin tools", () => {
   it("exports required tools", () => {
     expect(tools.omre_build_review_code_prompt).toBeDefined();
@@ -130,6 +225,7 @@ describe("plugin tools", () => {
       const input = parseToolArgs(tools.omre_write_handoff, { payload });
       const result = await tools.omre_write_handoff.execute(input, mockContext(tmpDir));
       const parsed = JSON.parse(result as string);
+      expect(parsed.ok).toBe(true);
       expect(parsed.filePath).toContain(".omre/handoffs");
       expect(fs.existsSync(parsed.filePath)).toBe(true);
     } finally {
@@ -205,6 +301,7 @@ describe("plugin tools", () => {
       const input = parseToolArgs(tools.omre_write_handoff, { payload });
       const result = await tools.omre_write_handoff.execute(input, mockContext(tmpDir));
       const parsed = JSON.parse(result as string);
+      expect(parsed.ok).toBe(true);
       expect(parsed.filePath).toContain(".omre/handoffs");
       expect(fs.existsSync(parsed.filePath)).toBe(true);
 
@@ -246,6 +343,7 @@ describe("plugin tools", () => {
       const writeInput = parseToolArgs(tools.omre_write_handoff, { payload });
       const writeResult = await tools.omre_write_handoff.execute(writeInput, mockContext(tmpDir));
       const writeParsed = JSON.parse(writeResult as string);
+      expect(writeParsed.ok).toBe(true);
       const handoffPath = writeParsed.filePath;
       expect(fs.existsSync(handoffPath)).toBe(true);
 
