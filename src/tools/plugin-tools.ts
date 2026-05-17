@@ -112,10 +112,7 @@ export const tools = {
     args: {
       payload: z.object({
         schema_version: z.string().optional(),
-        task_id: z
-          .string()
-          .refine((v) => v.length > 0, "task_id, when provided, must be non-empty")
-          .optional(),
+        task_id: z.string().optional(),
         agent: z.string(),
         dimension: z.string(),
         scope: z.string().optional(),
@@ -134,6 +131,9 @@ export const tools = {
     async execute(input, context) {
       try {
         const { cwd, trusted } = resolveCwd(input.cwd, context.directory);
+        if (input.payload.task_id !== undefined && input.payload.task_id.length === 0) {
+          return JSON.stringify({ ok: false, errors: ["task_id, when provided, must be non-empty"] });
+        }
         const config = loadConfig(cwd, trusted);
         const p = input.payload;
         const payload: HandoffPayload = {

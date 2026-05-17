@@ -151,14 +151,9 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
         },
       };
 
-      let parsed: { ok: boolean; errors?: unknown; filePath?: unknown };
-      try {
-        const input = parseToolArgs(tools.omre_write_handoff, rawInput);
-        const result = await tools.omre_write_handoff.execute(input, mockContext(tmpDir));
-        parsed = JSON.parse(result as string);
-      } catch (e) {
-        parsed = { ok: false, errors: [e instanceof Error ? e.message : String(e)] };
-      }
+      const input = parseToolArgs(tools.omre_write_handoff, rawInput);
+      const result = await tools.omre_write_handoff.execute(input, mockContext(tmpDir));
+      const parsed: { ok: boolean; errors?: unknown; filePath?: unknown } = JSON.parse(result as string);
 
       expect(parsed.ok).toBe(false);
       expect(Array.isArray(parsed.errors)).toBe(true);
