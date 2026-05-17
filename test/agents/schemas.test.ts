@@ -13,6 +13,8 @@ import {
   SLICE_ARBITER_JSON,
   SLICE_PLANNER_JSON,
   SLICE_PLAN_VALIDATOR_JSON,
+  SLICE_TYPE_VALUES,
+  SlicePlannerSchema,
   UnifiedFindingSchema,
   UnifiedHandoffSchema,
   NormalizedUnifiedHandoffSchema,
@@ -478,5 +480,42 @@ describe("zodToExample", () => {
       confidence: "high|medium|low",
       classification: "string",
     });
+  });
+});
+
+describe("SlicePlannerSchema", () => {
+  it("accepts the legacy example shape", () => {
+    const example = {
+      schema_version: "1",
+      status: "completed",
+      slicing_mode: "module-based",
+      should_slice: true,
+      reason: "split by module",
+      slices: [
+        {
+          slice_id: "slice-1",
+          slice_type: "business-module",
+          title: "Auth module",
+          files: ["src/auth.ts"],
+        },
+      ],
+    };
+    const result = SlicePlannerSchema.safeParse(example);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty input", () => {
+    expect(SlicePlannerSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("zodToExample renders all expected top-level keys", () => {
+    const example = zodToExample(SlicePlannerSchema) as Record<string, unknown>;
+    expect(example).toHaveProperty("schema_version");
+    expect(example).toHaveProperty("status");
+    expect(example).toHaveProperty("slicing_mode");
+    expect(example).toHaveProperty("should_slice");
+    expect(example).toHaveProperty("reason");
+    expect(example).toHaveProperty("slices");
+    expect(Array.isArray(example.slices)).toBe(true);
   });
 });

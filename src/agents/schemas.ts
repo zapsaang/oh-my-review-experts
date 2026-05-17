@@ -62,6 +62,23 @@ export const REJECTION_REASON_VALUES = [
 export type RejectionReason = (typeof REJECTION_REASON_VALUES)[number];
 
 /**
+ * Allowed `slice_type` values for the slice planner output. Mirrors the
+ * vocabulary documented in the slice planner prompt; both call sites must
+ * stay in sync.
+ */
+export const SLICE_TYPE_VALUES = [
+  "business-module",
+  "migration",
+  "api-contract",
+  "dependency-change",
+  "infra-change",
+  "shared-library",
+  "test-only",
+  "docs-only",
+] as const;
+export type SliceType = (typeof SLICE_TYPE_VALUES)[number];
+
+/**
  * Single source of truth for finding shape. Used by both write side
  * (omre_write_handoff input schema) and read side (handoff validator).
  *
@@ -207,6 +224,27 @@ export const SLICE_PLANNER_JSON = `{
   "reason": "short explanation",
   "slices": [{ "slice_id": "slice-1", "slice_type": "business-module", "title": "...", "files": ["path"] }]
 }`;
+
+/**
+ * Slice planner output schema. Field order mirrors the legacy
+ * `SLICE_PLANNER_JSON` template so prompt rendering stays byte-stable.
+ */
+export const SlicePlannerSchema = z.looseObject({
+  schema_version: z.string().regex(SCHEMA_VERSION_PATTERN),
+  status: z.enum(["completed", "blocked"]).catch("blocked"),
+  slicing_mode: z.enum(["none", "module-based", "risk-based", "hybrid"]).catch("none"),
+  should_slice: z.boolean(),
+  reason: z.string(),
+  slices: z.array(
+    z.looseObject({
+      slice_id: z.string(),
+      slice_type: z.enum(SLICE_TYPE_VALUES).catch("business-module"),
+      title: z.string(),
+      files: z.array(z.string()),
+    }),
+  ),
+});
+export type SlicePlanner = z.infer<typeof SlicePlannerSchema>;
 
 /** Expected JSON output for the slice plan validator. */
 export const SLICE_PLAN_VALIDATOR_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","is_valid":true,"failure_reason":"","retry_recommended":false,"normalized_result":null}`;
