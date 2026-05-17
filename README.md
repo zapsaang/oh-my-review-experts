@@ -142,7 +142,6 @@ Full schema:
     "injection": "both"
   },
   "models": {
-    "orchestrator":   "minimax-cn/MiniMax-M2.7",
     "spec":           "minimax-cn/MiniMax-M2.7",
     "quality":        "minimax-cn/MiniMax-M2.7",
     "security":       "minimax-cn/MiniMax-M2.7",
