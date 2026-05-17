@@ -61,3 +61,120 @@ describe("registry: registerAgents", () => {
     expect(result.skipped).toEqual([]);
   });
 });
+
+describe.each(AGENT_NAMES)("registry: agent %s shape", (name) => {
+  function registeredSlot(): Record<string, unknown> {
+    const config = freshConfig();
+    registerAgents(config, freshOmreConfig());
+    const slot = (config.agent as Record<string, unknown>)[name];
+    expect(slot).toBeDefined();
+    return slot as Record<string, unknown>;
+  }
+
+  it("[step 3] mode === 'subagent'", () => {
+    expect(registeredSlot().mode).toBe("subagent");
+  });
+
+  it("[step 4] hidden === false && disable === false", () => {
+    const slot = registeredSlot();
+    expect(slot.hidden).toBe(false);
+    expect(slot.disable).toBe(false);
+  });
+
+  it("[step 5] model === omreConfig.models[modelKey]", () => {
+    const omre = freshOmreConfig();
+    omre.models.spec = "test-model-spec";
+    omre.models.quality = "test-model-quality";
+    omre.models.security = "test-model-security";
+    omre.models.performance = "test-model-performance";
+    omre.models.concurrency = "test-model-concurrency";
+    omre.models.slicePlanner = "test-model-slicePlanner";
+    omre.models.validator = "test-model-validator";
+    omre.models.sliceArbiter = "test-model-sliceArbiter";
+    omre.models.globalArbiter = "test-model-globalArbiter";
+    omre.models.reportWriter = "test-model-reportWriter";
+
+    const config = freshConfig();
+    registerAgents(config, omre);
+    const entry = ALL_AGENTS.find((a) => a.name === name);
+    expect(entry).toBeDefined();
+    const slot = (config.agent as Record<string, unknown>)[name] as Record<string, unknown>;
+    expect(slot.model).toBe(omre.models[entry!.modelKey]);
+  });
+
+  it("[step 7] prompt does not contain a runId timestamp", () => {
+    const slot = registeredSlot();
+    const prompt = String(slot.prompt ?? "");
+    expect(prompt).not.toMatch(/\d{8}-\d{6}-\d{3}/);
+  });
+
+  it("[step 11] permission denies edit, bash, webfetch, websearch, doom_loop, external_directory", () => {
+    const slot = registeredSlot();
+    const permission = slot.permission as Record<string, string>;
+    expect(permission.edit).toBe("deny");
+    expect(permission.bash).toBe("deny");
+    expect(permission.webfetch).toBe("deny");
+    expect(permission.websearch).toBe("deny");
+    expect(permission.doom_loop).toBe("deny");
+    expect(permission.external_directory).toBe("deny");
+  });
+});
+
+describe.each(REVIEWER_NAMES)("registry: reviewer %s prompt + tools", (name) => {
+  function reviewerSlot(): Record<string, unknown> {
+    const config = freshConfig();
+    registerAgents(config, freshOmreConfig());
+    return (config.agent as Record<string, unknown>)[name] as Record<string, unknown>;
+  }
+
+  it("[step 6] prompt contains the CONTRACT signature", () => {
+    const prompt = String(reviewerSlot().prompt ?? "");
+    expect(prompt).toContain("Output strict JSON only when asked");
+  });
+
+  it("[step 8] tools deny baseline (task, skill, edit, write, bash, webfetch, todowrite, websearch)", () => {
+    const slot = reviewerSlot();
+    const tools = slot.tools as Record<string, boolean>;
+    expect(tools.task).toBe(false);
+    expect(tools.skill).toBe(false);
+    expect(tools.edit).toBe(false);
+    expect(tools.write).toBe(false);
+    expect(tools.bash).toBe(false);
+    expect(tools.webfetch).toBe(false);
+    expect(tools.todowrite).toBe(false);
+    expect(tools.websearch).toBe(false);
+  });
+});
+
+describe("registry: tool-flag uniqueness", () => {
+  function allSlots(): Array<{ name: string; tools: Record<string, boolean> }> {
+    const config = freshConfig();
+    registerAgents(config, freshOmreConfig());
+    return ALL_AGENTS.map((a) => ({
+      name: a.name,
+      tools: ((config.agent as Record<string, unknown>)[a.name] as Record<string, unknown>).tools as Record<string, boolean>,
+    }));
+  }
+
+  it("[step 9] only report-writer has omre_write_report === true", () => {
+    const slots = allSlots();
+    const writers = slots.filter((s) => s.tools.omre_write_report === true).map((s) => s.name);
+    expect(writers).toEqual(["report-writer"]);
+    for (const s of slots) {
+      if (s.name !== "report-writer") {
+        expect(s.tools.omre_write_report ?? false).toBe(false);
+      }
+    }
+  });
+
+  it("[step 10] only the 5 reviewers have omre_write_handoff === true", () => {
+    const slots = allSlots();
+    const writers = slots.filter((s) => s.tools.omre_write_handoff === true).map((s) => s.name).sort();
+    expect(writers).toEqual([...REVIEWER_NAMES].sort());
+    for (const s of slots) {
+      if (!REVIEWER_NAMES.includes(s.name)) {
+        expect(s.tools.omre_write_handoff ?? false).toBe(false);
+      }
+    }
+  });
+});
