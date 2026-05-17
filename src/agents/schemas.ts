@@ -288,5 +288,27 @@ export type ResultValidator = z.infer<typeof ResultValidatorSchema>;
 /** Expected JSON output for the slice arbiter. */
 export const SLICE_ARBITER_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","slice_id":"slice-1","confirmed":[],"needs_validation":[],"rejected":[{"id":"finding-1","reason":"${REJECTION_REASON_VALUES.join("|")}"}],"degraded":false,"missing_dimensions":[]}`;
 
+/**
+ * Slice arbiter output schema. confirmed/needs_validation reuse
+ * UnifiedFindingSchema; rejection reasons are constrained to
+ * REJECTION_REASON_VALUES with a soft-default to "speculative".
+ */
+export const SliceArbiterSchema = z.looseObject({
+  schema_version: z.string().regex(SCHEMA_VERSION_PATTERN),
+  status: z.enum(["completed", "blocked"]).catch("blocked"),
+  slice_id: z.string(),
+  confirmed: z.array(UnifiedFindingSchema),
+  needs_validation: z.array(UnifiedFindingSchema),
+  rejected: z.array(
+    z.object({
+      id: z.string(),
+      reason: z.enum(REJECTION_REASON_VALUES).catch("speculative"),
+    }),
+  ),
+  degraded: z.boolean(),
+  missing_dimensions: z.array(z.string()),
+});
+export type SliceArbiter = z.infer<typeof SliceArbiterSchema>;
+
 /** Expected JSON output for the global arbiter. */
 export const GLOBAL_ARBITER_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","confirmed":[],"needs_validation":[],"rejected":[{"id":"finding-1","reason":"${REJECTION_REASON_VALUES.join("|")}"}],"degraded_slices":[],"missing_dimensions_global":[],"summary":{"total_slices":0,"total_confirmed":0}}`;

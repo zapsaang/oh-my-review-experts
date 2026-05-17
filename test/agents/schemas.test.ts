@@ -15,6 +15,7 @@ import {
   SLICE_PLANNER_JSON,
   SLICE_PLAN_VALIDATOR_JSON,
   SLICE_TYPE_VALUES,
+  SliceArbiterSchema,
   SlicePlanValidatorSchema,
   SlicePlannerSchema,
   UnifiedFindingSchema,
@@ -579,5 +580,38 @@ describe("ResultValidatorSchema", () => {
     expect(example).toHaveProperty("is_valid");
     expect(example).toHaveProperty("failure_reason");
     expect(example).toHaveProperty("retry_recommended");
+  });
+});
+
+describe("SliceArbiterSchema", () => {
+  it("accepts the legacy example shape", () => {
+    const example = {
+      schema_version: "1",
+      status: "completed",
+      slice_id: "slice-1",
+      confirmed: [],
+      needs_validation: [],
+      rejected: [{ id: "finding-1", reason: "duplicate" }],
+      degraded: false,
+      missing_dimensions: [],
+    };
+    const result = SliceArbiterSchema.safeParse(example);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty input", () => {
+    expect(SliceArbiterSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("zodToExample renders all expected top-level keys", () => {
+    const example = zodToExample(SliceArbiterSchema) as Record<string, unknown>;
+    expect(example).toHaveProperty("schema_version");
+    expect(example).toHaveProperty("status");
+    expect(example).toHaveProperty("slice_id");
+    expect(example).toHaveProperty("confirmed");
+    expect(example).toHaveProperty("needs_validation");
+    expect(example).toHaveProperty("rejected");
+    expect(example).toHaveProperty("degraded");
+    expect(example).toHaveProperty("missing_dimensions");
   });
 });
