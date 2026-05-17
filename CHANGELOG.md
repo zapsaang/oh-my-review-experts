@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] — 2026-05-17
+
+### Fixed
+
+- Orchestrator handoff validation now checks `isValid === true`, matching the actual `omre_validate_handoff` camelCase response field.
+- `omre_write_handoff` now surfaces explicitly-empty `task_id` as an execute-time `{ ok: false, errors: [...] }` result instead of relying on a parse-time Zod refinement that bypassed the tool's no-throw contract.
+- Reviewer prompt instructions now tell subagents to pass the active top-level `runId` to `omre_write_handoff`, keeping handoffs scoped under `.omre/handoffs/{runId}/`.
+
+### Changed
+
+- Slice-type prompt prose is now derived from `SLICE_TYPE_VALUES`, removing the duplicated hand-written allowlist.
+- Orchestrator prompt documentation now names the `taskId` success-response field returned by `omre_write_handoff`.
+- Changelog history now restores the missing `0.1.2` heading and marks the `writeHandoff()` return-shape break as a public root-export change.
+- Reformatted the `writeHandoff()` test callsites left rough by the ast-grep migration. Total test count is now 544 (was 540 in 0.1.4).
+
 ## [0.1.4] — 2026-05-17
 
 ### Changed (BREAKING)
