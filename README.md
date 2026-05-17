@@ -84,6 +84,10 @@ Preview the generated prompt without calling any model:
 
 ## How it works
 
+Plugin loaded[^0] → command.execute.before hook intercepts → … → report persisted.
+
+[^0]: Plugin boot: `config` hook registers `/review-code` command and 11 subagents (5 reviewers + 6 coordinators) into `config.agent`; the subagent registration is consumed by OpenCode's agent picker. No command markdown files written.
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. User runs /review-code in OpenCode                       │
