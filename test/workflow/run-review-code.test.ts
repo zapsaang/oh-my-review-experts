@@ -61,9 +61,12 @@ describe("buildReviewCodePrompt", () => {
   });
 
   it("[L4 fix] orchestrator prompt describes the {ok, errors} contract for omre_write_handoff", () => {
-    const bundle = buildReviewCodePrompt({ args: "", cwd: process.cwd() });
-    expect(bundle.prompt).toMatch(/omre_write_handoff/);
-    expect(bundle.prompt).toMatch(/ok.*?(true|false)/);
+    withCleanGitRepo((cwd) => {
+      const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      expect(bundle.prompt).toMatch(/omre_write_handoff/);
+      expect(bundle.prompt).toMatch(/ok.*?(true|false)/);
+      expect(bundle.prompt).toContain("taskId");
+    });
   });
 
   it("includes report writer input rule", () => {
