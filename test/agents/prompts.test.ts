@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   CONTRACT,
+  CHAT_JSON_CONTRACT,
+  FILE_HANDOFF_CONTRACT,
   REVIEWER_PROMPTS,
   COMPLETE_REVIEWER_PROMPTS,
   SLICE_ARBITER_PROMPT,
@@ -12,12 +14,38 @@ import {
 } from "../../src/agents/prompts.js";
 import type { ReviewDimensionType } from "../../src/config/schema.js";
 
-describe("CONTRACT", () => {
-  it("contains expected rules", () => {
-    expect(CONTRACT).toContain("Output strict JSON only when asked for machine-readable results");
-    expect(CONTRACT).toContain("Do not wrap JSON in markdown fences");
-    expect(CONTRACT).toContain("Never fabricate issues");
-    expect(CONTRACT).toContain("evidence-backed");
+describe("CHAT_JSON_CONTRACT (coordinator-facing, chat-only)", () => {
+  it("contains the strict-JSON base rules", () => {
+    expect(CHAT_JSON_CONTRACT).toContain("Output strict JSON only when asked for machine-readable results");
+    expect(CHAT_JSON_CONTRACT).toContain("Never fabricate issues");
+    expect(CHAT_JSON_CONTRACT).toContain("evidence-backed");
+  });
+
+  it("forbids markdown fences and outside-JSON prose", () => {
+    expect(CHAT_JSON_CONTRACT).toContain("Do not wrap JSON in markdown fences");
+    expect(CHAT_JSON_CONTRACT).toContain("Do not emit commentary outside JSON");
+  });
+});
+
+describe("FILE_HANDOFF_CONTRACT (reviewer-facing, file-primary)", () => {
+  it("contains the strict-JSON base rules", () => {
+    expect(FILE_HANDOFF_CONTRACT).toContain("Output strict JSON only when asked for machine-readable results");
+    expect(FILE_HANDOFF_CONTRACT).toContain("Never fabricate issues");
+    expect(FILE_HANDOFF_CONTRACT).toContain("evidence-backed");
+  });
+
+  it("[L1 fix] does NOT forbid markdown fences (the handoff file requires one)", () => {
+    expect(FILE_HANDOFF_CONTRACT).not.toMatch(/Do not wrap JSON in markdown fences/);
+  });
+
+  it("[L1 fix] does NOT forbid outside-JSON prose (the handoff file has a Markdown body and a chat receipt)", () => {
+    expect(FILE_HANDOFF_CONTRACT).not.toMatch(/Do not emit commentary outside JSON/);
+  });
+});
+
+describe("CONTRACT (deprecated alias kept for back-compat)", () => {
+  it("aliases FILE_HANDOFF_CONTRACT (reviewers were the only consumer)", () => {
+    expect(CONTRACT).toBe(FILE_HANDOFF_CONTRACT);
   });
 });
 
@@ -63,11 +91,11 @@ describe("REVIEWER_PROMPTS", () => {
 });
 
 describe("composePrompt", () => {
-  it("prepends CONTRACT to each dimension prompt", () => {
+  it("prepends FILE_HANDOFF_CONTRACT to each dimension prompt", () => {
     const dimensions: ReviewDimensionType[] = ["spec", "quality", "security", "performance", "concurrency"];
     for (const dimension of dimensions) {
       const composed = composePrompt(dimension);
-      expect(composed.startsWith(CONTRACT.trim()), `dimension ${dimension} should start with CONTRACT`).toBe(true);
+      expect(composed.startsWith(FILE_HANDOFF_CONTRACT.trim()), `dimension ${dimension} should start with FILE_HANDOFF_CONTRACT`).toBe(true);
       expect(composed).toContain(REVIEWER_PROMPTS[dimension]);
     }
   });
@@ -88,9 +116,21 @@ describe("COMPLETE_REVIEWER_PROMPTS", () => {
     }
   });
 
-  it("each prompt starts with CONTRACT", () => {
+  it("each prompt starts with FILE_HANDOFF_CONTRACT (reviewers write file with json fence)", () => {
     for (const [dimension, prompt] of Object.entries(COMPLETE_REVIEWER_PROMPTS)) {
-      expect(prompt.startsWith(CONTRACT.trim()), `dimension ${dimension} should start with CONTRACT`).toBe(true);
+      expect(prompt.startsWith(FILE_HANDOFF_CONTRACT.trim()), `dimension ${dimension} should start with FILE_HANDOFF_CONTRACT`).toBe(true);
+    }
+  });
+
+  it("[L1 fix] no reviewer prompt forbids markdown fences", () => {
+    for (const [dim, p] of Object.entries(COMPLETE_REVIEWER_PROMPTS)) {
+      expect(p, `dimension=${dim}`).not.toMatch(/Do not wrap JSON in markdown fences/);
+    }
+  });
+
+  it("[L1 fix] no reviewer prompt forbids outside-JSON prose", () => {
+    for (const [dim, p] of Object.entries(COMPLETE_REVIEWER_PROMPTS)) {
+      expect(p, `dimension=${dim}`).not.toMatch(/Do not emit commentary outside JSON/);
     }
   });
 

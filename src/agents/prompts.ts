@@ -14,14 +14,44 @@ import {
   SLICE_PLAN_VALIDATOR_JSON,
 } from "./schemas.js";
 
-export const CONTRACT = `
+/**
+ * Base rules every JSON-emitting subagent must follow, regardless of channel.
+ * Channel-specific rules (chat-only vs file-primary) live in CHAT_JSON_CONTRACT
+ * and FILE_HANDOFF_CONTRACT below.
+ */
+const BASE_JSON_RULES = `
 Output strict JSON only when asked for machine-readable results.
-Do not wrap JSON in markdown fences.
-Do not emit commentary outside JSON.
 If no findings exist, return an empty findings list.
 Never fabricate issues.
 Every finding must be evidence-backed and anchored to file:line when possible.
 `;
+
+/**
+ * Coordinator-facing contract: bare JSON in chat, no markdown fences, no prose.
+ * Used by slice-planner / slice-plan-validator / result-validator / slice-arbiter
+ * / global-arbiter — agents that emit transient intermediate computations the
+ * orchestrator consumes once in the same turn.
+ */
+export const CHAT_JSON_CONTRACT = `${BASE_JSON_RULES.trim()}
+Do not wrap JSON in markdown fences.
+Do not emit commentary outside JSON.
+`;
+
+/**
+ * Reviewer-facing contract: persistent artifact via omre_write_handoff. The
+ * handoff file requires a markdown ```json fence + Markdown body, and the chat
+ * reply is a small fixed receipt. Therefore "no fences" and "no outside-JSON
+ * prose" do NOT apply — those rules belong to CHAT_JSON_CONTRACT only.
+ */
+export const FILE_HANDOFF_CONTRACT = `${BASE_JSON_RULES.trim()}
+`;
+
+/**
+ * @deprecated Use CHAT_JSON_CONTRACT (coordinators) or FILE_HANDOFF_CONTRACT
+ * (reviewers) explicitly. Kept as an alias of FILE_HANDOFF_CONTRACT because
+ * reviewers were CONTRACT's only direct consumer prior to this split.
+ */
+export const CONTRACT = FILE_HANDOFF_CONTRACT;
 
 export const LEAF_GUARDRAIL = `You are a leaf reviewer. Do not invoke the task tool. Do not invoke the skill tool. Do not delegate to any subagent. Your output must be a single handoff file per the handoff protocol, followed by the short chat reply specified by that protocol.`;
 
