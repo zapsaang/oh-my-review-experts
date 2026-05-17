@@ -33,4 +33,31 @@ describe("registry: registerAgents", () => {
     expect(Array.isArray(result.registered)).toBe(true);
     expect(Array.isArray(result.skipped)).toBe(true);
   });
+
+  it("[step 2] registers exactly 11 agents (5 reviewers + 6 coordinators)", () => {
+    const config = freshConfig();
+    const result = registerAgents(config, freshOmreConfig());
+
+    expect(REVIEWER_AGENTS.length).toBe(5);
+    expect(COORDINATOR_AGENTS.length).toBe(6);
+    expect(ALL_AGENTS.length).toBe(11);
+    expect(AGENT_NAMES.length).toBe(11);
+
+    const expected = [
+      "reviewer-spec",
+      "reviewer-quality",
+      "reviewer-security",
+      "reviewer-performance",
+      "reviewer-concurrency",
+      "slice-planner",
+      "slice-plan-validator",
+      "result-validator",
+      "slice-arbiter",
+      "global-arbiter",
+      "report-writer",
+    ];
+    expect([...AGENT_NAMES].sort()).toEqual([...expected].sort());
+    expect([...result.registered].sort()).toEqual([...expected].sort());
+    expect(result.skipped).toEqual([]);
+  });
 });
