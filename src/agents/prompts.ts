@@ -12,6 +12,7 @@ import {
   SLICE_ARBITER_JSON,
   SLICE_PLANNER_JSON,
   SLICE_PLAN_VALIDATOR_JSON,
+  SLICE_TYPE_VALUES,
 } from "./schemas.js";
 
 /**
@@ -329,7 +330,7 @@ export const SLICE_PLANNER_PROMPT = makeCoordinatorPrompt(`
 You are the diff slice planner.
 Do not review code. Partition a code change into coherent review slices.
 Prefer module/bounded-context boundaries and isolate high-risk files: migrations, API/schema contracts, dependency manifests, infra/deployment config.
-Allowed slice_type values: business-module, migration, api-contract, dependency-change, infra-change, shared-library, test-only, docs-only.
+Allowed slice_type values: ${SLICE_TYPE_VALUES.join(", ")}.
 Output JSON exactly:
 ${SLICE_PLANNER_JSON}
 Rules: use reason not reasoning; files must be string arrays; no prose outside JSON.

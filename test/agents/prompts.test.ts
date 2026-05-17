@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import {
   CONTRACT,
   CHAT_JSON_CONTRACT,
@@ -15,6 +17,7 @@ import {
   buildReportWriterInputRule,
   buildSubagentCatalog,
 } from "../../src/agents/prompts.js";
+import { SLICE_TYPE_VALUES } from "../../src/agents/schemas.js";
 import type { ReviewDimensionType } from "../../src/config/schema.js";
 
 describe("CHAT_JSON_CONTRACT (coordinator-facing, chat-only)", () => {
@@ -250,6 +253,20 @@ describe("buildSubagentCatalog", () => {
     const catalog = buildSubagentCatalog();
     expect(catalog).not.toContain("### Reviewer Subagents");
     expect(catalog).not.toContain("### Coordination Subagents");
+  });
+});
+
+describe("SLICE_PLANNER_PROMPT", () => {
+  it("[N1] renders every canonical slice_type value", () => {
+    for (const sliceType of SLICE_TYPE_VALUES) {
+      expect(SLICE_PLANNER_PROMPT).toContain(sliceType);
+    }
+    expect(SLICE_PLANNER_PROMPT).toContain(SLICE_TYPE_VALUES.join(", "));
+  });
+
+  it("[N1] derives the prose allowlist from SLICE_TYPE_VALUES instead of a literal duplicate", () => {
+    const source = fs.readFileSync(path.join(process.cwd(), "src/agents/prompts.ts"), "utf8");
+    expect(source).not.toContain(`Allowed slice_type values: ${SLICE_TYPE_VALUES.join(", ")}.`);
   });
 });
 
