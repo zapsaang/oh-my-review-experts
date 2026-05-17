@@ -178,3 +178,77 @@ describe("registry: tool-flag uniqueness", () => {
     }
   });
 });
+
+describe("registry: behavioral guarantees", () => {
+  it("[step 12] user override at config.agent[name] is preserved (skip-on-conflict)", () => {
+    const userEntry = { prompt: "USER_OVERRIDE_MARKER" };
+    const config = { agent: { "reviewer-security": userEntry } } as unknown as Config;
+
+    const result = registerAgents(config, freshOmreConfig());
+
+    const slot = (config.agent as Record<string, unknown>)["reviewer-security"];
+    expect(slot).toBe(userEntry);
+    expect((slot as { prompt: string }).prompt).toBe("USER_OVERRIDE_MARKER");
+    expect(result.skipped).toContain("reviewer-security");
+    expect(result.registered).not.toContain("reviewer-security");
+    expect(result.registered.length).toBe(10);
+  });
+
+  it("[step 13] re-invocation is idempotent and preserves object identity", () => {
+    const config = freshConfig();
+    const first = registerAgents(config, freshOmreConfig());
+    expect(first.registered.length).toBe(11);
+    expect(first.skipped).toEqual([]);
+
+    const snapshots = new Map<string, unknown>();
+    for (const name of AGENT_NAMES) {
+      snapshots.set(name, (config.agent as Record<string, unknown>)[name]);
+    }
+
+    const second = registerAgents(config, freshOmreConfig());
+    expect(second.registered).toEqual([]);
+    expect([...second.skipped].sort()).toEqual([...AGENT_NAMES].sort());
+
+    for (const name of AGENT_NAMES) {
+      const after = (config.agent as Record<string, unknown>)[name];
+      expect(Object.is(snapshots.get(name), after)).toBe(true);
+    }
+  });
+
+  it("[step 14] enabled === false short-circuits and does not mutate config.agent", () => {
+    const omre = freshOmreConfig();
+    omre.enabled = false;
+    const config = freshConfig();
+
+    const result = registerAgents(config, omre);
+
+    expect(result).toEqual({ registered: [], skipped: [] });
+    expect(config.agent).toBeUndefined();
+  });
+
+  it.each(["tool" as const, "disabled" as const, "hook" as const, "both" as const])(
+    "[step 15] registers regardless of command.injection mode (%s)",
+    (mode) => {
+      const omre = freshOmreConfig();
+      omre.command.injection = mode;
+      const config = freshConfig();
+
+      const result = registerAgents(config, omre);
+
+      expect(result.registered.length).toBe(11);
+      expect(Object.keys(config.agent ?? {}).sort()).toEqual([...AGENT_NAMES].sort());
+    },
+  );
+
+  it("[step 16] handles config without an `agent` key (no crash, populates it)", () => {
+    const config: Config = {} as Config;
+    expect(config.agent).toBeUndefined();
+
+    const result = registerAgents(config, freshOmreConfig());
+
+    expect(result.registered.length).toBe(11);
+    expect(config.agent).toBeDefined();
+    expect(typeof config.agent).toBe("object");
+    expect(Object.keys(config.agent ?? {}).sort()).toEqual([...AGENT_NAMES].sort());
+  });
+});
