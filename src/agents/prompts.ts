@@ -114,7 +114,7 @@ The Markdown body MUST contain:
 
 ### Subagent Final Reply Format
 
-The subagent's final reply MUST contain only:
+The subagent's final reply MUST consist of EXACTLY this block, with no text before it and no text after it:
 
 \`\`\`text
 HANDOFF_FILE: ${handoffDir}/${runId}/xxxx.md
@@ -124,32 +124,28 @@ SUMMARY:
 - ...
 \`\`\`
 
-### Chat Fallback (recovery only, do NOT use as primary channel)
+Replace \`xxxx.md\` with the filename returned by \`omre_write_handoff\`. Replace the SUMMARY bullets with one-line descriptions of your findings (or "no findings" if none).
 
-If the \`omre_write_handoff\` tool call fails, throws, or you cannot confirm the
-file was written successfully, you MUST also include the complete handoff JSON
-header inside a \`\`\`json fence in your final chat reply, immediately AFTER the
-\`HANDOFF_FILE\`/\`STATUS\`/\`SUMMARY\` block. Use the same schema as the file's
-JSON header. The primary agent will recover from chat only when the file is
-genuinely missing or invalid.
+### Chat output rule (critical)
 
-This is a recovery hatch, not a license to skip the file. Always attempt
-\`omre_write_handoff\` first.
+NEVER include a \`\`\`json fence in your chat reply. The handoff JSON header lives in the file ONLY. Recovery from a missing or invalid file is the primary agent's responsibility, not yours; do not try to "help" by duplicating the JSON in chat.
+
+If \`omre_write_handoff\` returns \`{ "ok": false, "errors": [...] }\`, do NOT emit a JSON fence in chat — instead, set STATUS to \`blocked\` and list the tool errors in the SUMMARY bullets. The primary agent will retry.
 
 ### Primary Agent Requirements
 
 Upon receiving a subagent reply, the primary agent MUST:
 
-1. Extract \`HANDOFF_FILE\`
+1. Extract \`HANDOFF_FILE\` from the receipt block
 2. Read that file
 3. Summarize the final review report based on the file contents
-4. When subagent chat output conflicts with the handoff file, the handoff file takes precedence
-5. When the handoff file is missing or fails validation, call \`omre_validate_handoff\` with both \`filePath\` and \`chatContent\` (the subagent's full final reply). The tool tries the file first and falls back to parsing the chat fence. Only if the result has \`source: "none"\` should you mark the subagent as \`handoff_missing\` and request regeneration.
+4. When the handoff file is missing or fails validation, call \`omre_validate_handoff\` with the \`filePath\`. If the result reports the file is missing or invalid, mark the subagent as \`handoff_missing\` and request regeneration. The chat-fence fallback path inside \`omre_validate_handoff\` exists for legacy callers; new code should treat the file as the only source of truth.
 
 ### Prohibited Behaviors
 
-* Primary agent directly using subagent chat output prose (i.e. anything outside the \`\`\`json fence) as a data source
+* Primary agent directly using subagent chat output as a data source — only the receipt block (\`HANDOFF_FILE\` / \`STATUS\` / \`SUMMARY\`) is consumed from chat
 * Subagent skipping \`omre_write_handoff\` and emitting only chat output
+* Subagent emitting a \`\`\`json fence in chat for any reason
 * Subagent writing complete results to temporary context
 * Subagent overwriting other subagent results with the same filename
 * Subagent using the \`write\` tool directly to create handoff files instead of \`omre_write_handoff\`

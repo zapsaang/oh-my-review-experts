@@ -170,6 +170,24 @@ describe("buildHandoffProtocol", () => {
     const prompt = buildHandoffProtocol(".omre/handoffs", "run-001");
     expect(prompt).not.toContain("File naming convention");
   });
+
+  it("[L1.5 fix] does not say the chat reply must 'contain only' the receipt block AND 'also include' a fallback fence", () => {
+    const prompt = buildHandoffProtocol(".omre/handoffs", "run-001");
+    const hasContainOnly = /contain\s+only/i.test(prompt);
+    const hasAlsoInclude = /MUST also include/i.test(prompt);
+    expect(hasContainOnly && hasAlsoInclude).toBe(false);
+  });
+
+  it("[L1.5 fix] removes the subagent-facing chat-fallback instruction (recovery is the orchestrator's job)", () => {
+    const prompt = buildHandoffProtocol(".omre/handoffs", "run-001");
+    expect(prompt).not.toMatch(/Chat Fallback/i);
+    expect(prompt).not.toMatch(/include the complete handoff JSON\s+header inside a/i);
+  });
+
+  it("[L1.5 fix] explicitly forbids the subagent from including a json fence in chat", () => {
+    const prompt = buildHandoffProtocol(".omre/handoffs", "run-001");
+    expect(prompt).toMatch(/never include[^.]*json fence[^.]*chat/i);
+  });
 });
 
 describe("buildReportWriterInputRule", () => {
