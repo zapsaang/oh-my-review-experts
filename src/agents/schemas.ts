@@ -249,6 +249,21 @@ export type SlicePlanner = z.infer<typeof SlicePlannerSchema>;
 /** Expected JSON output for the slice plan validator. */
 export const SLICE_PLAN_VALIDATOR_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","is_valid":true,"failure_reason":"","retry_recommended":false,"normalized_result":null}`;
 
+/**
+ * Slice plan validator output schema. `normalized_result` is `unknown |
+ * null`: the validator may emit a re-normalized planner payload or `null`
+ * when no normalization is needed.
+ */
+export const SlicePlanValidatorSchema = z.looseObject({
+  schema_version: z.string().regex(SCHEMA_VERSION_PATTERN),
+  status: z.enum(["completed", "blocked"]).catch("blocked"),
+  is_valid: z.boolean(),
+  failure_reason: z.string(),
+  retry_recommended: z.boolean(),
+  normalized_result: z.unknown().nullable(),
+});
+export type SlicePlanValidator = z.infer<typeof SlicePlanValidatorSchema>;
+
 /** Expected JSON output for the review result validator. */
 export const RESULT_VALIDATOR_JSON = `{"schema_version": "${SCHEMA_VERSION}", "status":"completed","assigned_dimension":"spec","slice_id":"","is_valid":true,"failure_reason":"","retry_recommended":false}`;
 

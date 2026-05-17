@@ -14,6 +14,7 @@ import {
   SLICE_PLANNER_JSON,
   SLICE_PLAN_VALIDATOR_JSON,
   SLICE_TYPE_VALUES,
+  SlicePlanValidatorSchema,
   SlicePlannerSchema,
   UnifiedFindingSchema,
   UnifiedHandoffSchema,
@@ -517,5 +518,34 @@ describe("SlicePlannerSchema", () => {
     expect(example).toHaveProperty("reason");
     expect(example).toHaveProperty("slices");
     expect(Array.isArray(example.slices)).toBe(true);
+  });
+});
+
+describe("SlicePlanValidatorSchema", () => {
+  it("accepts the legacy example shape", () => {
+    const example = {
+      schema_version: "1",
+      status: "completed",
+      is_valid: true,
+      failure_reason: "",
+      retry_recommended: false,
+      normalized_result: null,
+    };
+    const result = SlicePlanValidatorSchema.safeParse(example);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty input", () => {
+    expect(SlicePlanValidatorSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("zodToExample renders all expected top-level keys", () => {
+    const example = zodToExample(SlicePlanValidatorSchema) as Record<string, unknown>;
+    expect(example).toHaveProperty("schema_version");
+    expect(example).toHaveProperty("status");
+    expect(example).toHaveProperty("is_valid");
+    expect(example).toHaveProperty("failure_reason");
+    expect(example).toHaveProperty("retry_recommended");
+    expect(example).toHaveProperty("normalized_result");
   });
 });
