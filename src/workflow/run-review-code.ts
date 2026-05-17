@@ -4,7 +4,7 @@ import { writeReport } from "../tools/report.js";
 import { redactSecrets } from "../tools/secret-scanner.js";
 import { formatTimestamp } from "../tools/fs-utils.js";
 import { estimatePlan } from "./slicing.js";
-import { buildHandoffProtocol, buildReportWriterInputRule, buildSubagentCatalog } from "../agents/prompts.js";
+import { buildHandoffRuntime, buildReportWriterInputRule, buildSubagentCatalog } from "../agents/prompts.js";
 
 export interface ReviewCodeInput {
   args?: string;
@@ -72,7 +72,7 @@ export function buildReviewCodePrompt(input: ReviewCodeInput = {}, trusted = fal
 
   const runId = generateRunId();
   const handoffDir = config.handoff.directory;
-  const handoffProtocol = buildHandoffProtocol(handoffDir, runId);
+  const handoffRuntime = buildHandoffRuntime(handoffDir, runId);
   const reportWriterRule = buildReportWriterInputRule(handoffDir, runId);
   const subagentCatalog = buildSubagentCatalog();
 
@@ -125,12 +125,13 @@ Execution requirements:
 1. Resolve target: use working tree/staged diff if present, otherwise last commit.
 2. Use the heuristic slices above unless they are obviously wrong. Do not exceed maxSlices.
 3. For each slice, invoke only the selected reviewers listed in reviewersBySlice as independent subagents.
-4. Each reviewer subagent runs with its own context and returns findings via the handoff protocol.
-5. Before feeding reviewer output to the arbiter, call \`omre_validate_handoff\` on the handoff file. Do not feed reviewer output to the arbiter until \`omre_validate_handoff\` returns \`is_valid = true\`.
-6. If validation fails with retryRecommended=true, retry that reviewer once. If still invalid after retry, mark the dimension as degraded and proceed.
+4. Each reviewer subagent runs with its own context and writes a handoff file via \`omre_write_handoff\`. The full handoff protocol (channel rules, file format, receipt format, prohibited behaviors) is embedded in each reviewer's system prompt.
+5. \`omre_write_handoff\` returns \`{ "ok": true, "filePath": "..." }\` on success or \`{ "ok": false, "errors": [...] }\` on failure. The reviewer's chat reply is a fixed receipt (\`HANDOFF_FILE: ... STATUS: ... SUMMARY: ...\`) and never contains a JSON fence.
+6. Before feeding reviewer output to the arbiter, call \`omre_validate_handoff\` with the \`filePath\` extracted from the receipt. Do not feed reviewer output to the arbiter until \`omre_validate_handoff\` returns \`is_valid = true\`.
+7. If validation fails with retryRecommended=true, retry that reviewer once. If still invalid after retry, mark the dimension as degraded and proceed.
 ${arbitrationInstructions}
 
-${handoffProtocol}
+${handoffRuntime}
 
 Unified diff follows. Use it as evidence and do not invent files:
 ${diffTruncated ? `\n[WARNING: Diff truncated from ${diff.length} to ${MAX_DIFF_LENGTH} characters]\n` : ""}

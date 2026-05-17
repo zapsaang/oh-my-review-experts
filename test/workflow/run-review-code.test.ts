@@ -11,11 +11,30 @@ describe("buildReviewCodePrompt", () => {
     expect(Array.isArray(bundle.files)).toBe(true);
   });
 
-  it("includes handoff protocol in prompt when enabled", () => {
+  it("includes handoff runtime stanza (per-run path) in orchestrator prompt", () => {
     const bundle = buildReviewCodePrompt({ args: "", cwd: process.cwd() });
-    expect(bundle.prompt).toContain("Review Code Handoff Protocol");
+    expect(bundle.prompt).toContain("Review Code Handoff Runtime");
     expect(bundle.prompt).toContain(bundle.runId);
     expect(bundle.prompt).toContain("handoffEnabled");
+  });
+
+  it("[L2 fix] orchestrator prompt does NOT duplicate the file-protocol embedded in reviewer staticPrompt", () => {
+    const bundle = buildReviewCodePrompt({ args: "", cwd: process.cwd() });
+    const beforeDiff = bundle.prompt.split("Unified diff follows")[0] ?? "";
+    expect(beforeDiff).not.toContain("Subagent Final Reply Format");
+    expect(beforeDiff).not.toContain("Prohibited Behaviors");
+    expect(beforeDiff).not.toContain("### Subagent Requirements");
+  });
+
+  it("[L4 fix] orchestrator prompt describes file-first recovery via omre_validate_handoff", () => {
+    const bundle = buildReviewCodePrompt({ args: "", cwd: process.cwd() });
+    expect(bundle.prompt).toMatch(/omre_validate_handoff/);
+  });
+
+  it("[L4 fix] orchestrator prompt describes the {ok, errors} contract for omre_write_handoff", () => {
+    const bundle = buildReviewCodePrompt({ args: "", cwd: process.cwd() });
+    expect(bundle.prompt).toMatch(/omre_write_handoff/);
+    expect(bundle.prompt).toMatch(/ok.*?(true|false)/);
   });
 
   it("includes report writer input rule", () => {
