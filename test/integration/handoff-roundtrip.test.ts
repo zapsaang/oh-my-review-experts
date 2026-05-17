@@ -45,7 +45,7 @@ function basePayload(overrides: Partial<HandoffPayload> = {}): HandoffPayload {
 describe("handoff roundtrip", () => {
   it("write then validate succeeds for a canonical handoff", () => {
     withTempCwd((cwd) => {
-      const filePath = writeHandoff(DEFAULT_CONFIG, basePayload(), cwd, "run-1");
+      const { filePath } = writeHandoff(DEFAULT_CONFIG, basePayload(), cwd, "run-1");
       const result = validateReviewerHandoff(filePath);
 
       expect(result.isValid).toBe(true);
@@ -76,7 +76,7 @@ describe("handoff roundtrip", () => {
           } as HandoffPayload["findings"][number],
         ],
       });
-      const filePath = writeHandoff(DEFAULT_CONFIG, payload, cwd, "run-2");
+      const { filePath } = writeHandoff(DEFAULT_CONFIG, payload, cwd, "run-2");
       const result = validateReviewerHandoff(filePath);
 
       expect(result.isValid).toBe(true);
@@ -110,7 +110,7 @@ describe("handoff roundtrip", () => {
           },
         ],
       });
-      const filePath = writeHandoff(DEFAULT_CONFIG, payload, cwd, "run-3");
+      const { filePath } = writeHandoff(DEFAULT_CONFIG, payload, cwd, "run-3");
       const result = validateReviewerHandoff(filePath, { dimension: "performance" });
 
       expect(result.isValid).toBe(true);
@@ -124,7 +124,7 @@ describe("handoff roundtrip", () => {
   it("validate auto-corrects total_findings when written count diverges", () => {
     withTempCwd((cwd) => {
       const payload = basePayload();
-      const filePath = writeHandoff(DEFAULT_CONFIG, payload, cwd, "run-4");
+      const { filePath } = writeHandoff(DEFAULT_CONFIG, payload, cwd, "run-4");
 
       const original = fs.readFileSync(filePath, "utf-8");
       const tampered = original.replace(/"total_findings":\s*\d+/, '"total_findings": 99');
@@ -142,7 +142,7 @@ describe("handoff roundtrip", () => {
 
   it("validate accepts schema_version 1.0 (relaxed minor)", () => {
     withTempCwd((cwd) => {
-      const filePath = writeHandoff(DEFAULT_CONFIG, basePayload(), cwd, "run-5");
+      const { filePath } = writeHandoff(DEFAULT_CONFIG, basePayload(), cwd, "run-5");
 
       const original = fs.readFileSync(filePath, "utf-8");
       const tampered = original.replace(/"schema_version":\s*"1"/, '"schema_version": "1.0"');
@@ -156,7 +156,7 @@ describe("handoff roundtrip", () => {
 
   it("chat fallback recovers a handoff embedded in a prose-rich reply", () => {
     withTempCwd((cwd) => {
-      const filePath = writeHandoff(DEFAULT_CONFIG, basePayload(), cwd, "run-6");
+      const { filePath } = writeHandoff(DEFAULT_CONFIG, basePayload(), cwd, "run-6");
       const writtenContent = fs.readFileSync(filePath, "utf-8");
 
       const chatBody = [
@@ -198,7 +198,7 @@ describe("handoff roundtrip", () => {
           },
         ],
       });
-      const filePath = writeHandoff(DEFAULT_CONFIG, payload, cwd, "run-7");
+      const { filePath } = writeHandoff(DEFAULT_CONFIG, payload, cwd, "run-7");
       const result = validateReviewerHandoff(filePath);
 
       expect(result.isValid).toBe(true);

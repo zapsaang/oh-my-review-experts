@@ -151,7 +151,7 @@ export const tools = {
           openQuestions: p.open_questions,
           notesForPrimary: p.notes_for_primary,
         };
-        const filePath = writeHandoff(config, payload, cwd, input.runId);
+        const { filePath } = writeHandoff(config, payload, cwd, input.runId);
         return JSON.stringify({ ok: true, filePath });
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);

@@ -55,34 +55,32 @@ describe("writeHandoff", () => {
 
   it("writes a handoff file with correct structure", () => {
     const config = createTestConfig({ directory: "handoffs" });
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "security-reviewer",
-        dimension: "security",
-        scope: "auth-module",
-        status: "completed",
-        filesInspected: ["src/auth.ts", "src/middleware.ts"],
-        findings: [
-          {
-            id: "sec-1",
-            severity: "high",
-            classification: "injection",
-            file: "src/auth.ts",
-            line: 45,
-            title: "SQL Injection",
-            description: "Potential SQL injection allowing unauthorized data access",
-            evidence: "User input concatenated directly into SQL query",
-            confidence: "high",
-            recommendation: "Use parameterized queries",
-          },
-        ],
-        suggestedFixes: ["Replace string concatenation with prepared statements"],
-        openQuestions: ["Is this endpoint publicly accessible?"],
-        notesForPrimary: "Focus on the login endpoint first",
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "security-reviewer",
+      dimension: "security",
+      scope: "auth-module",
+      status: "completed",
+      filesInspected: ["src/auth.ts", "src/middleware.ts"],
+      findings: [
+        {
+          id: "sec-1",
+          severity: "high",
+          classification: "injection",
+          file: "src/auth.ts",
+          line: 45,
+          title: "SQL Injection",
+          description: "Potential SQL injection allowing unauthorized data access",
+          evidence: "User input concatenated directly into SQL query",
+          confidence: "high",
+          recommendation: "Use parameterized queries",
+        },
+      ],
+      suggestedFixes: ["Replace string concatenation with prepared statements"],
+      openQuestions: ["Is this endpoint publicly accessible?"],
+      notesForPrimary: "Focus on the login endpoint first",
+    },
+    tmpDir,);
 
     expect(fs.existsSync(filePath)).toBe(true);
     expect(filePath).toContain("handoffs/");
@@ -135,18 +133,16 @@ describe("writeHandoff", () => {
 
   it("sanitizes agent and scope names in filename", () => {
     const config = createTestConfig({ directory: "handoffs" });
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "reviewer@security",
-        dimension: "security",
-        scope: "auth/module",
-        status: "completed",
-        filesInspected: ["src/test.ts"],
-        findings: [],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "reviewer@security",
+      dimension: "security",
+      scope: "auth/module",
+      status: "completed",
+      filesInspected: ["src/test.ts"],
+      findings: [],
+    },
+    tmpDir,);
 
     const filename = path.basename(filePath);
     expect(filename).toContain("reviewer-security");
@@ -157,19 +153,17 @@ describe("writeHandoff", () => {
 
   it("supports runId for scoping handoffs", () => {
     const config = createTestConfig({ directory: "handoffs" });
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "security-reviewer",
-        dimension: "security",
-        scope: "auth",
-        status: "completed",
-        filesInspected: ["src/auth.ts"],
-        findings: [],
-      },
-      tmpDir,
-      "run-20260507-001",
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "security-reviewer",
+      dimension: "security",
+      scope: "auth",
+      status: "completed",
+      filesInspected: ["src/auth.ts"],
+      findings: [],
+    },
+    tmpDir,
+    "run-20260507-001",);
 
     expect(filePath).toContain("handoffs/run-20260507-001/");
     expect(fs.existsSync(filePath)).toBe(true);
@@ -185,8 +179,8 @@ describe("writeHandoff", () => {
       findings: [],
     };
 
-    const filePath1 = writeHandoff(config, payload, tmpDir);
-    const filePath2 = writeHandoff(config, payload, tmpDir);
+    const { filePath: filePath1 } = writeHandoff(config, payload, tmpDir);
+    const { filePath: filePath2 } = writeHandoff(config, payload, tmpDir);
 
     expect(filePath1).not.toBe(filePath2);
     expect(fs.existsSync(filePath1)).toBe(true);
@@ -195,31 +189,29 @@ describe("writeHandoff", () => {
 
   it("redacts secrets in handoff content", () => {
     const config = createTestConfig({ directory: "handoffs" });
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "security-reviewer",
-        dimension: "security",
-        scope: "auth-module",
-        status: "completed",
-        filesInspected: ["src/auth.ts"],
-        findings: [
-          {
-            id: "sec-1",
-            severity: "high",
-            classification: "secret-leak",
-            file: "src/auth.ts",
-            line: 45,
-            title: "AWS key exposed",
-            description: "AWS credentials exposed in source code",
-            evidence: "API key found: AKIAIOSFODNN7EXAMPLE",
-            confidence: "high",
-            recommendation: "Rotate credentials and use environment variables",
-          },
-        ],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "security-reviewer",
+      dimension: "security",
+      scope: "auth-module",
+      status: "completed",
+      filesInspected: ["src/auth.ts"],
+      findings: [
+        {
+          id: "sec-1",
+          severity: "high",
+          classification: "secret-leak",
+          file: "src/auth.ts",
+          line: 45,
+          title: "AWS key exposed",
+          description: "AWS credentials exposed in source code",
+          evidence: "API key found: AKIAIOSFODNN7EXAMPLE",
+          confidence: "high",
+          recommendation: "Rotate credentials and use environment variables",
+        },
+      ],
+    },
+    tmpDir,);
 
     const content = fs.readFileSync(filePath, "utf8");
     expect(content).not.toContain("AKIAIOSFODNN7EXAMPLE");
@@ -231,32 +223,30 @@ describe("writeHandoff", () => {
     const ghToken = "ghp_abcdefghijklmnopqrstuvwxyz1234567890abcd";
     const awsKey = "AKIAIOSFODNN7EXAMPLE";
     const apiKey = "sk-1234567890abcdef1234567890abcdef";
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "security-reviewer",
-        dimension: "security",
-        scope: "auth-module",
-        status: "completed",
-        findings: [
-          {
-            id: "sec-1",
-            severity: "high",
-            classification: "secret-leak",
-            file: "src/auth.ts",
-            line: 45,
-            title: "Token leak",
-            description: "Token in code",
-            evidence: "see file",
-            confidence: "high",
-            category: `leak: ${ghToken}`,
-            impact: `Compromised: ${awsKey}`,
-            recommendation: `Rotate immediately: ${apiKey}`,
-          },
-        ],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "security-reviewer",
+      dimension: "security",
+      scope: "auth-module",
+      status: "completed",
+      findings: [
+        {
+          id: "sec-1",
+          severity: "high",
+          classification: "secret-leak",
+          file: "src/auth.ts",
+          line: 45,
+          title: "Token leak",
+          description: "Token in code",
+          evidence: "see file",
+          confidence: "high",
+          category: `leak: ${ghToken}`,
+          impact: `Compromised: ${awsKey}`,
+          recommendation: `Rotate immediately: ${apiKey}`,
+        },
+      ],
+    },
+    tmpDir,);
 
     const content = fs.readFileSync(filePath, "utf8");
     expect(content).not.toContain(ghToken);
@@ -267,31 +257,29 @@ describe("writeHandoff", () => {
   it("redacts GitHub PAT in JSON header and preserves JSON validity", () => {
     const config = createTestConfig({ directory: "handoffs" });
     const token = "ghp_abcdefghijklmnopqrstuvwxyz1234567890abcd";
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "security-reviewer",
-        dimension: "security",
-        scope: "auth-module",
-        status: "completed",
-        filesInspected: ["src/auth.ts"],
-        findings: [
-          {
-            id: "sec-1",
-            severity: "high",
-            classification: "secret-leak",
-            file: "src/auth.ts",
-            line: 45,
-            title: `GitHub token exposed: ${token}`,
-            description: "Hardcoded GitHub PAT in source",
-            evidence: `Found ${token}`,
-            confidence: "high",
-            recommendation: "Use GitHub App authentication",
-          },
-        ],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "security-reviewer",
+      dimension: "security",
+      scope: "auth-module",
+      status: "completed",
+      filesInspected: ["src/auth.ts"],
+      findings: [
+        {
+          id: "sec-1",
+          severity: "high",
+          classification: "secret-leak",
+          file: "src/auth.ts",
+          line: 45,
+          title: `GitHub token exposed: ${token}`,
+          description: "Hardcoded GitHub PAT in source",
+          evidence: `Found ${token}`,
+          confidence: "high",
+          recommendation: "Use GitHub App authentication",
+        },
+      ],
+    },
+    tmpDir,);
 
     const content = fs.readFileSync(filePath, "utf8");
     const result = parseHandoffJsonHeader(content);
@@ -303,31 +291,29 @@ describe("writeHandoff", () => {
   it("redacts Bearer token in JSON header and preserves JSON validity", () => {
     const config = createTestConfig({ directory: "handoffs" });
     const bearer = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "security-reviewer",
-        dimension: "security",
-        scope: "auth-module",
-        status: "completed",
-        filesInspected: ["src/auth.ts"],
-        findings: [
-          {
-            id: "sec-1",
-            severity: "high",
-            classification: "secret-leak",
-            file: "src/auth.ts",
-            line: 45,
-            title: "Bearer token exposed",
-            description: "Hardcoded bearer token in source",
-            evidence: `Authorization: ${bearer}`,
-            confidence: "high",
-            recommendation: "Use OAuth2 refresh tokens",
-          },
-        ],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "security-reviewer",
+      dimension: "security",
+      scope: "auth-module",
+      status: "completed",
+      filesInspected: ["src/auth.ts"],
+      findings: [
+        {
+          id: "sec-1",
+          severity: "high",
+          classification: "secret-leak",
+          file: "src/auth.ts",
+          line: 45,
+          title: "Bearer token exposed",
+          description: "Hardcoded bearer token in source",
+          evidence: `Authorization: ${bearer}`,
+          confidence: "high",
+          recommendation: "Use OAuth2 refresh tokens",
+        },
+      ],
+    },
+    tmpDir,);
 
     const content = fs.readFileSync(filePath, "utf8");
     const result = parseHandoffJsonHeader(content);
@@ -339,31 +325,29 @@ describe("writeHandoff", () => {
   it("redacts generic API key in JSON header and preserves JSON validity", () => {
     const config = createTestConfig({ directory: "handoffs" });
     const apiKey = "api-key: abcdef1234567890abcdef1234567890";
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "security-reviewer",
-        dimension: "security",
-        scope: "auth-module",
-        status: "completed",
-        filesInspected: ["src/auth.ts"],
-        findings: [
-          {
-            id: "sec-1",
-            severity: "high",
-            classification: "secret-leak",
-            file: "src/auth.ts",
-            line: 45,
-            title: "API key exposed",
-            description: "Hardcoded API key in source",
-            evidence: `Found ${apiKey}`,
-            confidence: "high",
-            recommendation: "Move to environment variables",
-          },
-        ],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "security-reviewer",
+      dimension: "security",
+      scope: "auth-module",
+      status: "completed",
+      filesInspected: ["src/auth.ts"],
+      findings: [
+        {
+          id: "sec-1",
+          severity: "high",
+          classification: "secret-leak",
+          file: "src/auth.ts",
+          line: 45,
+          title: "API key exposed",
+          description: "Hardcoded API key in source",
+          evidence: `Found ${apiKey}`,
+          confidence: "high",
+          recommendation: "Move to environment variables",
+        },
+      ],
+    },
+    tmpDir,);
 
     const content = fs.readFileSync(filePath, "utf8");
     const result = parseHandoffJsonHeader(content);
@@ -375,31 +359,29 @@ describe("writeHandoff", () => {
   it("redacts password in JSON header and preserves JSON validity", () => {
     const config = createTestConfig({ directory: "handoffs" });
     const password = "password: SuperSecret123!";
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "security-reviewer",
-        dimension: "security",
-        scope: "auth-module",
-        status: "completed",
-        filesInspected: ["src/auth.ts"],
-        findings: [
-          {
-            id: "sec-1",
-            severity: "high",
-            classification: "secret-leak",
-            file: "src/auth.ts",
-            line: 45,
-            title: "Password exposed",
-            description: "Hardcoded password in source",
-            evidence: `Found ${password}`,
-            confidence: "high",
-            recommendation: "Use a secrets manager",
-          },
-        ],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "security-reviewer",
+      dimension: "security",
+      scope: "auth-module",
+      status: "completed",
+      filesInspected: ["src/auth.ts"],
+      findings: [
+        {
+          id: "sec-1",
+          severity: "high",
+          classification: "secret-leak",
+          file: "src/auth.ts",
+          line: 45,
+          title: "Password exposed",
+          description: "Hardcoded password in source",
+          evidence: `Found ${password}`,
+          confidence: "high",
+          recommendation: "Use a secrets manager",
+        },
+      ],
+    },
+    tmpDir,);
 
     const content = fs.readFileSync(filePath, "utf8");
     const result = parseHandoffJsonHeader(content);
@@ -411,31 +393,29 @@ describe("writeHandoff", () => {
   it("redacts generic token in JSON header and preserves JSON validity", () => {
     const config = createTestConfig({ directory: "handoffs" });
     const token = "token: abcdef1234567890abcdef1234567890";
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "security-reviewer",
-        dimension: "security",
-        scope: "auth-module",
-        status: "completed",
-        filesInspected: ["src/auth.ts"],
-        findings: [
-          {
-            id: "sec-1",
-            severity: "high",
-            classification: "secret-leak",
-            file: "src/auth.ts",
-            line: 45,
-            title: "Generic token exposed",
-            description: "Hardcoded token in source",
-            evidence: `Found ${token}`,
-            confidence: "high",
-            recommendation: "Use token rotation",
-          },
-        ],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "security-reviewer",
+      dimension: "security",
+      scope: "auth-module",
+      status: "completed",
+      filesInspected: ["src/auth.ts"],
+      findings: [
+        {
+          id: "sec-1",
+          severity: "high",
+          classification: "secret-leak",
+          file: "src/auth.ts",
+          line: 45,
+          title: "Generic token exposed",
+          description: "Hardcoded token in source",
+          evidence: `Found ${token}`,
+          confidence: "high",
+          recommendation: "Use token rotation",
+        },
+      ],
+    },
+    tmpDir,);
 
     const content = fs.readFileSync(filePath, "utf8");
     const result = parseHandoffJsonHeader(content);
@@ -449,31 +429,29 @@ describe("writeHandoff", () => {
     const keyBlock = `-----BEGIN RSA PRIVATE KEY-----
 MIIEpQIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MhgwMbRvI0MBZhpJ
 -----END RSA PRIVATE KEY-----`;
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "security-reviewer",
-        dimension: "security",
-        scope: "auth-module",
-        status: "completed",
-        filesInspected: ["src/auth.ts"],
-        findings: [
-          {
-            id: "sec-1",
-            severity: "high",
-            classification: "secret-leak",
-            file: "src/auth.ts",
-            line: 45,
-            title: "Private key exposed",
-            description: "Hardcoded private key in source",
-            evidence: `Found key:\n${keyBlock}`,
-            confidence: "high",
-            recommendation: "Use a key management service",
-          },
-        ],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "security-reviewer",
+      dimension: "security",
+      scope: "auth-module",
+      status: "completed",
+      filesInspected: ["src/auth.ts"],
+      findings: [
+        {
+          id: "sec-1",
+          severity: "high",
+          classification: "secret-leak",
+          file: "src/auth.ts",
+          line: 45,
+          title: "Private key exposed",
+          description: "Hardcoded private key in source",
+          evidence: `Found key:\n${keyBlock}`,
+          confidence: "high",
+          recommendation: "Use a key management service",
+        },
+      ],
+    },
+    tmpDir,);
 
     const content = fs.readFileSync(filePath, "utf8");
     const result = parseHandoffJsonHeader(content);
@@ -485,18 +463,16 @@ MIIEpQIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MhgwMbRvI0MBZhpJ
   it("truncates long scope names in filename", () => {
     const config = createTestConfig({ directory: "handoffs" });
     const longScope = "aura-daemon-core-changes--collectors-memory-linux-rs--collectors-meta-rs";
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "security-reviewer",
-        dimension: "security",
-        scope: longScope,
-        status: "completed",
-        filesInspected: ["src/test.ts"],
-        findings: [],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "security-reviewer",
+      dimension: "security",
+      scope: longScope,
+      status: "completed",
+      filesInspected: ["src/test.ts"],
+      findings: [],
+    },
+    tmpDir,);
 
     const filename = path.basename(filePath);
     const scopePart = filename.replace(/^\d{8}-\d{6}-\d{3}-security-reviewer-/, "").replace(/\.md$/, "");
@@ -508,18 +484,16 @@ MIIEpQIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MhgwMbRvI0MBZhpJ
   it("does not truncate scope at exactly 35 chars", () => {
     const config = createTestConfig({ directory: "handoffs" });
     const exactScope = "a".repeat(35);
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "test",
-        dimension: "quality",
-        scope: exactScope,
-        status: "completed",
-        filesInspected: ["src/test.ts"],
-        findings: [],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "test",
+      dimension: "quality",
+      scope: exactScope,
+      status: "completed",
+      filesInspected: ["src/test.ts"],
+      findings: [],
+    },
+    tmpDir,);
 
     const filename = path.basename(filePath);
     const scopePart = filename.replace(/^\d{8}-\d{6}-\d{3}-test-/, "").replace(/\.md$/, "");
@@ -529,18 +503,16 @@ MIIEpQIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MhgwMbRvI0MBZhpJ
   it("truncates scope at 36 chars to 35", () => {
     const config = createTestConfig({ directory: "handoffs" });
     const overScope = "a".repeat(36);
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "test",
-        dimension: "quality",
-        scope: overScope,
-        status: "completed",
-        filesInspected: ["src/test.ts"],
-        findings: [],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "test",
+      dimension: "quality",
+      scope: overScope,
+      status: "completed",
+      filesInspected: ["src/test.ts"],
+      findings: [],
+    },
+    tmpDir,);
 
     const filename = path.basename(filePath);
     const scopePart = filename.replace(/^\d{8}-\d{6}-\d{3}-test-/, "").replace(/\.md$/, "");
@@ -550,20 +522,48 @@ MIIEpQIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MhgwMbRvI0MBZhpJ
 
   it("falls back to dimension when scope is empty", () => {
     const config = createTestConfig({ directory: "handoffs" });
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "test",
-        dimension: "quality",
-        status: "completed",
-        filesInspected: ["src/test.ts"],
-        findings: [],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "test",
+      dimension: "quality",
+      status: "completed",
+      filesInspected: ["src/test.ts"],
+      findings: [],
+    },
+    tmpDir,);
 
     const filename = path.basename(filePath);
     expect(filename).toContain("quality");
+  });
+
+  it("resolves missing taskId to a deterministic generated value and returns { filePath, taskId }", () => {
+    const config = createTestConfig({ directory: "handoffs" });
+    const result = writeHandoff(
+      config,
+      {
+        agent: "reviewer-spec",
+        dimension: "spec",
+        status: "completed",
+        filesInspected: [],
+        findings: [],
+      },
+      tmpDir,
+      "run-001",
+    );
+
+    expect(typeof result).toBe("object");
+    expect(typeof result.filePath).toBe("string");
+    expect(typeof result.taskId).toBe("string");
+    expect(result.taskId.length).toBeGreaterThan(0);
+    expect(result.taskId).toContain("run-001");
+    expect(result.taskId).toContain("reviewer-spec");
+
+    const content = fs.readFileSync(result.filePath, "utf8");
+    const header = parseHandoffJsonHeader(content);
+    expect(header.success).toBe(true);
+    if (header.success) {
+      expect((header.data as { task_id: string }).task_id).toBe(result.taskId);
+    }
   });
 });
 
@@ -648,34 +648,30 @@ describe("writeHandoff round-trip", () => {
 
   it("output starts with ```json fence", () => {
     const config = createTestConfig({ directory: "handoffs" });
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "reviewer-security",
-        dimension: "security",
-        status: "completed",
-        filesInspected: ["src/auth.ts"],
-        findings: [],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "reviewer-security",
+      dimension: "security",
+      status: "completed",
+      filesInspected: ["src/auth.ts"],
+      findings: [],
+    },
+    tmpDir,);
     const content = fs.readFileSync(filePath, "utf8");
     expect(content.trimStart().startsWith("```json")).toBe(true);
   });
 
   it("parseHandoffJsonHeader returns success:true on writeHandoff output", () => {
     const config = createTestConfig({ directory: "handoffs" });
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "reviewer-quality",
-        dimension: "quality",
-        status: "completed",
-        filesInspected: ["src/index.ts"],
-        findings: [],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "reviewer-quality",
+      dimension: "quality",
+      status: "completed",
+      filesInspected: ["src/index.ts"],
+      findings: [],
+    },
+    tmpDir,);
     const content = fs.readFileSync(filePath, "utf8");
     const result = parseHandoffJsonHeader(content);
     expect(result.success).toBe(true);
@@ -684,17 +680,15 @@ describe("writeHandoff round-trip", () => {
 
   it("JSON header contains correct schema_version", () => {
     const config = createTestConfig({ directory: "handoffs" });
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "reviewer-spec",
-        dimension: "spec",
-        status: "completed",
-        filesInspected: [],
-        findings: [],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "reviewer-spec",
+      dimension: "spec",
+      status: "completed",
+      filesInspected: [],
+      findings: [],
+    },
+    tmpDir,);
     const content = fs.readFileSync(filePath, "utf8");
     const result = parseHandoffJsonHeader(content);
     expect(result.success).toBe(true);
@@ -704,40 +698,38 @@ describe("writeHandoff round-trip", () => {
 
   it("finding IDs round-trip through parseHandoffJsonHeader", () => {
     const config = createTestConfig({ directory: "handoffs" });
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "reviewer-security",
-        dimension: "security",
-        status: "completed",
-        filesInspected: ["src/auth.ts"],
-        findings: [
-          {
-            id: "sec-1",
-            severity: "high",
-            file: "src/auth.ts",
-            line: 42,
-            title: "SQL Injection",
-            description: "User input concatenated into SQL",
-            evidence: "query = 'SELECT * FROM users WHERE id = ' + userId",
-            confidence: "high",
-            classification: "injection",
-          },
-          {
-            id: "sec-2",
-            severity: "medium",
-            file: "src/auth.ts",
-            line: 88,
-            title: "Weak hashing",
-            description: "MD5 used for password hashing",
-            evidence: "md5(password)",
-            confidence: "medium",
-            classification: "cryptography",
-          },
-        ],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "reviewer-security",
+      dimension: "security",
+      status: "completed",
+      filesInspected: ["src/auth.ts"],
+      findings: [
+        {
+          id: "sec-1",
+          severity: "high",
+          file: "src/auth.ts",
+          line: 42,
+          title: "SQL Injection",
+          description: "User input concatenated into SQL",
+          evidence: "query = 'SELECT * FROM users WHERE id = ' + userId",
+          confidence: "high",
+          classification: "injection",
+        },
+        {
+          id: "sec-2",
+          severity: "medium",
+          file: "src/auth.ts",
+          line: 88,
+          title: "Weak hashing",
+          description: "MD5 used for password hashing",
+          evidence: "md5(password)",
+          confidence: "medium",
+          classification: "cryptography",
+        },
+      ],
+    },
+    tmpDir,);
     const content = fs.readFileSync(filePath, "utf8");
     const result = parseHandoffJsonHeader(content);
     expect(result.success).toBe(true);
@@ -752,29 +744,27 @@ describe("writeHandoff round-trip", () => {
   it("secret redaction does not corrupt JSON header validity", () => {
     const config = createTestConfig({ directory: "handoffs" });
     const simulatedSecret = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-    const filePath = writeHandoff(
-      config,
-      {
-        agent: "reviewer-security",
-        dimension: "security",
-        status: "completed",
-        filesInspected: ["src/auth.ts"],
-        findings: [
-          {
-            id: "sec-1",
-            severity: "high",
-            file: "src/auth.ts",
-            line: 10,
-            title: "Hardcoded secret",
-            description: `Secret value: ${simulatedSecret}`,
-            evidence: `Found: ${simulatedSecret}`,
-            confidence: "high",
-            classification: "secret-leak",
-          },
-        ],
-      },
-      tmpDir,
-    );
+    const { filePath } = writeHandoff(config,
+    {
+      agent: "reviewer-security",
+      dimension: "security",
+      status: "completed",
+      filesInspected: ["src/auth.ts"],
+      findings: [
+        {
+          id: "sec-1",
+          severity: "high",
+          file: "src/auth.ts",
+          line: 10,
+          title: "Hardcoded secret",
+          description: `Secret value: ${simulatedSecret}`,
+          evidence: `Found: ${simulatedSecret}`,
+          confidence: "high",
+          classification: "secret-leak",
+        },
+      ],
+    },
+    tmpDir,);
     const content = fs.readFileSync(filePath, "utf8");
     const result = parseHandoffJsonHeader(content);
     expect(result.success).toBe(true);

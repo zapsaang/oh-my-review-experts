@@ -36,10 +36,10 @@ export interface HandoffFinding {
   recommendation?: string;
 }
 
-function buildJsonHeader(payload: HandoffPayload): Record<string, unknown> {
+function buildJsonHeader(payload: HandoffPayload, resolvedTaskId: string): Record<string, unknown> {
   return {
     schema_version: payload.schemaVersion ?? SCHEMA_VERSION,
-    task_id: payload.taskId ?? "",
+    task_id: resolvedTaskId,
     agent: payload.agent,
     dimension: payload.dimension,
     status: payload.status,
@@ -69,10 +69,10 @@ function buildJsonHeader(payload: HandoffPayload): Record<string, unknown> {
   };
 }
 
-function formatHandoffMarkdown(payload: HandoffPayload): string {
+function formatHandoffMarkdown(payload: HandoffPayload, resolvedTaskId: string): string {
   const timestamp = new Date().toISOString();
 
-  const jsonHeader = buildJsonHeader(payload);
+  const jsonHeader = buildJsonHeader(payload, resolvedTaskId);
   const jsonBlock = `\`\`\`json\n${JSON.stringify(jsonHeader, null, 2)}\n\`\`\``;
 
   const findingsSection =
@@ -141,7 +141,7 @@ export function writeHandoff(
   payload: HandoffPayload,
   cwd = process.cwd(),
   runId?: string,
-): string {
+): { filePath: string; taskId: string } {
   if (!config.handoff.enabled) {
     throw new Error("Handoff protocol is disabled in config.");
   }
@@ -168,10 +168,35 @@ export function writeHandoff(
   const filename = `${ts}-${safeAgentName}-${safeScope}.md`;
   const filePath = path.join(dir, filename);
 
-  const content = formatHandoffMarkdown(payload);
+  const resolvedTaskId =
+    payload.taskId !== undefined && payload.taskId.length > 0
+      ? payload.taskId
+      : generateTaskId(runId, payload.agent, ts);
+
+  const content = formatHandoffMarkdown(payload, resolvedTaskId);
   const writtenPath = writeFileAtomic(filePath, content);
 
-  return writtenPath;
+  return { filePath: writtenPath, taskId: resolvedTaskId };
+}
+
+const TASK_ID_COUNTERS = new Map<string, number>();
+const TASK_ID_RUN_SENTINEL = "no-run";
+
+/**
+ * Generates a deterministic, per-process taskId of the shape
+ * `<runId>-<timestamp>-<agent>-<3-digit-counter>`. Used by `writeHandoff` when
+ * the caller omits `taskId`. The counter increments per (runId, agent) tuple
+ * inside the process; concurrent writers in the same review run get distinct
+ * IDs without coordination across processes (each review run is one process).
+ */
+export function generateTaskId(runId: string | undefined, agent: string, timestamp: string): string {
+  const safeRunId = (runId && runId.length > 0 ? runId : TASK_ID_RUN_SENTINEL).replace(/[^a-zA-Z0-9_-]/g, "-");
+  const safeAgent = agent.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const key = `${safeRunId}\u0000${safeAgent}`;
+  const next = (TASK_ID_COUNTERS.get(key) ?? 0) + 1;
+  TASK_ID_COUNTERS.set(key, next);
+  const counter = String(next).padStart(3, "0");
+  return `${safeRunId}-${timestamp}-${safeAgent}-${counter}`;
 }
 
 const MAX_HANDOFF_SIZE = 10 * 1024 * 1024;
