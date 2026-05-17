@@ -90,9 +90,10 @@
       "type": "object",
       "properties": {
         "orchestrator": {
-          "description": "Model for the orchestrator agent that coordinates the review pipeline.",
+          "description": "[DEPRECATED — no consumer, kept for config compatibility] Model for the orchestrator agent that coordinates the review pipeline.",
           "default": "minimax-cn/MiniMax-M2.7",
-          "type": "string"
+          "type": "string",
+          "deprecated": true
         },
         "spec": {
           "description": "Model for the spec compliance reviewer.",

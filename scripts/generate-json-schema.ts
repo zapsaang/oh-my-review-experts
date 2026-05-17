@@ -28,6 +28,13 @@ if (isRecord(aliasItems)) {
   aliasItems.not = { enum: ["__proto__", "constructor", "prototype"] };
 }
 
+const models = isRecord(properties) ? properties.models : undefined;
+const modelsProps = isRecord(models) ? models.properties : undefined;
+const orchestratorProp = isRecord(modelsProps) ? modelsProps.orchestrator : undefined;
+if (isRecord(orchestratorProp)) {
+  orchestratorProp.deprecated = true;
+}
+
 // Post-process: remove all nested "required" arrays.
 // Runtime config loading uses .default() on every top-level section, so partial
 // configs like { "command": { "name": "review" } } must be accepted.

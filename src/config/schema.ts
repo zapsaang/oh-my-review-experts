@@ -42,7 +42,7 @@ export function sanitizeDefaultModel(raw: string | undefined): string {
 const DEFAULT_MODEL = sanitizeDefaultModel(process.env.OMRE_DEFAULT_MODEL);
 
 export const ModelConfig = z.object({
-  orchestrator: z.string().default(DEFAULT_MODEL).describe("Model for the orchestrator agent that coordinates the review pipeline."),
+  orchestrator: z.string().default(DEFAULT_MODEL).describe("[DEPRECATED — no consumer, kept for config compatibility] Model for the orchestrator agent that coordinates the review pipeline."),
   spec: z.string().default(DEFAULT_MODEL).describe("Model for the spec compliance reviewer."),
   quality: z.string().default(DEFAULT_MODEL).describe("Model for the code quality reviewer."),
   security: z.string().default(DEFAULT_MODEL).describe("Model for the security reviewer."),
