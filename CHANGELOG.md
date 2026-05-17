@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] — 2026-05-17
+
+### Changed (BREAKING)
+
+- `omre_write_handoff` now rejects an explicitly-empty `task_id` in its payload via a Zod refinement: supplying `task_id: ""` returns `{ ok: false, errors: ["task_id, when provided, must be non-empty"] }` and writes no file. Omitting `task_id` is still allowed (and is the recommended pattern).
+- `omre_write_handoff` success response now carries the resolved `taskId`: `{ ok: true, filePath, taskId }`. Callers that previously only read `parsed.filePath` continue to work; the new field is additive.
+- `writeHandoff()` in `src/tools/handoff.ts` no longer defaults a missing `taskId` to `""`. When the input `taskId` is missing or empty, it generates a deterministic non-empty value of the form `<runId>-<timestamp>-<agent>-<3-digit-counter>` and writes it into the JSON header. The counter is per-process and keyed by `(runId, agent)`, so concurrent writers in the same review run get distinct ids without coordination across processes.
+- `writeHandoff()` return type changed from `string` to `{ filePath: string; taskId: string }`. This is a breaking change to the internal API. The package's only production caller (`omre_write_handoff` in `src/tools/plugin-tools.ts`) and all tests are migrated in this release.
+
+### Added
+
+- `generateTaskId(runId, agent, timestamp)` exported from `src/tools/handoff.ts`. Deterministic per-process taskId generator used by `writeHandoff` when the caller omits `taskId`.
+- 3 new tests covering: `writeHandoff` round-trip (resolved taskId equals JSON-header `task_id`), `omre_write_handoff` rejection of explicitly-empty `task_id`, and `omre_write_handoff` returning the resolved taskId in the success response. Total test count is now 540 (was 537 in 0.1.3).
+
+### Migration notes
+
+- Production callers of `omre_write_handoff`: read `parsed.taskId` if you need the resolved id; existing `parsed.filePath` reads are unchanged.
+- Internal callers of `writeHandoff()`: destructure `const { filePath } = writeHandoff(...)` instead of assigning to a string. The previous string return is gone.
+- Prompts are unchanged. Reviewer staticPrompt continues to show `"task_id": "<subagent task id>"` as a placeholder; the new behavior is "if you supply nothing, the tool generates one and reads it back to you in the response".
+
 ## [0.1.3] — 2026-05-17
 
 ### Added
