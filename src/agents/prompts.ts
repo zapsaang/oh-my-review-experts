@@ -60,7 +60,55 @@ export const LEAF_COORDINATOR_GUARDRAIL = `You are a leaf coordinator. Do not in
 // Review Code Handoff Protocol
 // Subagent chat output is an unreliable transport layer. The handoff file is the source of truth.
 
+const HANDOFF_DIR_TEMPLATE = "{handoffDir}";
+const RUN_ID_TEMPLATE = "{runId}";
+
+/**
+ * Channel and format rules for reviewer handoffs, with runtime values
+ * (handoffDir, runId) replaced by the literal placeholders {handoffDir}
+ * and {runId}. This string is embedded into reviewer staticPrompt at
+ * registration time so the system-channel contract matches the user-channel
+ * delegation; the per-run path values are then injected through
+ * buildHandoffRuntime() in the orchestrator's user-turn prompt.
+ */
+export const STATIC_HANDOFF_PROTOCOL = renderHandoffProtocol(
+  HANDOFF_DIR_TEMPLATE,
+  RUN_ID_TEMPLATE,
+);
+
+/**
+ * Per-run path stanza naming the actual handoff directory and runId for the
+ * current review run. Used by the orchestrator to remind subagents which
+ * directory their files belong in. The full channel/format rules already
+ * live in each reviewer's staticPrompt via STATIC_HANDOFF_PROTOCOL.
+ */
+export function buildHandoffRuntime(handoffDir: string, runId: string): string {
+  return `
+## Review Code Handoff Runtime
+
+Current review run ID: \`${runId}\`
+
+All subagent results for this run MUST be written under:
+
+${handoffDir}/${runId}/
+
+The full handoff protocol (file format, receipt format, chat output rule,
+prohibited behaviors) is embedded in each reviewer subagent's prompt and is
+not duplicated here.
+`;
+}
+
+/**
+ * @deprecated Compose `STATIC_HANDOFF_PROTOCOL` (in reviewer staticPrompt) and
+ * `buildHandoffRuntime(handoffDir, runId)` (in orchestrator prompt) instead.
+ * Kept so legacy callers and existing tests continue to receive the combined
+ * runtime+protocol text in one string.
+ */
 export function buildHandoffProtocol(handoffDir: string, runId: string): string {
+  return renderHandoffProtocol(handoffDir, runId);
+}
+
+function renderHandoffProtocol(handoffDir: string, runId: string): string {
   return `
 ## Review Code Handoff Protocol
 
@@ -249,7 +297,7 @@ Every finding must include a concrete failure sequence. `
 };
 
 export function composePrompt(dimension: ReviewDimensionType): string {
-  return `${CONTRACT.trim()}\n\n${REVIEWER_PROMPTS[dimension]}`;
+  return `${FILE_HANDOFF_CONTRACT.trim()}\n\n${REVIEWER_PROMPTS[dimension]}\n${STATIC_HANDOFF_PROTOCOL}`;
 }
 
 export const COMPLETE_REVIEWER_PROMPTS: Record<ReviewDimensionType, string> = {

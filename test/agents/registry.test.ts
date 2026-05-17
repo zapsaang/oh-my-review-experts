@@ -132,6 +132,24 @@ describe.each(REVIEWER_NAMES)("registry: reviewer %s prompt + tools", (name) => 
     expect(prompt).toContain("Output strict JSON only when asked");
   });
 
+  it("[L2 fix] reviewer staticPrompt embeds the file-output channel rules", () => {
+    const prompt = String(reviewerSlot().prompt ?? "");
+    expect(prompt, name).toContain("omre_write_handoff");
+    expect(prompt, name).toMatch(/```json/);
+    expect(prompt, name).toContain("HANDOFF_FILE:");
+  });
+
+  it("[L2 fix] reviewer staticPrompt is template-only (no runId or absolute handoff path)", () => {
+    const prompt = String(reviewerSlot().prompt ?? "");
+    expect(prompt, name).not.toMatch(/\d{8}-\d{6}-\d{3}/);
+    expect(prompt, name).toMatch(/\{handoffDir\}\/\{runId\}/);
+  });
+
+  it("[L2 fix] reviewer staticPrompt explicitly forbids emitting a json fence in chat", () => {
+    const prompt = String(reviewerSlot().prompt ?? "");
+    expect(prompt, name).toMatch(/never include[^.]*json fence[^.]*chat/i);
+  });
+
   it("[step 8] tools deny baseline (task, skill, edit, write, bash, webfetch, todowrite, websearch)", () => {
     const slot = reviewerSlot();
     const tools = slot.tools as Record<string, boolean>;
