@@ -9,6 +9,7 @@ import {
   REVIEWER_PROMPTS,
   COMPLETE_REVIEWER_PROMPTS,
   RESULT_VALIDATOR_PROMPT,
+  STATIC_HANDOFF_PROTOCOL,
   SLICE_ARBITER_PROMPT,
   SLICE_PLANNER_PROMPT,
   SLICE_PLAN_VALIDATOR_PROMPT,
@@ -193,6 +194,15 @@ describe("buildHandoffProtocol", () => {
   it("[L1.5 fix] explicitly forbids the subagent from including a json fence in chat", () => {
     const prompt = buildHandoffProtocol(".omre/handoffs", "run-001");
     expect(prompt).toMatch(/never include[^.]*json fence[^.]*chat/i);
+  });
+
+  it("[N3] tells reviewers to pass runId when calling omre_write_handoff", () => {
+    const paragraphs = STATIC_HANDOFF_PROTOCOL.split(/\n\s*\n/);
+    expect(
+      paragraphs.some((paragraph) =>
+        /omre_write_handoff/.test(paragraph) && /runId/.test(paragraph)
+      )
+    ).toBe(true);
   });
 });
 

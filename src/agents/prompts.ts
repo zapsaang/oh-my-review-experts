@@ -125,7 +125,7 @@ All subagent results MUST be written to:
 
 ${handoffDir}/${runId}/
 
-**YOU MUST use the \`omre_write_handoff\` tool to write handoff files. Do NOT use the \`write\` tool directly.** The \`omre_write_handoff\` tool handles file naming and location automatically.
+**YOU MUST use the \`omre_write_handoff\` tool to write handoff files. Do NOT use the \`write\` tool directly.** The \`omre_write_handoff\` tool handles file naming and location automatically. When calling \`omre_write_handoff\`, pass the current \`runId\` as the top-level \`runId\` argument so the file lands inside the per-run handoff directory.
 
 ### Subagent Requirements
 
