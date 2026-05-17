@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `omre_write_handoff` now rejects an explicitly-empty `task_id` in its payload via a Zod refinement: supplying `task_id: ""` returns `{ ok: false, errors: ["task_id, when provided, must be non-empty"] }` and writes no file. Omitting `task_id` is still allowed (and is the recommended pattern).
 - `omre_write_handoff` success response now carries the resolved `taskId`: `{ ok: true, filePath, taskId }`. Callers that previously only read `parsed.filePath` continue to work; the new field is additive.
 - `writeHandoff()` in `src/tools/handoff.ts` no longer defaults a missing `taskId` to `""`. When the input `taskId` is missing or empty, it generates a deterministic non-empty value of the form `<runId>-<timestamp>-<agent>-<3-digit-counter>` and writes it into the JSON header. The counter is per-process and keyed by `(runId, agent)`, so concurrent writers in the same review run get distinct ids without coordination across processes.
-- `writeHandoff()` return type changed from `string` to `{ filePath: string; taskId: string }`. This is a breaking change to the internal API. The package's only production caller (`omre_write_handoff` in `src/tools/plugin-tools.ts`) and all tests are migrated in this release.
+- `writeHandoff()` return type changed from `string` to `{ filePath: string; taskId: string }`. This is a breaking change to the public root export. The package's only production caller (`omre_write_handoff` in `src/tools/plugin-tools.ts`) and all tests are migrated in this release.
 
 ### Added
 
@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No caller changes required. The five `SLICE_*_JSON` constants keep their names and remain plain strings; only their content shape changed.
 - Schema evolution is now schema-side. Adding a field to a coordinator output is one edit in `schemas.ts`; the prompt example regenerates automatically and the snapshot test forces a deliberate review of the rendered prompt.
 
-
+## [0.1.2] — 2026-05-17
 
 ### Fixed
 
