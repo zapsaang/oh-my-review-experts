@@ -5,7 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.2] — 2026-05-17
+## [0.1.3] — 2026-05-17
+
+### Added
+
+- `SlicePlannerSchema`, `SlicePlanValidatorSchema`, `ResultValidatorSchema`, `SliceArbiterSchema`, `GlobalArbiterSchema` exported from `src/agents/schemas.ts` — Zod schemas that are now the single source of truth for coordinator output structure.
+- `SLICE_TYPE_VALUES` exported constant enumerating the eight allowed `slice_type` values (mirrors the slice planner prompt vocabulary).
+- 21 new schemas-side unit tests + 5 coordinator-prompt snapshot tests in `test/agents/`. Total test count is 537 (was 511 in 0.1.2).
+
+### Changed (BREAKING — prompt format)
+
+- `SLICE_PLANNER_JSON`, `SLICE_PLAN_VALIDATOR_JSON`, `RESULT_VALIDATOR_JSON`, `SLICE_ARBITER_JSON`, `GLOBAL_ARBITER_JSON` are now derived: `JSON.stringify(zodToExample(<Schema>), null, 2)`. Identifier names are unchanged so existing imports continue to compile, but the rendered text differs. The four previously-compact one-liners are now multi-line indented; coordinator prompts that interpolate them therefore changed shape. Field examples now use the canonical placeholder vocabulary produced by `zodToExample` (e.g. `"completed|blocked"`, `"string"`, `0`, `true`) instead of hand-written sentinel values.
+- `zodToExample` now renders `z.unknown()` as `null` and `z.nullable(...)` as `null` (instead of unwrapping to the inner type or returning the literal string `"unknown"`). This keeps prompt-facing examples JSON-clean for schemas that include an `unknown | null` branch (used by `SlicePlanValidatorSchema.normalized_result`).
+
+### Migration notes
+
+- No caller changes required. The five `SLICE_*_JSON` constants keep their names and remain plain strings; only their content shape changed.
+- Schema evolution is now schema-side. Adding a field to a coordinator output is one edit in `schemas.ts`; the prompt example regenerates automatically and the snapshot test forces a deliberate review of the rendered prompt.
+
+
 
 ### Fixed
 
