@@ -140,8 +140,10 @@ export type NormalizedUnifiedHandoff = z.infer<typeof NormalizedUnifiedHandoffSc
  * - enum   → "value1|value2|..." pipe-separated string.
  * - union  → first option's example.
  * - default/catch/optional → unwrapped to inner type's example.
+ * - nullable → null (the safe, JSON-renderable representative for the optional-null branch).
  * - array  → single-element array containing element example.
  * - string → "string", number → 0, boolean → true.
+ * - unknown → null (no concrete type to materialize; null keeps prompt examples JSON-clean).
  *
  * Depth-limited at 10 to defend against accidental cyclic schemas.
  */
@@ -171,8 +173,12 @@ export function zodToExample(schema: unknown, depth = 0): unknown {
     return options.length > 0 ? zodToExample(options[0], depth + 1) : "unknown";
   }
 
-  if (type === "default" || type === "catch" || type === "optional" || type === "nullable") {
+  if (type === "default" || type === "catch" || type === "optional") {
     return zodToExample(def?.innerType, depth + 1);
+  }
+
+  if (type === "nullable") {
+    return null;
   }
 
   if (type === "array") {
@@ -183,6 +189,7 @@ export function zodToExample(schema: unknown, depth = 0): unknown {
   if (type === "string") return "string";
   if (type === "number") return 0;
   if (type === "boolean") return true;
+  if (type === "unknown") return null;
 
   return "unknown";
 }

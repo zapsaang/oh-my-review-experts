@@ -649,3 +649,29 @@ describe("GlobalArbiterSchema", () => {
     expect(example).toHaveProperty("summary");
   });
 });
+
+describe("zodToExample (coordinator schemas) — no 'unknown' placeholder", () => {
+  function noUnknownPlaceholders(obj: unknown): boolean {
+    if (typeof obj === "string") return obj !== "unknown";
+    if (Array.isArray(obj)) return obj.every(noUnknownPlaceholders);
+    if (obj && typeof obj === "object") {
+      return Object.values(obj as Record<string, unknown>).every(noUnknownPlaceholders);
+    }
+    return true;
+  }
+
+  it.each([
+    ["SlicePlannerSchema", SlicePlannerSchema],
+    ["SlicePlanValidatorSchema", SlicePlanValidatorSchema],
+    ["ResultValidatorSchema", ResultValidatorSchema],
+    ["SliceArbiterSchema", SliceArbiterSchema],
+    ["GlobalArbiterSchema", GlobalArbiterSchema],
+  ])("zodToExample(%s) produces no 'unknown' placeholder", (_name, schema) => {
+    expect(noUnknownPlaceholders(zodToExample(schema))).toBe(true);
+  });
+
+  it("renders z.unknown().nullable() as null (not the 'unknown' placeholder)", () => {
+    const example = zodToExample(SlicePlanValidatorSchema) as Record<string, unknown>;
+    expect(example.normalized_result).toBeNull();
+  });
+});
