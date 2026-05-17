@@ -97,6 +97,46 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
     }
   });
 
+  it("rejects explicitly-empty task_id with { ok: false, errors }", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-empty-task-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".omre", "config.json"),
+        JSON.stringify({ handoff: { enabled: true, directory: ".omre/handoffs" } }),
+        "utf8",
+      );
+
+      const rawInput = {
+        payload: {
+          task_id: "",
+          agent: "reviewer-spec",
+          dimension: "spec",
+          status: "completed" as const,
+          findings: [],
+        },
+      };
+
+      let parsed: { ok: boolean; errors?: unknown; filePath?: unknown };
+      try {
+        const input = parseToolArgs(tools.omre_write_handoff, rawInput);
+        const result = await tools.omre_write_handoff.execute(input, mockContext(tmpDir));
+        parsed = JSON.parse(result as string);
+      } catch (e) {
+        parsed = { ok: false, errors: [e instanceof Error ? e.message : String(e)] };
+      }
+
+      expect(parsed.ok).toBe(false);
+      expect(Array.isArray(parsed.errors)).toBe(true);
+      const errs = parsed.errors as string[];
+      expect(errs.length).toBeGreaterThan(0);
+      expect(errs.join(" ")).toMatch(/task_id.*non-empty/i);
+      expect(parsed.filePath).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it("returns { ok: false, errors } on rejected handoff directory (no throw)", async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-traversal-"));
     try {

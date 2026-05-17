@@ -112,7 +112,10 @@ export const tools = {
     args: {
       payload: z.object({
         schema_version: z.string().optional(),
-        task_id: z.string().optional(),
+        task_id: z
+          .string()
+          .refine((v) => v.length > 0, "task_id, when provided, must be non-empty")
+          .optional(),
         agent: z.string(),
         dimension: z.string(),
         scope: z.string().optional(),
