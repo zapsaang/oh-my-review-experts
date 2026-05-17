@@ -1,5 +1,26 @@
 import { describe, it, expect } from "vitest";
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { buildReviewCodePrompt, renderLocalDryRun } from "../../src/workflow/run-review-code.js";
+
+function withCleanGitRepo<T>(fn: (cwd: string) => T): T {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-review-prompt-"));
+  try {
+    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
+    execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync(
+      "git",
+      ["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "init"],
+      { cwd: tmpDir, stdio: "ignore" }
+    );
+    return fn(tmpDir);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
 
 describe("buildReviewCodePrompt", () => {
   it("returns a prompt bundle with runId", () => {
@@ -29,6 +50,14 @@ describe("buildReviewCodePrompt", () => {
   it("[L4 fix] orchestrator prompt describes file-first recovery via omre_validate_handoff", () => {
     const bundle = buildReviewCodePrompt({ args: "", cwd: process.cwd() });
     expect(bundle.prompt).toMatch(/omre_validate_handoff/);
+  });
+
+  it("[C1] orchestrator prompt uses camelCase isValid from omre_validate_handoff", () => {
+    withCleanGitRepo((cwd) => {
+      const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      expect(bundle.prompt).not.toContain("is_valid");
+      expect(bundle.prompt).toMatch(/isValid/);
+    });
   });
 
   it("[L4 fix] orchestrator prompt describes the {ok, errors} contract for omre_write_handoff", () => {

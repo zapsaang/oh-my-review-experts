@@ -127,7 +127,7 @@ Execution requirements:
 3. For each slice, invoke only the selected reviewers listed in reviewersBySlice as independent subagents.
 4. Each reviewer subagent runs with its own context and writes a handoff file via \`omre_write_handoff\`. The full handoff protocol (channel rules, file format, receipt format, prohibited behaviors) is embedded in each reviewer's system prompt.
 5. \`omre_write_handoff\` returns \`{ "ok": true, "filePath": "..." }\` on success or \`{ "ok": false, "errors": [...] }\` on failure. The reviewer's chat reply is a fixed receipt (\`HANDOFF_FILE: ... STATUS: ... SUMMARY: ...\`) and never contains a JSON fence.
-6. Before feeding reviewer output to the arbiter, call \`omre_validate_handoff\` with the \`filePath\` extracted from the receipt. Do not feed reviewer output to the arbiter until \`omre_validate_handoff\` returns \`is_valid = true\`.
+6. Before feeding reviewer output to the arbiter, call \`omre_validate_handoff\` with the \`filePath\` extracted from the receipt. Do not feed reviewer output to the arbiter until \`omre_validate_handoff\` returns \`isValid === true\`.
 7. If validation fails with retryRecommended=true, retry that reviewer once. If still invalid after retry, mark the dimension as degraded and proceed.
 ${arbitrationInstructions}
 
