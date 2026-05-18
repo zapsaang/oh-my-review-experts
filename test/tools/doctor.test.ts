@@ -7,6 +7,7 @@ import { checkAgentRegistration, checkOmrePermissions, checkOpencodeConfig } fro
 import { AGENT_NAMES } from "../../src/agents/registry.js";
 import pluginModule from "../../src/index.js";
 import { clearLoadConfigCache } from "../../src/config/load-config.js";
+import { stubPluginInput } from "../_helpers/plugin-input.js";
 
 const OhMyReviewExperts = pluginModule.server;
 
@@ -151,22 +152,6 @@ describe("checkOpencodeConfig", () => {
 });
 
 describe("[step 18] checkAgentRegistration", () => {
-  function stubPluginInput(directory: string) {
-    return {
-      client: {
-        app: {
-          log: async () => undefined,
-        },
-      } as any,
-      project: {} as any,
-      directory,
-      worktree: directory,
-      experimental_workspace: { register: () => {} },
-      serverUrl: new URL("http://localhost"),
-      $: {} as any,
-    };
-  }
-
   it("reports zero registered when config has no agent map", () => {
     const result = checkAgentRegistration({} as Config);
     expect(result.expected).toBe(11);

@@ -1,19 +1,8 @@
 import { describe, it, expect } from "vitest";
 import pluginModule from "../src/index.js";
+import { stubPluginInput } from "./_helpers/plugin-input.js";
 
 const OhMyReviewExperts = pluginModule.server;
-
-function stubPluginInput(directory: string) {
-  return {
-    client: {} as any,
-    project: {} as any,
-    directory,
-    worktree: directory,
-    experimental_workspace: { register: () => {} },
-    serverUrl: new URL("http://localhost"),
-    $: {} as any,
-  };
-}
 
 describe("tool hook registration", () => {
   it("registers all expected tools", async () => {
