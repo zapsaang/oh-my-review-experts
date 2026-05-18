@@ -25,6 +25,22 @@ import {
   zodToExample,
 } from "../../src/agents/schemas.js";
 
+type SchemaParseResult =
+  | { success: true }
+  | { success: false; error: { issues: Array<{ message: string; path: Array<PropertyKey> }> } };
+
+type SchemaUnderTest = {
+  safeParse: (value: unknown) => SchemaParseResult;
+};
+
+function expectRejectsWithMessage(schema: SchemaUnderTest, input: unknown, expectedMessage: string): void {
+  const result = schema.safeParse(input);
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.issues.some((issue) => issue.message.includes(expectedMessage))).toBe(true);
+  }
+}
+
 describe("JSON schema constants", () => {
   it("SLICE_PLANNER_JSON contains expected fields", () => {
     expect(SLICE_PLANNER_JSON).toContain('"status"');
@@ -492,6 +508,165 @@ describe("zodToExample", () => {
       confidence: "high|medium|low",
       classification: "string",
     });
+  });
+});
+
+describe("schema-wide non-empty hardening", () => {
+  const findingFixture = {
+    id: "sec-1",
+    severity: "high" as const,
+    title: "Finding title",
+    description: "Finding description",
+    evidence: "Finding evidence",
+    confidence: "high" as const,
+    classification: "injection",
+  };
+
+  const handoffFixture = {
+    schema_version: "1",
+    task_id: "task-123",
+    agent: "reviewer-security",
+    dimension: "security",
+    status: "completed" as const,
+    target: { kind: "working-tree", value: "" },
+    slice_id: "whole-target",
+    findings: [],
+    meta: { total_findings: 0, notes: "" },
+  };
+
+  const plannerSliceFixture = {
+    slice_id: "slice-1",
+    slice_type: SLICE_TYPE_VALUES[0],
+    title: "Auth module",
+    files: ["src/auth.ts"],
+  };
+
+  const slicePlannerFixture = {
+    schema_version: "1",
+    status: "completed" as const,
+    slicing_mode: "module-based" as const,
+    should_slice: true,
+    reason: "split by module",
+    slices: [plannerSliceFixture],
+  };
+
+  const resultValidatorFixture = {
+    schema_version: "1",
+    status: "completed" as const,
+    assigned_dimension: "spec" as const,
+    slice_id: "whole-target",
+    is_valid: true,
+    failure_reason: "",
+    retry_recommended: false,
+  };
+
+  const sliceArbiterRejectedFixture = { id: "finding-1", reason: "duplicate" as const };
+  const sliceArbiterFixture = {
+    schema_version: "1",
+    status: "completed" as const,
+    slice_id: "slice-1",
+    confirmed: [],
+    needs_validation: [],
+    rejected: [sliceArbiterRejectedFixture],
+    degraded: false,
+    missing_dimensions: ["security"],
+  };
+
+  const globalArbiterRejectedFixture = { id: "finding-1", reason: "duplicate" as const };
+  const globalArbiterDegradedSliceFixture = {
+    slice_id: "slice-1",
+    missing_dimensions: ["security"],
+  };
+  const globalArbiterFixture = {
+    schema_version: "1",
+    status: "completed" as const,
+    confirmed: [],
+    needs_validation: [],
+    rejected: [globalArbiterRejectedFixture],
+    degraded_slices: [globalArbiterDegradedSliceFixture],
+    missing_dimensions_global: ["security"],
+    summary: { total_slices: 1, total_confirmed: 0 },
+  };
+
+  const nonEmptyCases: Array<[string, string, SchemaUnderTest, unknown]> = [
+    ["UnifiedFindingSchema", "id", UnifiedFindingSchema, { ...findingFixture, id: "" }],
+    ["UnifiedFindingSchema", "title", UnifiedFindingSchema, { ...findingFixture, title: "" }],
+    ["UnifiedFindingSchema", "description", UnifiedFindingSchema, { ...findingFixture, description: "" }],
+    ["UnifiedFindingSchema", "evidence", UnifiedFindingSchema, { ...findingFixture, evidence: "" }],
+    ["UnifiedFindingSchema", "classification", UnifiedFindingSchema, { ...findingFixture, classification: "" }],
+    ["UnifiedHandoffSchema", "task_id", UnifiedHandoffSchema, { ...handoffFixture, task_id: "" }],
+    ["UnifiedHandoffSchema", "agent", UnifiedHandoffSchema, { ...handoffFixture, agent: "" }],
+    ["UnifiedHandoffSchema", "dimension", UnifiedHandoffSchema, { ...handoffFixture, dimension: "" }],
+    ["UnifiedHandoffSchema", "target.kind", UnifiedHandoffSchema, { ...handoffFixture, target: { ...handoffFixture.target, kind: "" } }],
+    ["UnifiedHandoffSchema", "slice_id", UnifiedHandoffSchema, { ...handoffFixture, slice_id: "" }],
+    ["SlicePlannerSchema", "reason", SlicePlannerSchema, { ...slicePlannerFixture, reason: "" }],
+    ["SlicePlannerSchema", "slices[].slice_id", SlicePlannerSchema, { ...slicePlannerFixture, slices: [{ ...plannerSliceFixture, slice_id: "" }] }],
+    ["SlicePlannerSchema", "slices[].title", SlicePlannerSchema, { ...slicePlannerFixture, slices: [{ ...plannerSliceFixture, title: "" }] }],
+    ["SlicePlannerSchema", "slices[].files[]", SlicePlannerSchema, { ...slicePlannerFixture, slices: [{ ...plannerSliceFixture, files: [""] }] }],
+    ["ResultValidatorSchema", "slice_id", ResultValidatorSchema, { ...resultValidatorFixture, slice_id: "" }],
+    ["SliceArbiterSchema", "slice_id", SliceArbiterSchema, { ...sliceArbiterFixture, slice_id: "" }],
+    ["SliceArbiterSchema", "rejected[].id", SliceArbiterSchema, { ...sliceArbiterFixture, rejected: [{ ...sliceArbiterRejectedFixture, id: "" }] }],
+    ["SliceArbiterSchema", "missing_dimensions[]", SliceArbiterSchema, { ...sliceArbiterFixture, missing_dimensions: [""] }],
+    ["GlobalArbiterSchema", "rejected[].id", GlobalArbiterSchema, { ...globalArbiterFixture, rejected: [{ ...globalArbiterRejectedFixture, id: "" }] }],
+    ["GlobalArbiterSchema", "degraded_slices[].slice_id", GlobalArbiterSchema, { ...globalArbiterFixture, degraded_slices: [{ ...globalArbiterDegradedSliceFixture, slice_id: "" }] }],
+    ["GlobalArbiterSchema", "degraded_slices[].missing_dimensions[]", GlobalArbiterSchema, { ...globalArbiterFixture, degraded_slices: [{ ...globalArbiterDegradedSliceFixture, missing_dimensions: [""] }] }],
+    ["GlobalArbiterSchema", "missing_dimensions_global[]", GlobalArbiterSchema, { ...globalArbiterFixture, missing_dimensions_global: [""] }],
+  ];
+
+  it.each(nonEmptyCases)("%s rejects empty %s", (_schemaName, _fieldPath, schema, input) => {
+    expectRejectsWithMessage(schema, input, "non-empty");
+  });
+
+  const nestedArrayCases: Array<[string, SchemaUnderTest, unknown]> = [
+    ["SlicePlannerSchema rejects empty file path elements", SlicePlannerSchema, { ...slicePlannerFixture, slices: [{ ...plannerSliceFixture, files: [""] }] }],
+    ["SliceArbiterSchema rejects empty missing dimension elements", SliceArbiterSchema, { ...sliceArbiterFixture, missing_dimensions: [""] }],
+    ["GlobalArbiterSchema rejects empty degraded-slice missing dimension elements", GlobalArbiterSchema, { ...globalArbiterFixture, degraded_slices: [{ ...globalArbiterDegradedSliceFixture, missing_dimensions: [""] }] }],
+    ["GlobalArbiterSchema rejects empty global missing dimension elements", GlobalArbiterSchema, { ...globalArbiterFixture, missing_dimensions_global: [""] }],
+  ];
+
+  it.each(nestedArrayCases)("%s", (_name, schema, input) => {
+    expectRejectsWithMessage(schema, input, "non-empty");
+  });
+});
+
+describe("validator failure_reason discrimination", () => {
+  const slicePlanValidatorBase = {
+    schema_version: "1",
+    status: "completed" as const,
+    retry_recommended: false,
+    normalized_result: null,
+  };
+
+  const resultValidatorBase = {
+    schema_version: "1",
+    status: "completed" as const,
+    assigned_dimension: "spec" as const,
+    slice_id: "whole-target",
+    retry_recommended: false,
+  };
+
+  const cases: Array<[string, string, SchemaUnderTest, Record<string, unknown>, boolean, string, boolean]> = [
+    ["SlicePlanValidatorSchema", "valid with empty reason", SlicePlanValidatorSchema, slicePlanValidatorBase, true, "", true],
+    ["SlicePlanValidatorSchema", "valid with populated reason", SlicePlanValidatorSchema, slicePlanValidatorBase, true, "planner normalized", true],
+    ["SlicePlanValidatorSchema", "invalid with empty reason", SlicePlanValidatorSchema, slicePlanValidatorBase, false, "", false],
+    ["SlicePlanValidatorSchema", "invalid with populated reason", SlicePlanValidatorSchema, slicePlanValidatorBase, false, "missing files", true],
+    ["ResultValidatorSchema", "valid with empty reason", ResultValidatorSchema, resultValidatorBase, true, "", true],
+    ["ResultValidatorSchema", "valid with populated reason", ResultValidatorSchema, resultValidatorBase, true, "minor normalization", true],
+    ["ResultValidatorSchema", "invalid with empty reason", ResultValidatorSchema, resultValidatorBase, false, "", false],
+    ["ResultValidatorSchema", "invalid with populated reason", ResultValidatorSchema, resultValidatorBase, false, "dimension mismatch", true],
+  ];
+
+  it.each(cases)("%s %s", (_schemaName, _caseName, schema, base, isValid, failureReason, expectedSuccess) => {
+    const result = schema.safeParse({ ...base, is_valid: isValid, failure_reason: failureReason });
+    expect(result.success).toBe(expectedSuccess);
+    if (!expectedSuccess && !result.success) {
+      expect(
+        result.error.issues.some(
+          (issue) => issue.path.join(".") === "failure_reason"
+            && issue.message === "failure_reason required when is_valid=false",
+        ),
+      ).toBe(true);
+    }
   });
 });
 

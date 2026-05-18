@@ -34,6 +34,19 @@ function parseToolArgs<T extends z.ZodRawShape>(
   return parsed.data;
 }
 
+type WriteHandoffResult = { ok: boolean; errors?: string[]; filePath?: unknown };
+
+async function executeWriteHandoffRaw(raw: unknown, directory: string): Promise<WriteHandoffResult> {
+  try {
+    const input = parseToolArgs(tools.omre_write_handoff, raw);
+    const result = await tools.omre_write_handoff.execute(input, mockContext(directory));
+    return JSON.parse(result as string) as WriteHandoffResult;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return { ok: false, errors: [message] };
+  }
+}
+
 describe("omre_write_handoff result shape [L4 fix]", () => {
   it("returns { ok: true, filePath } on success", async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-ok-"));
@@ -160,6 +173,91 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
       const errs = parsed.errors as string[];
       expect(errs.length).toBeGreaterThan(0);
       expect(errs.join(" ")).toMatch(/task_id.*non-empty/i);
+      expect(parsed.filePath).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects empty agent at the write boundary", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-empty-agent-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".omre", "config.json"),
+        JSON.stringify({ handoff: { enabled: true, directory: ".omre/handoffs" } }),
+        "utf8",
+      );
+
+      const parsed = await executeWriteHandoffRaw({
+        payload: {
+          agent: "",
+          dimension: "spec",
+          status: "completed" as const,
+          findings: [],
+        },
+      }, tmpDir);
+
+      expect(parsed.ok).toBe(false);
+      expect(Array.isArray(parsed.errors)).toBe(true);
+      expect(parsed.errors?.join(" ")).toMatch(/agent.*non-empty/i);
+      expect(parsed.filePath).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects empty dimension at the write boundary", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-empty-dimension-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".omre", "config.json"),
+        JSON.stringify({ handoff: { enabled: true, directory: ".omre/handoffs" } }),
+        "utf8",
+      );
+
+      const parsed = await executeWriteHandoffRaw({
+        payload: {
+          agent: "reviewer-spec",
+          dimension: "",
+          status: "completed" as const,
+          findings: [],
+        },
+      }, tmpDir);
+
+      expect(parsed.ok).toBe(false);
+      expect(Array.isArray(parsed.errors)).toBe(true);
+      expect(parsed.errors?.join(" ")).toMatch(/dimension.*non-empty/i);
+      expect(parsed.filePath).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects empty target kind at the write boundary", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-empty-kind-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".omre", "config.json"),
+        JSON.stringify({ handoff: { enabled: true, directory: ".omre/handoffs" } }),
+        "utf8",
+      );
+
+      const parsed = await executeWriteHandoffRaw({
+        payload: {
+          agent: "reviewer-spec",
+          dimension: "spec",
+          status: "completed" as const,
+          target: { kind: "", value: "src/auth.ts" },
+          findings: [],
+        },
+      }, tmpDir);
+
+      expect(parsed.ok).toBe(false);
+      expect(Array.isArray(parsed.errors)).toBe(true);
+      expect(parsed.errors?.join(" ")).toMatch(/target\.kind.*non-empty/i);
       expect(parsed.filePath).toBeUndefined();
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
