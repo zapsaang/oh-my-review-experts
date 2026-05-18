@@ -7,6 +7,9 @@
 
 import { z } from "zod";
 
+/** Builds string validators whose messages preserve the "must be non-empty" grep contract. */
+const nonEmpty = (label: string) => z.string().min(1, `${label} must be non-empty`);
+
 /**
  * Current schema version for handoff contracts.
  *
@@ -89,15 +92,15 @@ export type SliceType = (typeof SLICE_TYPE_VALUES)[number];
  * - Extra-field warnings are emitted by validate-result.ts, not enforced here.
  */
 export const UnifiedFindingSchema = z.looseObject({
-  id: z.string(),
+  id: nonEmpty("id"),
   severity: z.enum(SEVERITY_VALUES).catch("medium"),
   file: z.string().default("N/A"),
   line: z.union([z.number(), z.string()]).default("N/A"),
-  title: z.string(),
-  description: z.string(),
-  evidence: z.string(),
+  title: nonEmpty("title"),
+  description: nonEmpty("description"),
+  evidence: nonEmpty("evidence"),
   confidence: z.enum(CONFIDENCE_VALUES).catch("low"),
-  classification: z.string(),
+  classification: nonEmpty("classification"),
 });
 export type UnifiedFinding = z.infer<typeof UnifiedFindingSchema>;
 
@@ -108,12 +111,12 @@ export type UnifiedFinding = z.infer<typeof UnifiedFindingSchema>;
  */
 export const UnifiedHandoffSchema = z.object({
   schema_version: z.string().regex(SCHEMA_VERSION_PATTERN),
-  task_id: z.string().min(1, "task_id must be non-empty"),
-  agent: z.string(),
-  dimension: z.string(),
+  task_id: nonEmpty("task_id"),
+  agent: nonEmpty("agent"),
+  dimension: nonEmpty("dimension"),
   status: z.enum(["completed", "blocked"]),
-  target: z.object({ kind: z.string(), value: z.string() }),
-  slice_id: z.string(),
+  target: z.object({ kind: nonEmpty("target.kind"), value: z.string() }),
+  slice_id: nonEmpty("slice_id"),
   findings: z.array(z.unknown()),
   meta: z.object({
     total_findings: z.number(),
@@ -231,13 +234,13 @@ export const SlicePlannerSchema = z.looseObject({
   status: z.enum(["completed", "blocked"]).catch("blocked"),
   slicing_mode: z.enum(["none", "module-based", "risk-based", "hybrid"]).catch("none"),
   should_slice: z.boolean(),
-  reason: z.string(),
+  reason: nonEmpty("reason"),
   slices: z.array(
     z.looseObject({
-      slice_id: z.string(),
+      slice_id: nonEmpty("slices[].slice_id"),
       slice_type: z.enum(SLICE_TYPE_VALUES).catch("business-module"),
-      title: z.string(),
-      files: z.array(z.string()),
+      title: nonEmpty("slices[].title"),
+      files: z.array(nonEmpty("slices[].files[]")),
     }),
   ),
 });
@@ -258,7 +261,10 @@ export const SlicePlanValidatorSchema = z.looseObject({
   failure_reason: z.string(),
   retry_recommended: z.boolean(),
   normalized_result: z.unknown().nullable(),
-});
+}).refine(
+  (d) => d.is_valid || d.failure_reason.length > 0,
+  { message: "failure_reason required when is_valid=false", path: ["failure_reason"] }
+);
 export type SlicePlanValidator = z.infer<typeof SlicePlanValidatorSchema>;
 
 /** Prompt-facing JSON example for the slice plan validator, derived from `SlicePlanValidatorSchema`. */
@@ -279,11 +285,14 @@ export const ResultValidatorSchema = z.looseObject({
   assigned_dimension: z
     .enum(["spec", "quality", "security", "performance", "concurrency"])
     .catch("spec"),
-  slice_id: z.string(),
+  slice_id: nonEmpty("slice_id"),
   is_valid: z.boolean(),
   failure_reason: z.string(),
   retry_recommended: z.boolean(),
-});
+}).refine(
+  (d) => d.is_valid || d.failure_reason.length > 0,
+  { message: "failure_reason required when is_valid=false", path: ["failure_reason"] }
+);
 export type ResultValidator = z.infer<typeof ResultValidatorSchema>;
 
 /** Prompt-facing JSON example for the review result validator, derived from `ResultValidatorSchema`. */
@@ -297,17 +306,17 @@ export const RESULT_VALIDATOR_JSON = JSON.stringify(zodToExample(ResultValidator
 export const SliceArbiterSchema = z.looseObject({
   schema_version: z.string().regex(SCHEMA_VERSION_PATTERN),
   status: z.enum(["completed", "blocked"]).catch("blocked"),
-  slice_id: z.string(),
+  slice_id: nonEmpty("slice_id"),
   confirmed: z.array(UnifiedFindingSchema),
   needs_validation: z.array(UnifiedFindingSchema),
   rejected: z.array(
     z.object({
-      id: z.string(),
+      id: nonEmpty("rejected[].id"),
       reason: z.enum(REJECTION_REASON_VALUES).catch("speculative"),
     }),
   ),
   degraded: z.boolean(),
-  missing_dimensions: z.array(z.string()),
+  missing_dimensions: z.array(nonEmpty("missing_dimensions[]")),
 });
 export type SliceArbiter = z.infer<typeof SliceArbiterSchema>;
 
@@ -326,17 +335,17 @@ export const GlobalArbiterSchema = z.looseObject({
   needs_validation: z.array(UnifiedFindingSchema),
   rejected: z.array(
     z.object({
-      id: z.string(),
+      id: nonEmpty("rejected[].id"),
       reason: z.enum(REJECTION_REASON_VALUES).catch("speculative"),
     }),
   ),
   degraded_slices: z.array(
     z.object({
-      slice_id: z.string(),
-      missing_dimensions: z.array(z.string()),
+      slice_id: nonEmpty("degraded_slices[].slice_id"),
+      missing_dimensions: z.array(nonEmpty("degraded_slices[].missing_dimensions[]")),
     }),
   ),
-  missing_dimensions_global: z.array(z.string()),
+  missing_dimensions_global: z.array(nonEmpty("missing_dimensions_global[]")),
   summary: z.object({
     total_slices: z.number(),
     total_confirmed: z.number(),

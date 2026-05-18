@@ -567,7 +567,7 @@ describe("ResultValidatorSchema", () => {
       schema_version: "1",
       status: "completed",
       assigned_dimension: "spec",
-      slice_id: "",
+      slice_id: "whole-target",
       is_valid: true,
       failure_reason: "",
       retry_recommended: false,
