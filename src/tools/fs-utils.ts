@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { randomBytes } from "node:crypto";
 
 export function assertSafePath(resolvedPath: string, basePath: string, context: string): void {
   const normalizedResolved = path.normalize(resolvedPath);
@@ -45,6 +46,10 @@ export function writeFileAtomicOverwrite(filePath: string, content: string): voi
     try { fs.unlinkSync(tmpFile); } catch { }
     throw err;
   }
+}
+
+export function makeTempPath(targetPath: string): string {
+  return `${targetPath}.tmp.${process.pid}.${Date.now()}.${randomBytes(6).toString("hex")}`;
 }
 
 export function formatTimestamp(d = new Date()): string {

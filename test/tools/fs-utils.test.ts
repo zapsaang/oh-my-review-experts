@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { assertSafePath, writeFileAtomic, writeFileAtomicOverwrite, formatTimestamp } from "../../src/tools/fs-utils.js";
+import { assertSafePath, writeFileAtomic, writeFileAtomicOverwrite, formatTimestamp, makeTempPath } from "../../src/tools/fs-utils.js";
 
 describe("assertSafePath", () => {
   it("allows paths within base directory", () => {
@@ -76,5 +76,20 @@ describe("formatTimestamp", () => {
   it("pads single digits", () => {
     const ts = formatTimestamp(new Date(2026, 0, 1, 1, 2, 3, 7));
     expect(ts).toBe("20260101-010203-007");
+  });
+});
+
+describe("makeTempPath", () => {
+  it("produces 1000 distinct paths in a tight loop", () => {
+    const paths = new Set<string>();
+    for (let i = 0; i < 1000; i++) {
+      paths.add(makeTempPath("/tmp/target.txt"));
+    }
+    expect(paths.size).toBe(1000);
+  });
+
+  it("matches expected format", () => {
+    const p = makeTempPath("/tmp/target.txt");
+    expect(p).toMatch(/^.*\.tmp\.\d+\.\d+\.[0-9a-f]{12}$/);
   });
 });
