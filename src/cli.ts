@@ -9,6 +9,7 @@ import type { Config } from "@opencode-ai/plugin"
 import { defaultConfigJsonc, findConfigFiles, loadConfig } from "./config/load-config.js"
 import { renderLocalDryRun } from "./workflow/run-review-code.js"
 import { checkAgentRegistration, checkOpencodeConfig } from "./tools/doctor.js"
+import { makeTempPath } from "./tools/fs-utils.js"
 import { registerAgents } from "./agents/registry.js"
 import { VERSION } from "./version.js"
 
@@ -35,9 +36,9 @@ function readFileSafe(file: string): string | undefined {
 
 function writeFileViaTempRename(file: string, content: string) {
   ensureDir(path.dirname(file))
-  const tmpFile = `${file}.tmp.${Date.now()}`
+  const tmpFile = makeTempPath(file)
   try {
-    fs.writeFileSync(tmpFile, content, "utf8")
+    fs.writeFileSync(tmpFile, content, { flag: "wx", encoding: "utf8" })
     fs.renameSync(tmpFile, file)
   } catch (err) {
     try { fs.unlinkSync(tmpFile) } catch { }
