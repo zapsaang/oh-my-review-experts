@@ -6,4 +6,5 @@ docs/
 .omre
 shell.nix
 opencode.json
+settings.json
 AGENTS.md

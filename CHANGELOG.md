@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] — 2026-05-18
+
+### Changed (BREAKING)
+
+- Tightened empty-string validation across `UnifiedFindingSchema`, `UnifiedHandoffSchema`, `SlicePlannerSchema`, `ResultValidatorSchema`, `SliceArbiterSchema`, and `GlobalArbiterSchema`. Tooling that previously accepted handoffs or coordinator outputs with empty identifier/content fields (`agent`, `dimension`, `slice_id`, `target.kind`, `id`, `title`, `description`, `evidence`, `classification`) will now reject them.
+- `omre_write_handoff` now mirrors the schema tightening at the write boundary for `agent`, `dimension`, `target.kind`, and supplied `slice_id` while preserving omitted `slice_id` defaulting.
+
+### Changed
+
+- `SlicePlanValidatorSchema` and `ResultValidatorSchema` now require `failure_reason` only when `is_valid=false`. Empty `failure_reason` remains accepted when `is_valid=true` and is rejected when `is_valid=false`.
+
+### Migration notes
+
+- Regenerate legacy handoffs through a normal review run if validation now rejects empty identifiers. Auto-resolution of omitted `task_id` was added in PR-2b, so callers should omit unknown task IDs instead of sending `""`.
+
 ## [0.1.6] — 2026-05-18
 
 ### Changed (BREAKING)
