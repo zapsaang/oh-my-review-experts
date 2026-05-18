@@ -264,6 +264,132 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
     }
   });
 
+  it("rejects empty agent directly in execute() bypassing args schema", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-direct-agent-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".omre", "config.json"),
+        JSON.stringify({ handoff: { enabled: true, directory: ".omre/handoffs" } }),
+        "utf8",
+      );
+
+      const badInput = {
+        payload: {
+          agent: "",
+          dimension: "spec",
+          status: "completed" as const,
+          findings: [],
+        },
+      } as unknown as Parameters<typeof tools.omre_write_handoff.execute>[0];
+
+      const result = await tools.omre_write_handoff.execute(badInput, mockContext(tmpDir));
+      const parsed: WriteHandoffResult = JSON.parse(result as string);
+
+      expect(parsed.ok).toBe(false);
+      expect(Array.isArray(parsed.errors)).toBe(true);
+      expect(parsed.errors?.join(" ")).toMatch(/agent.*non-empty/i);
+      expect(parsed.filePath).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects empty dimension directly in execute() bypassing args schema", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-direct-dimension-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".omre", "config.json"),
+        JSON.stringify({ handoff: { enabled: true, directory: ".omre/handoffs" } }),
+        "utf8",
+      );
+
+      const badInput = {
+        payload: {
+          agent: "spec",
+          dimension: "",
+          status: "completed" as const,
+          findings: [],
+        },
+      } as unknown as Parameters<typeof tools.omre_write_handoff.execute>[0];
+
+      const result = await tools.omre_write_handoff.execute(badInput, mockContext(tmpDir));
+      const parsed: WriteHandoffResult = JSON.parse(result as string);
+
+      expect(parsed.ok).toBe(false);
+      expect(Array.isArray(parsed.errors)).toBe(true);
+      expect(parsed.errors?.join(" ")).toMatch(/dimension.*non-empty/i);
+      expect(parsed.filePath).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects empty target.kind directly in execute() bypassing args schema", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-direct-kind-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".omre", "config.json"),
+        JSON.stringify({ handoff: { enabled: true, directory: ".omre/handoffs" } }),
+        "utf8",
+      );
+
+      const badInput = {
+        payload: {
+          agent: "spec",
+          dimension: "spec",
+          status: "completed" as const,
+          target: { kind: "", value: "src/auth.ts" },
+          findings: [],
+        },
+      } as unknown as Parameters<typeof tools.omre_write_handoff.execute>[0];
+
+      const result = await tools.omre_write_handoff.execute(badInput, mockContext(tmpDir));
+      const parsed: WriteHandoffResult = JSON.parse(result as string);
+
+      expect(parsed.ok).toBe(false);
+      expect(Array.isArray(parsed.errors)).toBe(true);
+      expect(parsed.errors?.join(" ")).toMatch(/target\.kind.*non-empty/i);
+      expect(parsed.filePath).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects empty slice_id directly in execute() bypassing args schema", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-direct-slice-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".omre", "config.json"),
+        JSON.stringify({ handoff: { enabled: true, directory: ".omre/handoffs" } }),
+        "utf8",
+      );
+
+      const badInput = {
+        payload: {
+          agent: "spec",
+          dimension: "spec",
+          status: "completed" as const,
+          slice_id: "",
+          findings: [],
+        },
+      } as unknown as Parameters<typeof tools.omre_write_handoff.execute>[0];
+
+      const result = await tools.omre_write_handoff.execute(badInput, mockContext(tmpDir));
+      const parsed: WriteHandoffResult = JSON.parse(result as string);
+
+      expect(parsed.ok).toBe(false);
+      expect(Array.isArray(parsed.errors)).toBe(true);
+      expect(parsed.errors?.join(" ")).toMatch(/slice_id.*non-empty/i);
+      expect(parsed.filePath).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it("returns { ok: false, errors } on rejected handoff directory (no throw)", async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-traversal-"));
     try {

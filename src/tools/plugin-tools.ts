@@ -134,8 +134,24 @@ export const tools = {
     async execute(input, context) {
       try {
         const { cwd, trusted } = resolveCwd(input.cwd, context.directory);
+        const errors: string[] = [];
         if (input.payload.task_id !== undefined && input.payload.task_id.length === 0) {
-          return JSON.stringify({ ok: false, errors: ["task_id, when provided, must be non-empty"] });
+          errors.push("task_id, when provided, must be non-empty");
+        }
+        if (input.payload.agent.length === 0) {
+          errors.push("agent must be non-empty");
+        }
+        if (input.payload.dimension.length === 0) {
+          errors.push("dimension must be non-empty");
+        }
+        if (input.payload.target !== undefined && input.payload.target.kind.length === 0) {
+          errors.push("target.kind must be non-empty");
+        }
+        if (input.payload.slice_id !== undefined && input.payload.slice_id.length === 0) {
+          errors.push("slice_id, when provided, must be non-empty");
+        }
+        if (errors.length > 0) {
+          return JSON.stringify({ ok: false, errors });
         }
         const config = loadConfig(cwd, trusted);
         const p = input.payload;
