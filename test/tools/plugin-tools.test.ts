@@ -313,7 +313,7 @@ describe("plugin tools", () => {
     const handoffFile = path.join(process.cwd(), "test-handoff-temp.md");
     fs.writeFileSync(
       handoffFile,
-      '```json\n{"schema_version":"1","task_id":"","agent":"test","dimension":"spec","status":"completed","target":{"kind":"working-tree","value":""},"slice_id":"whole-target","findings":[],"meta":{"total_findings":0,"notes":""}}\n```\n\n# Test\n',
+      '```json\n{"schema_version":"1","task_id":"test-task","agent":"test","dimension":"spec","status":"completed","target":{"kind":"working-tree","value":""},"slice_id":"whole-target","findings":[],"meta":{"total_findings":0,"notes":""}}\n```\n\n# Test\n',
       "utf8"
     );
     try {

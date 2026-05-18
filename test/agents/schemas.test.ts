@@ -327,6 +327,14 @@ describe("UnifiedHandoffSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("rejects task_id: empty string", () => {
+    const result = UnifiedHandoffSchema.safeParse({ ...baseHandoff, task_id: "" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.path.includes("task_id") && issue.message.includes("non-empty"))).toBe(true);
+    }
+  });
+
   it("rejects missing required top-level fields", () => {
     const { agent: _agent, ...withoutAgent } = baseHandoff;
     const result = UnifiedHandoffSchema.safeParse(withoutAgent);

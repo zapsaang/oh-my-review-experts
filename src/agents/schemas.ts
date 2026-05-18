@@ -108,7 +108,7 @@ export type UnifiedFinding = z.infer<typeof UnifiedFindingSchema>;
  */
 export const UnifiedHandoffSchema = z.object({
   schema_version: z.string().regex(SCHEMA_VERSION_PATTERN),
-  task_id: z.string(),
+  task_id: z.string().min(1, "task_id must be non-empty"),
   agent: z.string(),
   dimension: z.string(),
   status: z.enum(["completed", "blocked"]),
