@@ -1,4 +1,5 @@
 import type { Plugin, Hooks, Config, PluginModule } from "@opencode-ai/plugin"
+import type { Part } from "@opencode-ai/sdk"
 import { injectReviewCodePrompt } from "./hooks/command-injection.js"
 import { tools } from "./tools/plugin-tools.js"
 import { loadConfig } from "./config/load-config.js"
@@ -128,7 +129,7 @@ const OhMyReviewExperts: Plugin = async (input) => {
 
       const textPart = makeTextPart(ctx.sessionID, prompt)
       const idx = output.parts.findIndex(
-        (part: any) => part.type === "text" && (part.text ?? "").trim().startsWith("/")
+        (part: Part) => part.type === "text" && (part.text ?? "").trim().startsWith("/")
       )
 
       if (idx >= 0) {
