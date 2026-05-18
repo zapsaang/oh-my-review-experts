@@ -38,9 +38,9 @@ export function writeFileAtomic(filePath: string, content: string, maxAttempts =
 }
 
 export function writeFileAtomicOverwrite(filePath: string, content: string): void {
-  const tmpFile = `${filePath}.tmp.${Date.now()}`;
+  const tmpFile = makeTempPath(filePath);
   try {
-    fs.writeFileSync(tmpFile, content, "utf8");
+    fs.writeFileSync(tmpFile, content, { flag: "wx", encoding: "utf8" });
     fs.renameSync(tmpFile, filePath);
   } catch (err) {
     try { fs.unlinkSync(tmpFile); } catch { }

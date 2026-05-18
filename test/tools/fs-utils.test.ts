@@ -1,8 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { assertSafePath, writeFileAtomic, writeFileAtomicOverwrite, formatTimestamp, makeTempPath } from "../../src/tools/fs-utils.js";
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 describe("assertSafePath", () => {
   it("allows paths within base directory", () => {
@@ -56,6 +60,7 @@ describe("writeFileAtomicOverwrite", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -64,6 +69,60 @@ describe("writeFileAtomicOverwrite", () => {
     fs.writeFileSync(filePath, "old", "utf8");
     writeFileAtomicOverwrite(filePath, "new");
     expect(fs.readFileSync(filePath, "utf8")).toBe("new");
+  });
+
+  it("uses collision-resistant temp file name", () => {
+    const filePath = path.join(tmpDir, "test.txt");
+    const writeFileSpy = vi.spyOn(fs, "writeFileSync");
+
+    writeFileAtomicOverwrite(filePath, "new");
+
+    const tempPath = writeFileSpy.mock.calls[0]?.[0];
+    if (typeof tempPath !== "string") {
+      throw new Error("Expected writeFileSync to receive a temp file path");
+    }
+    expect(tempPath).toMatch(new RegExp(String.raw`^${escapeRegExp(filePath)}\.tmp\.\d+\.\d+\.[0-9a-f]{12}$`));
+  });
+
+  it("survives tight-loop overwrites without temp path collisions", () => {
+    const filePath = path.join(tmpDir, "test.txt");
+    const writeFileSpy = vi.spyOn(fs, "writeFileSync");
+    vi.spyOn(Date, "now").mockReturnValue(1716000000000);
+
+    for (let i = 0; i < 10; i++) {
+      writeFileAtomicOverwrite(filePath, `content-${i}`);
+    }
+
+    const tempPaths = writeFileSpy.mock.calls.map(([tempPath]) => {
+      if (typeof tempPath !== "string") {
+        throw new Error("Expected writeFileSync to receive temp file paths");
+      }
+      return tempPath;
+    });
+    expect(new Set(tempPaths).size).toBe(10);
+    expect(fs.readFileSync(filePath, "utf8")).toBe("content-9");
+  });
+
+  it("cleans up temp file when rename fails", () => {
+    const filePath = path.join(tmpDir, "test.txt");
+    const writeFileSpy = vi.spyOn(fs, "writeFileSync");
+    vi.spyOn(fs, "renameSync").mockImplementation(() => {
+      throw new Error("rename failed");
+    });
+
+    expect(() => writeFileAtomicOverwrite(filePath, "new")).toThrow("rename failed");
+
+    const writeCall = writeFileSpy.mock.calls[0];
+    if (writeCall === undefined) {
+      throw new Error("Expected writeFileSync to be called");
+    }
+    const [tempPath, , options] = writeCall;
+    if (typeof tempPath !== "string") {
+      throw new Error("Expected writeFileSync to receive a temp file path");
+    }
+    expect(options).toEqual({ flag: "wx", encoding: "utf8" });
+    expect(fs.existsSync(tempPath)).toBe(false);
+    expect(fs.readdirSync(tmpDir)).toEqual([]);
   });
 });
 
