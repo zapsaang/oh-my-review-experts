@@ -2,13 +2,19 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 import { Command } from "commander"
 import pc from "picocolors"
 import { modify, parse as parseJsonc, applyEdits } from "jsonc-parser"
 import type { Config } from "@opencode-ai/plugin"
 import { defaultConfigJsonc, findConfigFiles, loadConfig } from "./config/load-config.js"
 import { renderLocalDryRun } from "./workflow/run-review-code.js"
-import { checkAgentRegistration, checkOpencodeConfig } from "./tools/doctor.js"
+import {
+  checkAgentRegistration,
+  checkAgentToolWhitelist,
+  checkOpencodeConfig,
+  checkPromptExampleSchemaIdentity,
+} from "./tools/doctor.js"
 import { makeTempPath } from "./tools/fs-utils.js"
 import { registerAgents } from "./agents/registry.js"
 import { VERSION } from "./version.js"
@@ -90,10 +96,10 @@ function ensurePluginInOpencodeConfig(configFile: string, maxRetries = 3): boole
   return false
 }
 
-function getOpencodeConfigPath(global: boolean): string {
+function getOpencodeConfigPath(global: boolean, cwd = process.cwd()): string {
   return global
     ? path.join(os.homedir(), ".config", "opencode", "opencode.json")
-    : path.resolve(process.cwd(), "opencode.json")
+    : path.resolve(cwd, "opencode.json")
 }
 
 function getPluginConfigPath(global: boolean): string {
@@ -102,148 +108,212 @@ function getPluginConfigPath(global: boolean): string {
     : path.resolve(process.cwd(), ".opencode", "oh-my-review-experts.jsonc")
 }
 
-const program = new Command()
-program
-  .name("omre")
-  .description("Oh My Review Experts - runtime-first OpenCode review-code plugin")
-  .version(VERSION)
+export interface DoctorContractChecks {
+  checkPromptExampleSchemaIdentity: () => readonly string[]
+  checkAgentToolWhitelist: () => readonly string[]
+}
 
-program.command("init")
-  .description("Create project-level oh-my-review-experts config only")
-  .option("--force", "overwrite existing config", false)
-  .action((opts: { force?: boolean }) => {
-    try {
-      const file = path.resolve(process.cwd(), ".opencode", "oh-my-review-experts.jsonc")
-      ensureDir(path.dirname(file))
-      if (fs.existsSync(file) && !opts.force) {
-        console.log(pc.yellow(`exists: ${file}`))
-        return
+export interface DoctorOutput {
+  log: (...values: unknown[]) => void
+  error: (...values: unknown[]) => void
+}
+
+export interface RunDoctorOptions {
+  cwd?: string
+  output?: DoctorOutput
+  contractChecks?: DoctorContractChecks
+}
+
+const CONTRACT_CHECK_LABEL_WIDTH = 40
+
+const defaultContractChecks: DoctorContractChecks = {
+  checkPromptExampleSchemaIdentity,
+  checkAgentToolWhitelist,
+}
+
+function formatContractStatus(label: string, warnings: readonly string[]): string {
+  const status = warnings.length === 0 ? pc.green("✓") : pc.red("✗")
+  return `${label.padEnd(CONTRACT_CHECK_LABEL_WIDTH)}${status}`
+}
+
+export function runDoctor(options: RunDoctorOptions = {}): void {
+  const cwd = options.cwd ?? process.cwd()
+  const output = options.output ?? console
+  const contractChecks = options.contractChecks ?? defaultContractChecks
+
+  output.log(pc.bold("Oh My Review Experts doctor"))
+  const files = findConfigFiles(cwd)
+  output.log("Config files:")
+  for (const f of files) output.log(`- ${f}`)
+  if (!files.length) output.log(pc.yellow("- none found; defaults will be used"))
+  const config = loadConfig(cwd)
+  output.log("Command:", `/${config.command.name}`, "aliases:", config.command.aliases.join(", "))
+  output.log("Report dir:", config.report.directory)
+  output.log("Max estimated tasks:", config.costGuardrail.maxEstimatedTasks)
+
+  const projectConfig = getOpencodeConfigPath(false, cwd)
+  const globalConfig = getOpencodeConfigPath(true)
+  const projectStatus = checkOpencodeConfig(projectConfig)
+  const globalStatus = checkOpencodeConfig(globalConfig)
+
+  output.log("\nPlugin registration:")
+  if (projectStatus.pluginRegistered) {
+    output.log(pc.green(`  registered in ${projectConfig}`))
+  } else if (globalStatus.pluginRegistered) {
+    output.log(pc.green(`  registered in ${globalConfig}`))
+  } else {
+    output.log(pc.yellow(`  not registered (run: omre install --project)`))
+  }
+
+  output.log("\nConfig hook:")
+  const activeConfig = loadConfig(cwd)
+  if (!activeConfig.enabled) {
+    output.log(pc.yellow("  plugin disabled"))
+  } else if (!activeConfig.command.enabled) {
+    output.log(pc.yellow("  commands disabled"))
+  } else if (activeConfig.command.injection === "disabled") {
+    output.log(pc.yellow("  injection disabled"))
+  } else if (activeConfig.command.injection === "tool") {
+    output.log(pc.yellow("  tool mode (commands not registered via config hook)"))
+  } else {
+    output.log(pc.green("  commands registered at runtime via config hook"))
+  }
+
+  output.log("\nSubagent permissions:")
+  const projectWarnings = projectStatus.permissionWarnings
+  const globalWarnings = globalStatus.permissionWarnings
+
+  if (!projectStatus.exists && !globalStatus.exists) {
+    output.log(pc.yellow("  no opencode.json found; cannot verify omre_* permissions"))
+  } else {
+    if (projectStatus.exists) {
+      if (projectWarnings.length === 0) {
+        output.log(pc.green(`  ${projectConfig}: omre_* permissions OK (opencode.json only; agent frontmatter not inspected)`))
+      } else {
+        for (const w of projectWarnings) output.log(pc.yellow(`  ${projectConfig}: ${w}`))
       }
-      writeFileViaTempRename(file, defaultConfigJsonc())
-      console.log(pc.green(`created: ${file}`))
-      console.log(`Enable plugin in opencode.json: { "plugin": ["${PLUGIN_NAME}"] }`)
-    } catch (err) {
-      console.error(pc.red(`init failed: ${err instanceof Error ? err.message : String(err)}`))
-      process.exit(1)
     }
-  })
-
-program.command("install")
-  .description("Enable the plugin in OpenCode config; does not install markdown agents")
-  .option("--global", "write ~/.config/opencode/opencode.json", false)
-  .option("--project", "write ./opencode.json", false)
-  .action((opts: { global?: boolean; project?: boolean }) => {
-    try {
-      const target = getOpencodeConfigPath(!!opts.global)
-      const pluginChanged = ensurePluginInOpencodeConfig(target)
-      console.log(pluginChanged ? pc.green(`enabled plugin in ${target}`) : pc.gray(`already enabled in ${target}`))
-      const cfg = getPluginConfigPath(!!opts.global)
-      const created = writeIfMissing(cfg, defaultConfigJsonc())
-      if (created) {
-        console.log(pc.green(`config ready: ${cfg}`))
+    if (globalStatus.exists) {
+      if (globalWarnings.length === 0) {
+        output.log(pc.green(`  ${globalConfig}: omre_* permissions OK (opencode.json only; agent frontmatter not inspected)`))
       } else {
-        console.log(pc.gray(`config exists: ${cfg}`))
+        for (const w of globalWarnings) output.log(pc.yellow(`  ${globalConfig}: ${w}`))
       }
-    } catch (err) {
-      console.error(pc.red(`install failed: ${err instanceof Error ? err.message : String(err)}`))
-      process.exit(1)
     }
-  })
+  }
 
-program.command("doctor")
-  .description("Check plugin configuration")
-  .action(() => {
-    try {
-      console.log(pc.bold("Oh My Review Experts doctor"))
-      const files = findConfigFiles(process.cwd())
-      console.log("Config files:")
-      for (const f of files) console.log(`- ${f}`)
-      if (!files.length) console.log(pc.yellow("- none found; defaults will be used"))
-      const config = loadConfig(process.cwd())
-      console.log("Command:", `/${config.command.name}`, "aliases:", config.command.aliases.join(", "))
-      console.log("Report dir:", config.report.directory)
-      console.log("Max estimated tasks:", config.costGuardrail.maxEstimatedTasks)
+  output.log("\nSubagent registration:")
+  const probeConfig: Config = {}
+  registerAgents(probeConfig, activeConfig)
+  const agentStatus = checkAgentRegistration(probeConfig)
+  const agentLine = `agents: ${agentStatus.registered}/${agentStatus.expected} registered`
+  if (agentStatus.registered === agentStatus.expected) {
+    output.log(pc.green(`  ${agentLine}`))
+  } else {
+    output.log(pc.yellow(`  ${agentLine}`))
+    if (agentStatus.missing.length > 0) {
+      output.log(pc.yellow(`  missing: ${agentStatus.missing.join(", ")}`))
+    }
+  }
 
-      const projectConfig = getOpencodeConfigPath(false)
-      const globalConfig = getOpencodeConfigPath(true)
-      const projectStatus = checkOpencodeConfig(projectConfig)
-      const globalStatus = checkOpencodeConfig(globalConfig)
+  const promptWarnings = contractChecks.checkPromptExampleSchemaIdentity()
+  const toolWarnings = contractChecks.checkAgentToolWhitelist()
+  const contractWarnings = [...promptWarnings, ...toolWarnings]
 
-      console.log("\nPlugin registration:")
-      if (projectStatus.pluginRegistered) {
-        console.log(pc.green(`  registered in ${projectConfig}`))
-      } else if (globalStatus.pluginRegistered) {
-        console.log(pc.green(`  registered in ${globalConfig}`))
-      } else {
-        console.log(pc.yellow(`  not registered (run: omre install --project)`))
-      }
+  output.log("\nContract self-check:")
+  output.log(`  ${formatContractStatus("prompt JSON examples match Zod schemas", promptWarnings)}`)
+  output.log(`  ${formatContractStatus("agent tool whitelists clean", toolWarnings)}`)
+  for (const warning of contractWarnings) output.log(pc.yellow(`  ${warning}`))
 
-      console.log("\nConfig hook:")
-      const activeConfig = loadConfig(process.cwd())
-      if (!activeConfig.enabled) {
-        console.log(pc.yellow("  plugin disabled"))
-      } else if (!activeConfig.command.enabled) {
-        console.log(pc.yellow("  commands disabled"))
-      } else if (activeConfig.command.injection === "disabled") {
-        console.log(pc.yellow("  injection disabled"))
-      } else if (activeConfig.command.injection === "tool") {
-        console.log(pc.yellow("  tool mode (commands not registered via config hook)"))
-      } else {
-        console.log(pc.green("  commands registered at runtime via config hook"))
-      }
+  if (contractWarnings.length > 0) process.exitCode = 2
+}
 
-      console.log("\nSubagent permissions:")
-      const projectWarnings = projectStatus.permissionWarnings
-      const globalWarnings = globalStatus.permissionWarnings
+export function createCliProgram(): Command {
+  const program = new Command()
+  program
+    .name("omre")
+    .description("Oh My Review Experts - runtime-first OpenCode review-code plugin")
+    .version(VERSION)
 
-      if (!projectStatus.exists && !globalStatus.exists) {
-        console.log(pc.yellow("  no opencode.json found; cannot verify omre_* permissions"))
-      } else {
-        if (projectStatus.exists) {
-          if (projectWarnings.length === 0) {
-            console.log(pc.green(`  ${projectConfig}: omre_* permissions OK (opencode.json only; agent frontmatter not inspected)`))
-          } else {
-            for (const w of projectWarnings) console.log(pc.yellow(`  ${projectConfig}: ${w}`))
-          }
+  program.command("init")
+    .description("Create project-level oh-my-review-experts config only")
+    .option("--force", "overwrite existing config", false)
+    .action((opts: { force?: boolean }) => {
+      try {
+        const file = path.resolve(process.cwd(), ".opencode", "oh-my-review-experts.jsonc")
+        ensureDir(path.dirname(file))
+        if (fs.existsSync(file) && !opts.force) {
+          console.log(pc.yellow(`exists: ${file}`))
+          return
         }
-        if (globalStatus.exists) {
-          if (globalWarnings.length === 0) {
-            console.log(pc.green(`  ${globalConfig}: omre_* permissions OK (opencode.json only; agent frontmatter not inspected)`))
-          } else {
-            for (const w of globalWarnings) console.log(pc.yellow(`  ${globalConfig}: ${w}`))
-          }
-        }
+        writeFileViaTempRename(file, defaultConfigJsonc())
+        console.log(pc.green(`created: ${file}`))
+        console.log(`Enable plugin in opencode.json: { "plugin": ["${PLUGIN_NAME}"] }`)
+      } catch (err) {
+        console.error(pc.red(`init failed: ${err instanceof Error ? err.message : String(err)}`))
+        process.exit(1)
       }
+    })
 
-      console.log("\nSubagent registration:")
-      const probeConfig: Config = {}
-      registerAgents(probeConfig, activeConfig)
-      const agentStatus = checkAgentRegistration(probeConfig)
-      const agentLine = `agents: ${agentStatus.registered}/${agentStatus.expected} registered`
-      if (agentStatus.registered === agentStatus.expected) {
-        console.log(pc.green(`  ${agentLine}`))
-      } else {
-        console.log(pc.yellow(`  ${agentLine}`))
-        if (agentStatus.missing.length > 0) {
-          console.log(pc.yellow(`  missing: ${agentStatus.missing.join(", ")}`))
+  program.command("install")
+    .description("Enable the plugin in OpenCode config; does not install markdown agents")
+    .option("--global", "write ~/.config/opencode/opencode.json", false)
+    .option("--project", "write ./opencode.json", false)
+    .action((opts: { global?: boolean; project?: boolean }) => {
+      try {
+        const target = getOpencodeConfigPath(!!opts.global)
+        const pluginChanged = ensurePluginInOpencodeConfig(target)
+        console.log(pluginChanged ? pc.green(`enabled plugin in ${target}`) : pc.gray(`already enabled in ${target}`))
+        const cfg = getPluginConfigPath(!!opts.global)
+        const created = writeIfMissing(cfg, defaultConfigJsonc())
+        if (created) {
+          console.log(pc.green(`config ready: ${cfg}`))
+        } else {
+          console.log(pc.gray(`config exists: ${cfg}`))
         }
+      } catch (err) {
+        console.error(pc.red(`install failed: ${err instanceof Error ? err.message : String(err)}`))
+        process.exit(1)
       }
-    } catch (err) {
-      console.error(pc.red(`doctor failed: ${err instanceof Error ? err.message : String(err)}`))
-      process.exit(1)
-    }
-  })
+    })
 
-program.command("dry-run")
-  .description("Show estimated review-code plan without calling models")
-  .argument("[args...]", "extra review-code guidance")
-  .action((args: string[]) => {
-    try {
-      console.log(renderLocalDryRun({ args: args.join(" ") }))
-    } catch (err) {
-      console.error(pc.red(`dry-run failed: ${err instanceof Error ? err.message : String(err)}`))
-      process.exit(1)
-    }
-  })
+  program.command("doctor")
+    .description("Check plugin configuration. CI exit codes: 0 clean, 1 doctor errored, 2 contract self-check failed")
+    .action(() => {
+      try {
+        runDoctor()
+      } catch (err) {
+        console.error(pc.red(`doctor failed: ${err instanceof Error ? err.message : String(err)}`))
+        process.exit(1)
+      }
+    })
 
-program.parse(process.argv)
+  program.command("dry-run")
+    .description("Show estimated review-code plan without calling models")
+    .argument("[args...]", "extra review-code guidance")
+    .action((args: string[]) => {
+      try {
+        console.log(renderLocalDryRun({ args: args.join(" ") }))
+      } catch (err) {
+        console.error(pc.red(`dry-run failed: ${err instanceof Error ? err.message : String(err)}`))
+        process.exit(1)
+      }
+    })
+
+  return program
+}
+
+function isDirectExecution(): boolean {
+  const entry = process.argv[1]
+  if (!entry) return false
+  const modulePath = fileURLToPath(import.meta.url)
+  try {
+    return fs.realpathSync(path.resolve(entry)) === fs.realpathSync(modulePath)
+  } catch {
+    return path.resolve(entry) === modulePath
+  }
+}
+
+if (isDirectExecution()) {
+  createCliProgram().parse(process.argv)
+}
