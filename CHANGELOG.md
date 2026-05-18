@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] — 2026-05-18
+
+### Changed (BREAKING)
+
+- `UnifiedHandoffSchema` now rejects empty `task_id` values during handoff validation with `"task_id must be non-empty"`. Closes the write/validate boundary asymmetry — PR-2b refused empty `task_id` on write; PR-2d now refuses it on validate as well.
+
+### Migration notes
+
+- Any persisted handoff file with `task_id: ""` will now fail `omre_validate_handoff`. Such files are legacy artifacts written before 0.1.4; regenerate them via the normal review run, which auto-resolves missing `task_id` per PR-2b.
+
 ## [0.1.5] — 2026-05-17
 
 ### Fixed
