@@ -25,7 +25,7 @@ export interface AgentRegistration {
  * Tools denied for every registered subagent unless explicitly allowed.
  * Enforces leaf guardrails via the runtime tool whitelist, not just prompt prose.
  */
-const TOOL_DENY_BASELINE = [
+export const TOOL_DENY_BASELINE = [
   "task",
   "skill",
   "edit",
@@ -41,7 +41,7 @@ const TOOL_DENY_BASELINE = [
  * top of the tool whitelist: even if a tool slips through, the permission
  * layer rejects the action.
  */
-const PERMISSION_DENIES = {
+export const PERMISSION_DENIES = {
   edit: "deny",
   bash: "deny",
   webfetch: "deny",

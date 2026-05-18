@@ -22,7 +22,7 @@
 import fs from "node:fs";
 import { parse as parseJsonc } from "jsonc-parser";
 import type { Config } from "@opencode-ai/plugin";
-import { AGENT_NAMES } from "../agents/registry.js";
+import { AGENT_NAMES, ALL_AGENTS, TOOL_DENY_BASELINE, registerAgents, type AgentRegistration } from "../agents/registry.js";
 import {
   GLOBAL_ARBITER_JSON,
   GlobalArbiterSchema,
@@ -36,6 +36,7 @@ import {
   SlicePlannerSchema,
   zodToExample,
 } from "../agents/schemas.js";
+import { DEFAULT_CONFIG } from "../config/schema.js";
 
 const PLUGIN_NAME = "oh-my-review-experts";
 
@@ -122,6 +123,75 @@ export function checkPromptExampleSchemaIdentityForExamples(
 
 export function checkPromptExampleSchemaIdentity(): string[] {
   return checkPromptExampleSchemaIdentityForExamples(PROMPT_EXAMPLES);
+}
+
+type AgentPermissionMap = Readonly<Record<string, Readonly<Record<string, unknown>> | undefined>>;
+
+const REQUIRED_AGENT_PERMISSION_DENIES = ["bash", "edit", "webfetch", "websearch"] as const;
+
+const WRITER_RULES = {
+  omre_write_handoff: [
+    "reviewer-spec",
+    "reviewer-quality",
+    "reviewer-security",
+    "reviewer-performance",
+    "reviewer-concurrency",
+  ],
+  omre_write_report: ["report-writer"],
+} as const satisfies Record<string, readonly string[]>;
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function effectiveAgentPermissions(): AgentPermissionMap {
+  const config: Config = {};
+  registerAgents(config, DEFAULT_CONFIG);
+
+  const agentMap = config.agent ?? {};
+  const permissions: Record<string, Readonly<Record<string, unknown>>> = {};
+  for (const agent of ALL_AGENTS) {
+    const registered = agentMap[agent.name];
+    if (isPlainRecord(registered) && isPlainRecord(registered.permission)) {
+      permissions[agent.name] = registered.permission;
+    }
+  }
+  return permissions;
+}
+
+export function checkAgentToolWhitelistForAgents(
+  agents: readonly AgentRegistration[],
+  permissionByAgent: AgentPermissionMap = effectiveAgentPermissions(),
+): string[] {
+  const warnings: string[] = [];
+  const forbiddenToolSet = new Set<string>(TOOL_DENY_BASELINE);
+
+  for (const agent of agents) {
+    const forbiddenAllows = agent.toolsAllow.filter((tool) => forbiddenToolSet.has(tool));
+    if (forbiddenAllows.length > 0) {
+      warnings.push(`${agent.name}: allows forbidden tools [${forbiddenAllows.join(", ")}]`);
+    }
+
+    for (const [tool, allowedAgents] of Object.entries(WRITER_RULES)) {
+      const allowedAgentNames: readonly string[] = allowedAgents;
+      if (agent.toolsAllow.includes(tool) && !allowedAgentNames.includes(agent.name)) {
+        warnings.push(`${agent.name}: writer tool ${tool} is not allowed for this agent`);
+      }
+    }
+
+    const permission = permissionByAgent[agent.name];
+    for (const tool of REQUIRED_AGENT_PERMISSION_DENIES) {
+      if (!permission || permission[tool] !== "deny") {
+        warnings.push(`${agent.name}: missing deny for ${tool}`);
+      }
+    }
+  }
+
+  return warnings;
+}
+
+export function checkAgentToolWhitelist(): string[] {
+  return checkAgentToolWhitelistForAgents(ALL_AGENTS, effectiveAgentPermissions());
 }
 
 export function checkOmrePermissions(config: unknown): string[] {

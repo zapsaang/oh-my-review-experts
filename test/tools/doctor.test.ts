@@ -5,12 +5,14 @@ import os from "node:os";
 import type { Config } from "@opencode-ai/plugin";
 import {
   checkAgentRegistration,
+  checkAgentToolWhitelist,
+  checkAgentToolWhitelistForAgents,
   checkOmrePermissions,
   checkOpencodeConfig,
   checkPromptExampleSchemaIdentity,
   checkPromptExampleSchemaIdentityForExamples,
 } from "../../src/tools/doctor.js";
-import { AGENT_NAMES } from "../../src/agents/registry.js";
+import { AGENT_NAMES, type AgentRegistration } from "../../src/agents/registry.js";
 import { SLICE_PLANNER_JSON, SlicePlannerSchema } from "../../src/agents/schemas.js";
 import pluginModule from "../../src/index.js";
 import { clearLoadConfigCache } from "../../src/config/load-config.js";
@@ -234,5 +236,62 @@ describe("checkPromptExampleSchemaIdentity", () => {
     expect(warnings).toContain(
       "SLICE_PLANNER_JSON: drifted from SlicePlannerSchema; regenerate by re-importing schemas.ts",
     );
+  });
+});
+
+describe("checkAgentToolWhitelist", () => {
+  function fakeAgent(name: string, toolsAllow: readonly string[]): AgentRegistration {
+    return {
+      name,
+      modelKey: "spec",
+      staticPrompt: "test prompt",
+      description: "test agent",
+      toolsAllow,
+    };
+  }
+
+  const requiredDenies = {
+    bash: "deny",
+    edit: "deny",
+    webfetch: "deny",
+    websearch: "deny",
+  };
+
+  it("returns no warnings for the clean agent registry", () => {
+    expect(checkAgentToolWhitelist()).toEqual([]);
+  });
+
+  it("warns when an agent allows tools from the forbidden baseline", () => {
+    const warnings = checkAgentToolWhitelistForAgents(
+      [fakeAgent("bad-reviewer", ["read", "bash", "edit"])],
+      { "bad-reviewer": requiredDenies },
+    );
+
+    expect(warnings).toContain("bad-reviewer: allows forbidden tools [bash, edit]");
+  });
+
+  it("warns when a non-authorized agent is granted a writer tool", () => {
+    const warnings = checkAgentToolWhitelistForAgents(
+      [fakeAgent("slice-planner", ["read", "omre_write_report"])],
+      { "slice-planner": requiredDenies },
+    );
+
+    expect(warnings).toContain("slice-planner: writer tool omre_write_report is not allowed for this agent");
+  });
+
+  it("warns when an effective agent registration is missing a required permission deny", () => {
+    const warnings = checkAgentToolWhitelistForAgents(
+      [fakeAgent("reviewer-spec", ["read"])],
+      {
+        "reviewer-spec": {
+          bash: "allow",
+          edit: "deny",
+          webfetch: "deny",
+          websearch: "deny",
+        },
+      },
+    );
+
+    expect(warnings).toContain("reviewer-spec: missing deny for bash");
   });
 });
