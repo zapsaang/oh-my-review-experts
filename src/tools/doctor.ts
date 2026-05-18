@@ -23,8 +23,106 @@ import fs from "node:fs";
 import { parse as parseJsonc } from "jsonc-parser";
 import type { Config } from "@opencode-ai/plugin";
 import { AGENT_NAMES } from "../agents/registry.js";
+import {
+  GLOBAL_ARBITER_JSON,
+  GlobalArbiterSchema,
+  RESULT_VALIDATOR_JSON,
+  ResultValidatorSchema,
+  SLICE_ARBITER_JSON,
+  SLICE_PLAN_VALIDATOR_JSON,
+  SLICE_PLANNER_JSON,
+  SliceArbiterSchema,
+  SlicePlanValidatorSchema,
+  SlicePlannerSchema,
+  zodToExample,
+} from "../agents/schemas.js";
 
 const PLUGIN_NAME = "oh-my-review-experts";
+
+export interface PromptExampleSchemaIdentityEntry {
+  readonly name: string;
+  readonly schemaName: string;
+  readonly schema: unknown;
+  readonly example: string;
+}
+
+const PROMPT_EXAMPLES = [
+  {
+    name: "SLICE_PLANNER_JSON",
+    schemaName: "SlicePlannerSchema",
+    schema: SlicePlannerSchema,
+    example: SLICE_PLANNER_JSON,
+  },
+  {
+    name: "SLICE_PLAN_VALIDATOR_JSON",
+    schemaName: "SlicePlanValidatorSchema",
+    schema: SlicePlanValidatorSchema,
+    example: SLICE_PLAN_VALIDATOR_JSON,
+  },
+  {
+    name: "RESULT_VALIDATOR_JSON",
+    schemaName: "ResultValidatorSchema",
+    schema: ResultValidatorSchema,
+    example: RESULT_VALIDATOR_JSON,
+  },
+  {
+    name: "SLICE_ARBITER_JSON",
+    schemaName: "SliceArbiterSchema",
+    schema: SliceArbiterSchema,
+    example: SLICE_ARBITER_JSON,
+  },
+  {
+    name: "GLOBAL_ARBITER_JSON",
+    schemaName: "GlobalArbiterSchema",
+    schema: GlobalArbiterSchema,
+    example: GLOBAL_ARBITER_JSON,
+  },
+] as const satisfies readonly PromptExampleSchemaIdentityEntry[];
+
+function driftWarning(entry: PromptExampleSchemaIdentityEntry): string {
+  return `${entry.name}: drifted from ${entry.schemaName}; regenerate by re-importing schemas.ts`;
+}
+
+function getSchemaTopLevelKeys(schema: unknown): string[] {
+  if (!schema || typeof schema !== "object") return [];
+  const shape = (schema as { shape?: unknown }).shape;
+  if (!shape || typeof shape !== "object" || Array.isArray(shape)) return [];
+  return Object.keys(shape).sort();
+}
+
+function getExampleTopLevelKeys(example: string): string[] | undefined {
+  try {
+    const parsed: unknown = JSON.parse(example);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+    return Object.keys(parsed).sort();
+  } catch {
+    return undefined;
+  }
+}
+
+function sameStringArray(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+export function checkPromptExampleSchemaIdentityForExamples(
+  examples: readonly PromptExampleSchemaIdentityEntry[],
+): string[] {
+  const warnings: string[] = [];
+  for (const entry of examples) {
+    const expectedExample = JSON.stringify(zodToExample(entry.schema), null, 2);
+    const schemaKeys = getSchemaTopLevelKeys(entry.schema);
+    const exampleKeys = getExampleTopLevelKeys(entry.example);
+    const keysDrifted = exampleKeys === undefined || !sameStringArray(exampleKeys, schemaKeys);
+    if (entry.example !== expectedExample || keysDrifted) {
+      warnings.push(driftWarning(entry));
+    }
+  }
+  return warnings;
+}
+
+export function checkPromptExampleSchemaIdentity(): string[] {
+  return checkPromptExampleSchemaIdentityForExamples(PROMPT_EXAMPLES);
+}
 
 export function checkOmrePermissions(config: unknown): string[] {
   if (!config || typeof config !== "object" || Array.isArray(config)) {

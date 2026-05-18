@@ -3,8 +3,15 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import type { Config } from "@opencode-ai/plugin";
-import { checkAgentRegistration, checkOmrePermissions, checkOpencodeConfig } from "../../src/tools/doctor.js";
+import {
+  checkAgentRegistration,
+  checkOmrePermissions,
+  checkOpencodeConfig,
+  checkPromptExampleSchemaIdentity,
+  checkPromptExampleSchemaIdentityForExamples,
+} from "../../src/tools/doctor.js";
 import { AGENT_NAMES } from "../../src/agents/registry.js";
+import { SLICE_PLANNER_JSON, SlicePlannerSchema } from "../../src/agents/schemas.js";
 import pluginModule from "../../src/index.js";
 import { clearLoadConfigCache } from "../../src/config/load-config.js";
 import { stubPluginInput } from "../_helpers/plugin-input.js";
@@ -181,5 +188,51 @@ describe("[step 18] checkAgentRegistration", () => {
     expect(result.expected).toBe(11);
     expect(result.registered).toBe(11);
     expect(result.missing).toEqual([]);
+  });
+});
+
+describe("checkPromptExampleSchemaIdentity", () => {
+  const slicePlannerEntry = {
+    name: "SLICE_PLANNER_JSON",
+    schemaName: "SlicePlannerSchema",
+    schema: SlicePlannerSchema,
+  };
+
+  it("returns no warnings when prompt examples match their schemas", () => {
+    expect(checkPromptExampleSchemaIdentity()).toEqual([]);
+  });
+
+  it("warns when a prompt example drops a top-level schema field", () => {
+    const tamperedExample = JSON.parse(SLICE_PLANNER_JSON) as Record<string, unknown>;
+    delete tamperedExample.reason;
+
+    const warnings = checkPromptExampleSchemaIdentityForExamples([
+      {
+        ...slicePlannerEntry,
+        example: JSON.stringify(tamperedExample, null, 2),
+      },
+    ]);
+
+    expect(warnings).toContain(
+      "SLICE_PLANNER_JSON: drifted from SlicePlannerSchema; regenerate by re-importing schemas.ts",
+    );
+  });
+
+  it("warns when a prompt example adds an unknown top-level field", () => {
+    const tamperedExample = {
+      ...(JSON.parse(SLICE_PLANNER_JSON) as Record<string, unknown>),
+      unknown_top_level_key: "unexpected",
+    };
+
+    const warnings = checkPromptExampleSchemaIdentityForExamples([
+      {
+        ...slicePlannerEntry,
+        example: JSON.stringify(tamperedExample, null, 2),
+      },
+    ]);
+
+    expect(warnings).toContain(
+      "SLICE_PLANNER_JSON: drifted from SlicePlannerSchema; regenerate by re-importing schemas.ts",
+    );
   });
 });
