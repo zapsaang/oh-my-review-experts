@@ -1,0 +1,9 @@
+{
+  "schema_version": "1",
+  "status": "completed",
+  "assigned_dimension": "security",
+  "slice_id": "slice-auth",
+  "is_valid": true,
+  "failure_reason": "",
+  "retry_recommended": false
+}

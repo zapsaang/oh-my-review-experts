@@ -1,0 +1,35 @@
+{
+  "schema_version": "1",
+  "status": "completed",
+  "confirmed": [
+    {
+      "id": "sec-1",
+      "severity": "critical",
+      "file": "src/auth.ts",
+      "line": 42,
+      "title": "Hardcoded API key in authentication module",
+      "description": "An API key is hardcoded in the authentication source file, exposing credentials to anyone with repository access.",
+      "evidence": "const API_KEY = 'sk-live-abc123def456';",
+      "confidence": "high",
+      "classification": "injection"
+    }
+  ],
+  "needs_validation": [],
+  "rejected": [
+    {
+      "id": "sec-3",
+      "reason": "weak-evidence"
+    }
+  ],
+  "degraded_slices": [
+    {
+      "slice_id": "slice-perf",
+      "missing_dimensions": ["performance"]
+    }
+  ],
+  "missing_dimensions_global": ["performance"],
+  "summary": {
+    "total_slices": 3,
+    "total_confirmed": 1
+  }
+}
