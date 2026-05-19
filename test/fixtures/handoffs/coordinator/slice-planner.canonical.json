@@ -1,0 +1,21 @@
+{
+  "schema_version": "1",
+  "status": "completed",
+  "slicing_mode": "module-based",
+  "should_slice": true,
+  "reason": "Files span multiple business modules with distinct review concerns",
+  "slices": [
+    {
+      "slice_id": "slice-auth",
+      "slice_type": "business-module",
+      "title": "Authentication module",
+      "files": ["src/auth.ts", "src/middleware/auth.ts"]
+    },
+    {
+      "slice_id": "slice-api",
+      "slice_type": "api-contract",
+      "title": "Public API surface",
+      "files": ["src/routes/users.ts", "src/routes/orders.ts"]
+    }
+  ]
+}
