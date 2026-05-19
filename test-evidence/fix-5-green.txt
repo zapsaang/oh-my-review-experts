@@ -1,0 +1,23 @@
+[Fix 5 GREEN] Targeted tests passing — 2026-05-19T17:16:01Z
+
+$ npx vitest run test/tools/report.test.ts test/tools/plugin-tools.test.ts
+
+ RUN  v3.2.4  /home/ricardom/code/github.com/zapsaang/oh-my-review-experts
+
+ ✓ test/tools/report.test.ts (28 tests) 18ms
+ ✓ test/tools/plugin-tools.test.ts (41 tests) 79ms
+
+ Test Files  2 passed (2)
+      Tests  69 passed (69)
+   Start at  17:16:01
+   Duration  736ms (transform 226ms, setup 0ms, collect 547ms, tests 96ms, environment 0ms, prepare 109ms)
+
+Full suite: 25 files, 642 tests — all passing.
+Typecheck: zero diagnostics.
+
+Key invariants verified:
+- runId="run-fixed-id" produces history filenames "run-fixed-id-review.md" and "run-fixed-id-review.json".
+- runId absent falls back to timestamp-style history filenames.
+- History markdown/JSON content equals latest.md/latest.json content.
+- Path safety: assertSafePath guards history file writes against histDir (not just resolvedCwd).
+

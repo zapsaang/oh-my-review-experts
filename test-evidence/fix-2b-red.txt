@@ -1,0 +1,133 @@
+
+[1m[46m RUN [49m[22m [36mv3.2.4 [39m[90m/home/ricardom/code/github.com/zapsaang/oh-my-review-experts[39m
+
+ [31m❯[39m test/workflow/finalize-review.test.ts [2m([22m[2m6 tests[22m[2m | [22m[31m6 failed[39m[2m)[22m[32m 18[2mms[22m[39m
+[31m   [31m×[31m finalizeReview [Fix 2-B RED][2m > [22mreads all handoff files in .omre/handoffs/{runId}/ and emits a markdown report >= 50 lines starting with '#'[39m[32m 13[2mms[22m[39m
+[31m     → Cannot find module '../../src/workflow/finalize-review.js' imported from '/home/ricardom/code/github.com/zapsaang/oh-my-review-experts/test/workflow/finalize-review.test.ts'[39m
+[31m   [31m×[31m finalizeReview [Fix 2-B RED][2m > [22memits a JSON report with slices[].findings[] structure[39m[32m 1[2mms[22m[39m
+[31m     → Cannot find module '../../src/workflow/finalize-review.js' imported from '/home/ricardom/code/github.com/zapsaang/oh-my-review-experts/test/workflow/finalize-review.test.ts'[39m
+[31m   [31m×[31m finalizeReview [Fix 2-B RED][2m > [22mis deterministic — same handoffs produce byte-identical markdown and JSON[39m[32m 1[2mms[22m[39m
+[31m     → Cannot find module '../../src/workflow/finalize-review.js' imported from '/home/ricardom/code/github.com/zapsaang/oh-my-review-experts/test/workflow/finalize-review.test.ts'[39m
+[31m   [31m×[31m finalizeReview [Fix 2-B RED][2m > [22msurfaces degraded coverage when handoffs declare missing dimensions[39m[32m 1[2mms[22m[39m
+[31m     → Cannot find module '../../src/workflow/finalize-review.js' imported from '/home/ricardom/code/github.com/zapsaang/oh-my-review-experts/test/workflow/finalize-review.test.ts'[39m
+[31m   [31m×[31m finalizeReview [Fix 2-B RED][2m > [22mthrows when runId path resolves outside cwd (path traversal)[39m[32m 1[2mms[22m[39m
+[31m     → Cannot find module '../../src/workflow/finalize-review.js' imported from '/home/ricardom/code/github.com/zapsaang/oh-my-review-experts/test/workflow/finalize-review.test.ts'[39m
+[31m   [31m×[31m finalizeReview [Fix 2-B RED][2m > [22mthrows when handoff dir is empty[39m[32m 1[2mms[22m[39m
+[31m     → Cannot find module '../../src/workflow/finalize-review.js' imported from '/home/ricardom/code/github.com/zapsaang/oh-my-review-experts/test/workflow/finalize-review.test.ts'[39m
+ [31m❯[39m test/tools/plugin-tools.test.ts [2m([22m[2m44 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[32m 73[2mms[22m[39m
+   [32m✓[39m omre_write_handoff result shape [L4 fix][2m > [22mreturns { ok: true, filePath } on success[32m 8[2mms[22m[39m
+   [32m✓[39m omre_write_handoff result shape [L4 fix][2m > [22mreturns the resolved taskId when payload omits task_id[32m 1[2mms[22m[39m
+   [32m✓[39m omre_write_handoff result shape [L4 fix][2m > [22mreturns { ok: false, errors } when handoff is disabled (no throw)[32m 1[2mms[22m[39m
+   [32m✓[39m omre_write_handoff result shape [L4 fix][2m > [22mrejects explicitly-empty task_id with { ok: false, errors }[32m 1[2mms[22m[39m
+   [32m✓[39m omre_write_handoff result shape [L4 fix][2m > [22mrejects empty agent at the write boundary[32m 1[2mms[22m[39m
+   [32m✓[39m omre_write_handoff result shape [L4 fix][2m > [22mrejects empty dimension at the write boundary[32m 1[2mms[22m[39m
+   [32m✓[39m omre_write_handoff result shape [L4 fix][2m > [22mrejects empty target kind at the write boundary[32m 1[2mms[22m[39m
+   [32m✓[39m omre_write_handoff result shape [L4 fix][2m > [22mrejects empty agent directly in execute() bypassing args schema[32m 0[2mms[22m[39m
+   [32m✓[39m omre_write_handoff result shape [L4 fix][2m > [22mrejects empty dimension directly in execute() bypassing args schema[32m 0[2mms[22m[39m
+   [32m✓[39m omre_write_handoff result shape [L4 fix][2m > [22mrejects empty target.kind directly in execute() bypassing args schema[32m 0[2mms[22m[39m
+   [32m✓[39m omre_write_handoff result shape [L4 fix][2m > [22mrejects empty slice_id directly in execute() bypassing args schema[32m 0[2mms[22m[39m
+   [32m✓[39m omre_write_handoff result shape [L4 fix][2m > [22mreturns { ok: false, errors } on rejected handoff directory (no throw)[32m 1[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22mexports required tools[32m 0[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22momre_dry_run returns markdown[32m 7[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22momre_config loads default config[32m 0[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22momre_config uses context.directory when cwd is omitted[32m 0[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22momre_dry_run uses context.directory when cwd is omitted[32m 6[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22momre_validate_handoff rejects files outside project directory[32m 2[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22momre_write_report accepts structured JSON payload[32m 2[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22momre_write_report propagates runId to history markdown filename[32m 2[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22momre_write_report propagates runId to history json filename[32m 1[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22momre_write_report falls back to timestamp when runId is absent[32m 1[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22momre_build_review_code_prompt uses context.directory when cwd is omitted[32m 17[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22momre_write_handoff uses context.directory when cwd is omitted[32m 2[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22momre_validate_handoff blocks path traversal to external paths[32m 1[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22momre_validate_handoff resolves successfully with relative cwd[32m 2[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22momre_validate_handoff rejects malicious absolute cwd outside workspace[32m 0[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22momre_write_handoff writes findings with extra fields and missing optionals[32m 2[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22momre_write_handoff followed by validate_handoff round-trip[32m 2[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22mUnifiedFindingSchema preserves unknown fields via safeParse[32m 0[2mms[22m[39m
+   [32m✓[39m plugin tools[2m > [22mtool args are correctly inferred at call site[32m 0[2mms[22m[39m
+   [32m✓[39m plugin factory integration[2m > [22mreturns Hooks object with command.execute.before[32m 0[2mms[22m[39m
+   [32m✓[39m plugin factory integration[2m > [22mdoes not include legacy name property[32m 0[2mms[22m[39m
+   [32m✓[39m omre_validate_handoff chat fallback[2m > [22mreturns source=file when filePath validates[32m 1[2mms[22m[39m
+   [32m✓[39m omre_validate_handoff chat fallback[2m > [22mfalls back to chatContent when file is missing[32m 1[2mms[22m[39m
+   [32m✓[39m omre_validate_handoff chat fallback[2m > [22mprefers file when both file and chat are valid[32m 1[2mms[22m[39m
+   [32m✓[39m omre_validate_handoff chat fallback[2m > [22mreturns isValid=false with source=none when both file and chat fail[32m 0[2mms[22m[39m
+   [32m✓[39m omre_validate_handoff chat fallback[2m > [22mworks with chatContent only (no filePath provided)[32m 1[2mms[22m[39m
+   [32m✓[39m omre_validate_handoff chat fallback[2m > [22mreturns retryRecommended when neither filePath nor chatContent is provided[32m 0[2mms[22m[39m
+   [32m✓[39m omre_validate_handoff chat fallback[2m > [22mpreserves a fence located beyond the prefix truncation limit (smart truncation)[32m 0[2mms[22m[39m
+   [32m✓[39m omre_validate_handoff chat fallback[2m > [22mtruncates safely when fence body exceeds the limit and reports failure[32m 0[2mms[22m[39m
+[31m   [31m×[31m omre_finalize_review [Fix 2-B RED][2m > [22mreturns { ok: true, written, handoffsConsumed, ... } on success[39m[32m 3[2mms[22m[39m
+[31m     → Tool omre_finalize_review is not registered in tools map[39m
+[31m   [31m×[31m omre_finalize_review [Fix 2-B RED][2m > [22mreturns { ok: false, errors } when handoff dir does not exist[39m[32m 0[2mms[22m[39m
+[31m     → Tool omre_finalize_review is not registered in tools map[39m
+[31m   [31m×[31m omre_finalize_review [Fix 2-B RED][2m > [22mrejects path-traversal cwd[39m[32m 0[2mms[22m[39m
+[31m     → Tool omre_finalize_review is not registered in tools map[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 9 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m test/tools/plugin-tools.test.ts[2m > [22momre_finalize_review [Fix 2-B RED][2m > [22mreturns { ok: true, written, handoffsConsumed, ... } on success
+[31m[1mError[22m: Tool omre_finalize_review is not registered in tools map[39m
+[36m [2m❯[22m getTool test/tools/plugin-tools.test.ts:[2m975:11[22m[39m
+    [90m973| [39m  [35mconst[39m found [33m=[39m entries[33m.[39m[34mfind[39m(([k]) [33m=>[39m k [33m===[39m name)[33m;[39m
+    [90m974| [39m  [35mif[39m ([33m![39mfound) {
+    [90m975| [39m    [35mthrow[39m [35mnew[39m [33mError[39m([32m`Tool [39m[36m${[39mname[36m}[39m[32m is not registered in tools map`[39m)[33m;[39m
+    [90m   | [39m          [31m^[39m
+    [90m976| [39m  }
+    [90m977| [39m  [35mconst[39m [[33m,[39m tool] [33m=[39m found[33m;[39m
+[90m [2m❯[22m test/tools/plugin-tools.test.ts:[2m1072:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/tools/plugin-tools.test.ts[2m > [22momre_finalize_review [Fix 2-B RED][2m > [22mreturns { ok: false, errors } when handoff dir does not exist
+[31m[1mError[22m: Tool omre_finalize_review is not registered in tools map[39m
+[36m [2m❯[22m getTool test/tools/plugin-tools.test.ts:[2m975:11[22m[39m
+    [90m973| [39m  [35mconst[39m found [33m=[39m entries[33m.[39m[34mfind[39m(([k]) [33m=>[39m k [33m===[39m name)[33m;[39m
+    [90m974| [39m  [35mif[39m ([33m![39mfound) {
+    [90m975| [39m    [35mthrow[39m [35mnew[39m [33mError[39m([32m`Tool [39m[36m${[39mname[36m}[39m[32m is not registered in tools map`[39m)[33m;[39m
+    [90m   | [39m          [31m^[39m
+    [90m976| [39m  }
+    [90m977| [39m  [35mconst[39m [[33m,[39m tool] [33m=[39m found[33m;[39m
+[90m [2m❯[22m test/tools/plugin-tools.test.ts:[2m1092:20[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/tools/plugin-tools.test.ts[2m > [22momre_finalize_review [Fix 2-B RED][2m > [22mrejects path-traversal cwd
+[31m[1mError[22m: Tool omre_finalize_review is not registered in tools map[39m
+[36m [2m❯[22m getTool test/tools/plugin-tools.test.ts:[2m975:11[22m[39m
+    [90m973| [39m  [35mconst[39m found [33m=[39m entries[33m.[39m[34mfind[39m(([k]) [33m=>[39m k [33m===[39m name)[33m;[39m
+    [90m974| [39m  [35mif[39m ([33m![39mfound) {
+    [90m975| [39m    [35mthrow[39m [35mnew[39m [33mError[39m([32m`Tool [39m[36m${[39mname[36m}[39m[32m is not registered in tools map`[39m)[33m;[39m
+    [90m   | [39m          [31m^[39m
+    [90m976| [39m  }
+    [90m977| [39m  [35mconst[39m [[33m,[39m tool] [33m=[39m found[33m;[39m
+[90m [2m❯[22m test/tools/plugin-tools.test.ts:[2m1106:18[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/workflow/finalize-review.test.ts[2m > [22mfinalizeReview [Fix 2-B RED][2m > [22mreads all handoff files in .omre/handoffs/{runId}/ and emits a markdown report >= 50 lines starting with '#'
+[41m[1m FAIL [22m[49m test/workflow/finalize-review.test.ts[2m > [22mfinalizeReview [Fix 2-B RED][2m > [22memits a JSON report with slices[].findings[] structure
+[41m[1m FAIL [22m[49m test/workflow/finalize-review.test.ts[2m > [22mfinalizeReview [Fix 2-B RED][2m > [22mis deterministic — same handoffs produce byte-identical markdown and JSON
+[41m[1m FAIL [22m[49m test/workflow/finalize-review.test.ts[2m > [22mfinalizeReview [Fix 2-B RED][2m > [22msurfaces degraded coverage when handoffs declare missing dimensions
+[41m[1m FAIL [22m[49m test/workflow/finalize-review.test.ts[2m > [22mfinalizeReview [Fix 2-B RED][2m > [22mthrows when runId path resolves outside cwd (path traversal)
+[41m[1m FAIL [22m[49m test/workflow/finalize-review.test.ts[2m > [22mfinalizeReview [Fix 2-B RED][2m > [22mthrows when handoff dir is empty
+[31m[1mError[22m: Cannot find module '../../src/workflow/finalize-review.js' imported from '/home/ricardom/code/github.com/zapsaang/oh-my-review-experts/test/workflow/finalize-review.test.ts'[39m
+[36m [2m❯[22m loadFinalizeReview test/workflow/finalize-review.test.ts:[2m39:15[22m[39m
+    [90m 37| [39m  const segments = ["..", "..", "src", "workflow", "finalize-review.js…
+    [90m 38| [39m  [35mconst[39m modPath [33m=[39m segments[33m.[39m[34mjoin[39m([32m"/"[39m)[33m;[39m
+    [90m 39| [39m  [35mconst[39m mod [33m=[39m [35mawait[39m [35mimport[39m(modPath)[33m;[39m
+    [90m   | [39m              [31m^[39m
+    [90m 40| [39m  [35mreturn[39m mod [35mas[39m unknown [35mas[39m {
+    [90m 41| [39m    [34mfinalizeReview[39m(input[33m:[39m [33mFinalizeReviewInput[39m)[33m:[39m [33mFinalizeReviewResult[39m[33m;[39m
+[90m [2m❯[22m test/workflow/finalize-review.test.ts:[2m135:19[22m[39m
+
+[31m[1mCaused by: Error[22m: Failed to load url ../../src/workflow/finalize-review.js (resolved id: ../../src/workflow/finalize-review.js). Does the file exist?[39m
+[90m [2m❯[22m loadAndTransform node_modules/vite/dist/node/chunks/config.js:[2m22679:33[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m9 failed[39m[22m[2m | [22m[1m[32m41 passed[39m[22m[90m (50)[39m
+[2m   Start at [22m 17:41:43
+[2m   Duration [22m 680ms[2m (transform 169ms, setup 0ms, collect 456ms, tests 91ms, environment 0ms, prepare 107ms)[22m
+

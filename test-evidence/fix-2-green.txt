@@ -1,0 +1,12 @@
+
+[1m[46m RUN [49m[22m [36mv3.2.4 [39m[90m/home/ricardom/code/github.com/zapsaang/oh-my-review-experts[39m
+
+ [32m✓[39m test/workflow/finalize-review.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 155[2mms[22m[39m
+ [32m✓[39m test/tools/plugin-tools.test.ts [2m([22m[2m44 tests[22m[2m)[22m[32m 82[2mms[22m[39m
+ [32m✓[39m test/workflow/run-review-code.test.ts [2m([22m[2m19 tests[22m[2m)[22m[33m 495[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[32m69 passed[39m[22m[90m (69)[39m
+[2m   Start at [22m 20:20:18
+[2m   Duration [22m 945ms[2m (transform 260ms, setup 0ms, collect 630ms, tests 731ms, environment 1ms, prepare 208ms)[22m
+

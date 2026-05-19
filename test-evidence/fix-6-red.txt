@@ -1,0 +1,113 @@
+
+[1m[46m RUN [49m[22m [36mv3.2.4 [39m[90m/home/ricardom/code/github.com/zapsaang/oh-my-review-experts[39m
+
+ [31m❯[39m test/tools/doctor.test.ts [2m([22m[2m30 tests[22m[2m | [22m[31m5 failed[39m[2m)[22m[32m 21[2mms[22m[39m
+   [32m✓[39m checkOmrePermissions[2m > [22mreturns no warnings when omre_* is explicitly allowed[32m 2[2mms[22m[39m
+   [32m✓[39m checkOmrePermissions[2m > [22mreturns no warnings when each omre tool is individually allowed[32m 0[2mms[22m[39m
+   [32m✓[39m checkOmrePermissions[2m > [22mwarns when no omre_* permission rule is present[32m 1[2mms[22m[39m
+   [32m✓[39m checkOmrePermissions[2m > [22mwarns when permission key is missing entirely[32m 0[2mms[22m[39m
+   [32m✓[39m checkOmrePermissions[2m > [22mwarns when omre_* is set to deny[32m 0[2mms[22m[39m
+   [32m✓[39m checkOmrePermissions[2m > [22mwarns when omre_* is set to ask (subagents may not be able to call tools without prompt)[32m 0[2mms[22m[39m
+   [32m✓[39m checkOmrePermissions[2m > [22mreturns no warnings for null config (treated as no permission constraint)[32m 0[2mms[22m[39m
+   [32m✓[39m checkOmrePermissions[2m > [22mreturns no warnings for non-object config[32m 0[2mms[22m[39m
+   [32m✓[39m checkOmrePermissions[2m > [22mtreats permission.subagent.<name>.<tool> with allow as covered[32m 0[2mms[22m[39m
+   [32m✓[39m checkOpencodeConfig[2m > [22mreturns exists=false for a missing file (regression: !== null was always true)[32m 0[2mms[22m[39m
+   [32m✓[39m checkOpencodeConfig[2m > [22mreturns exists=true and detects plugin registration[32m 1[2mms[22m[39m
+   [32m✓[39m checkOpencodeConfig[2m > [22mreturns exists=true with permission warnings when omre_* not allowed[32m 0[2mms[22m[39m
+   [32m✓[39m checkOpencodeConfig[2m > [22mreturns exists=false for empty file[32m 0[2mms[22m[39m
+   [32m✓[39m checkOpencodeConfig[2m > [22mreturns exists=true but pluginRegistered=false when plugin not listed[32m 0[2mms[22m[39m
+   [32m✓[39m checkOpencodeConfig[2m > [22msupports both 'plugin' and 'plugins' keys (back-compat)[32m 0[2mms[22m[39m
+   [32m✓[39m [step 18] checkAgentRegistration[2m > [22mreports zero registered when config has no agent map[32m 0[2mms[22m[39m
+   [32m✓[39m [step 18] checkAgentRegistration[2m > [22mreports a partial registration when only one agent is present[32m 0[2mms[22m[39m
+   [32m✓[39m [step 18] checkAgentRegistration[2m > [22mreports 11/11 after the plugin's config hook runs on an empty config[32m 4[2mms[22m[39m
+   [32m✓[39m checkPromptExampleSchemaIdentity[2m > [22mreturns no warnings when prompt examples match their schemas[32m 0[2mms[22m[39m
+   [32m✓[39m checkPromptExampleSchemaIdentity[2m > [22mwarns when a prompt example drops a top-level schema field[32m 0[2mms[22m[39m
+   [32m✓[39m checkPromptExampleSchemaIdentity[2m > [22mwarns when a prompt example adds an unknown top-level field[32m 0[2mms[22m[39m
+   [32m✓[39m checkAgentToolWhitelist[2m > [22mreturns no warnings for the clean agent registry[32m 0[2mms[22m[39m
+   [32m✓[39m checkAgentToolWhitelist[2m > [22mwarns when an agent allows tools from the forbidden baseline[32m 0[2mms[22m[39m
+   [32m✓[39m checkAgentToolWhitelist[2m > [22mwarns when a non-authorized agent is granted a writer tool[32m 0[2mms[22m[39m
+   [32m✓[39m checkAgentToolWhitelist[2m > [22mwarns when an effective agent registration is missing a required permission deny[32m 0[2mms[22m[39m
+[31m   [31m×[31m checkReportLayout [Fix 6][2m > [22mflags stray X-report.md at repo root[39m[32m 4[2mms[22m[39m
+[31m     → checkReportLayout is not exported from src/tools/doctor.ts[39m
+[31m   [31m×[31m checkReportLayout [Fix 6][2m > [22mflags stray X-report.json under .omre/reports/[39m[32m 1[2mms[22m[39m
+[31m     → checkReportLayout is not exported from src/tools/doctor.ts[39m
+[31m   [31m×[31m checkReportLayout [Fix 6][2m > [22m--apply removes flagged files[39m[32m 1[2mms[22m[39m
+[31m     → checkReportLayout is not exported from src/tools/doctor.ts[39m
+[31m   [31m×[31m checkReportLayout [Fix 6][2m > [22mflags latest.md when validateReportMarkdown rejects it (reference-only)[39m[32m 0[2mms[22m[39m
+[31m     → checkReportLayout is not exported from src/tools/doctor.ts[39m
+[31m   [31m×[31m checkReportLayout [Fix 6][2m > [22mexits 0 when layout is clean[39m[32m 0[2mms[22m[39m
+[31m     → checkReportLayout is not exported from src/tools/doctor.ts[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 5 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m test/tools/doctor.test.ts[2m > [22mcheckReportLayout [Fix 6][2m > [22mflags stray X-report.md at repo root
+[31m[1mError[22m: checkReportLayout is not exported from src/tools/doctor.ts[39m
+[36m [2m❯[22m loadCheckReportLayout test/tools/doctor.test.ts:[2m309:13[22m[39m
+    [90m307| [39m    const mod = (await import(segments.join("/"))) as { checkReportLay…
+    [90m308| [39m    [35mif[39m ([35mtypeof[39m mod[33m.[39mcheckReportLayout [33m!==[39m [32m"function"[39m) {
+    [90m309| [39m      throw new Error("checkReportLayout is not exported from src/tool…
+    [90m   | [39m            [31m^[39m
+    [90m310| [39m    }
+    [90m311| [39m    [35mreturn[39m mod[33m.[39mcheckReportLayout[33m;[39m
+[90m [2m❯[22m test/tools/doctor.test.ts:[2m353:31[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/tools/doctor.test.ts[2m > [22mcheckReportLayout [Fix 6][2m > [22mflags stray X-report.json under .omre/reports/
+[31m[1mError[22m: checkReportLayout is not exported from src/tools/doctor.ts[39m
+[36m [2m❯[22m loadCheckReportLayout test/tools/doctor.test.ts:[2m309:13[22m[39m
+    [90m307| [39m    const mod = (await import(segments.join("/"))) as { checkReportLay…
+    [90m308| [39m    [35mif[39m ([35mtypeof[39m mod[33m.[39mcheckReportLayout [33m!==[39m [32m"function"[39m) {
+    [90m309| [39m      throw new Error("checkReportLayout is not exported from src/tool…
+    [90m   | [39m            [31m^[39m
+    [90m310| [39m    }
+    [90m311| [39m    [35mreturn[39m mod[33m.[39mcheckReportLayout[33m;[39m
+[90m [2m❯[22m test/tools/doctor.test.ts:[2m363:31[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/tools/doctor.test.ts[2m > [22mcheckReportLayout [Fix 6][2m > [22m--apply removes flagged files
+[31m[1mError[22m: checkReportLayout is not exported from src/tools/doctor.ts[39m
+[36m [2m❯[22m loadCheckReportLayout test/tools/doctor.test.ts:[2m309:13[22m[39m
+    [90m307| [39m    const mod = (await import(segments.join("/"))) as { checkReportLay…
+    [90m308| [39m    [35mif[39m ([35mtypeof[39m mod[33m.[39mcheckReportLayout [33m!==[39m [32m"function"[39m) {
+    [90m309| [39m      throw new Error("checkReportLayout is not exported from src/tool…
+    [90m   | [39m            [31m^[39m
+    [90m310| [39m    }
+    [90m311| [39m    [35mreturn[39m mod[33m.[39mcheckReportLayout[33m;[39m
+[90m [2m❯[22m test/tools/doctor.test.ts:[2m375:31[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/tools/doctor.test.ts[2m > [22mcheckReportLayout [Fix 6][2m > [22mflags latest.md when validateReportMarkdown rejects it (reference-only)
+[31m[1mError[22m: checkReportLayout is not exported from src/tools/doctor.ts[39m
+[36m [2m❯[22m loadCheckReportLayout test/tools/doctor.test.ts:[2m309:13[22m[39m
+    [90m307| [39m    const mod = (await import(segments.join("/"))) as { checkReportLay…
+    [90m308| [39m    [35mif[39m ([35mtypeof[39m mod[33m.[39mcheckReportLayout [33m!==[39m [32m"function"[39m) {
+    [90m309| [39m      throw new Error("checkReportLayout is not exported from src/tool…
+    [90m   | [39m            [31m^[39m
+    [90m310| [39m    }
+    [90m311| [39m    [35mreturn[39m mod[33m.[39mcheckReportLayout[33m;[39m
+[90m [2m❯[22m test/tools/doctor.test.ts:[2m385:31[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/tools/doctor.test.ts[2m > [22mcheckReportLayout [Fix 6][2m > [22mexits 0 when layout is clean
+[31m[1mError[22m: checkReportLayout is not exported from src/tools/doctor.ts[39m
+[36m [2m❯[22m loadCheckReportLayout test/tools/doctor.test.ts:[2m309:13[22m[39m
+    [90m307| [39m    const mod = (await import(segments.join("/"))) as { checkReportLay…
+    [90m308| [39m    [35mif[39m ([35mtypeof[39m mod[33m.[39mcheckReportLayout [33m!==[39m [32m"function"[39m) {
+    [90m309| [39m      throw new Error("checkReportLayout is not exported from src/tool…
+    [90m   | [39m            [31m^[39m
+    [90m310| [39m    }
+    [90m311| [39m    [35mreturn[39m mod[33m.[39mcheckReportLayout[33m;[39m
+[90m [2m❯[22m test/tools/doctor.test.ts:[2m399:31[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m5 failed[39m[22m[2m | [22m[1m[32m25 passed[39m[22m[90m (30)[39m
+[2m   Start at [22m 20:41:07
+[2m   Duration [22m 440ms[2m (transform 138ms, setup 0ms, collect 223ms, tests 21ms, environment 0ms, prepare 55ms)[22m
+

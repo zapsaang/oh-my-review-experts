@@ -1,0 +1,137 @@
+
+[1m[46m RUN [49m[22m [36mv3.2.4 [39m[90m/home/ricardom/code/github.com/zapsaang/oh-my-review-experts[39m
+
+ [31m❯[39m test/agents/prompts.test.ts [2m([22m[2m51 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[32m 18[2mms[22m[39m
+   [32m✓[39m CHAT_JSON_CONTRACT (coordinator-facing, chat-only)[2m > [22mcontains the strict-JSON base rules[32m 1[2mms[22m[39m
+   [32m✓[39m CHAT_JSON_CONTRACT (coordinator-facing, chat-only)[2m > [22mforbids markdown fences and outside-JSON prose[32m 0[2mms[22m[39m
+   [32m✓[39m FILE_HANDOFF_CONTRACT (reviewer-facing, file-primary)[2m > [22mcontains the strict-JSON base rules[32m 0[2mms[22m[39m
+   [32m✓[39m FILE_HANDOFF_CONTRACT (reviewer-facing, file-primary)[2m > [22m[L1 fix] does NOT forbid markdown fences (the handoff file requires one)[32m 0[2mms[22m[39m
+   [32m✓[39m FILE_HANDOFF_CONTRACT (reviewer-facing, file-primary)[2m > [22m[L1 fix] does NOT forbid outside-JSON prose (the handoff file has a Markdown body and a chat receipt)[32m 0[2mms[22m[39m
+   [32m✓[39m REVIEWER_PROMPTS[2m > [22mcontains all expected dimensions[32m 0[2mms[22m[39m
+   [32m✓[39m REVIEWER_PROMPTS[2m > [22mdoes not include FILE_HANDOFF_CONTRACT in individual prompts[32m 0[2mms[22m[39m
+   [32m✓[39m REVIEWER_PROMPTS[2m > [22mincludes severity enum instructions for all dimensions[32m 0[2mms[22m[39m
+   [32m✓[39m REVIEWER_PROMPTS[2m > [22mincludes confidence enum instructions for all dimensions[32m 0[2mms[22m[39m
+   [32m✓[39m REVIEWER_PROMPTS[2m > [22mincludes performance classification enum for performance dimension[32m 0[2mms[22m[39m
+   [32m✓[39m REVIEWER_PROMPTS[2m > [22mincludes concurrency classification enum for concurrency dimension[32m 0[2mms[22m[39m
+   [32m✓[39m composePrompt[2m > [22mprepends FILE_HANDOFF_CONTRACT to each dimension prompt[32m 0[2mms[22m[39m
+   [32m✓[39m composePrompt[2m > [22mreturns identical results for repeated calls[32m 0[2mms[22m[39m
+   [32m✓[39m COMPLETE_REVIEWER_PROMPTS[2m > [22mcontains all expected dimensions[32m 0[2mms[22m[39m
+   [32m✓[39m COMPLETE_REVIEWER_PROMPTS[2m > [22meach prompt starts with FILE_HANDOFF_CONTRACT (reviewers write file with json fence)[32m 0[2mms[22m[39m
+   [32m✓[39m COMPLETE_REVIEWER_PROMPTS[2m > [22m[L1 fix] no reviewer prompt forbids markdown fences[32m 0[2mms[22m[39m
+   [32m✓[39m COMPLETE_REVIEWER_PROMPTS[2m > [22m[L1 fix] no reviewer prompt forbids outside-JSON prose[32m 0[2mms[22m[39m
+   [32m✓[39m COMPLETE_REVIEWER_PROMPTS[2m > [22meach prompt includes the dimension-specific content[32m 0[2mms[22m[39m
+   [32m✓[39m COMPLETE_REVIEWER_PROMPTS[2m > [22mmatches composePrompt output exactly[32m 0[2mms[22m[39m
+   [32m✓[39m buildHandoffRuntime (per-run runtime stanza)[2m > [22mincludes runId and handoff directory[32m 0[2mms[22m[39m
+   [32m✓[39m buildHandoffRuntime (per-run runtime stanza)[2m > [22mincludes custom handoff directory[32m 0[2mms[22m[39m
+   [32m✓[39m STATIC_HANDOFF_PROTOCOL (channel/format rules)[2m > [22mcontains protocol header[32m 0[2mms[22m[39m
+   [32m✓[39m STATIC_HANDOFF_PROTOCOL (channel/format rules)[2m > [22mmandates omre_write_handoff tool usage[32m 0[2mms[22m[39m
+   [32m✓[39m STATIC_HANDOFF_PROTOCOL (channel/format rules)[2m > [22mdoes not contain file naming convention for direct writes[32m 0[2mms[22m[39m
+   [32m✓[39m STATIC_HANDOFF_PROTOCOL (channel/format rules)[2m > [22m[L1.5 fix] does not say the chat reply must 'contain only' the receipt block AND 'also include' a fallback fence[32m 0[2mms[22m[39m
+   [32m✓[39m STATIC_HANDOFF_PROTOCOL (channel/format rules)[2m > [22m[L1.5 fix] removes the subagent-facing chat-fallback instruction (recovery is the orchestrator's job)[32m 0[2mms[22m[39m
+   [32m✓[39m STATIC_HANDOFF_PROTOCOL (channel/format rules)[2m > [22m[L1.5 fix] explicitly forbids the subagent from including a json fence in chat[32m 0[2mms[22m[39m
+   [32m✓[39m STATIC_HANDOFF_PROTOCOL (channel/format rules)[2m > [22m[N3] tells reviewers to pass runId when calling omre_write_handoff[32m 0[2mms[22m[39m
+   [32m✓[39m buildReportWriterInputRule[2m > [22mincludes runId and directory[32m 0[2mms[22m[39m
+   [32m✓[39m buildReportWriterInputRule[2m > [22minstructs reading JSON header first[32m 0[2mms[22m[39m
+   [32m✓[39m buildReportWriterInputRule[2m > [22mdefines handoff status values including unreadable[32m 0[2mms[22m[39m
+   [32m✓[39m buildSubagentCatalog[2m > [22mlists all reviewer subagents[32m 0[2mms[22m[39m
+   [32m✓[39m buildSubagentCatalog[2m > [22mlists all coordination subagents[32m 0[2mms[22m[39m
+   [32m✓[39m buildSubagentCatalog[2m > [22mdoes not include full role prompts[32m 0[2mms[22m[39m
+   [32m✓[39m buildSubagentCatalog[2m > [22m[step 20] is a one-liner without legacy section headers[32m 0[2mms[22m[39m
+   [32m✓[39m SLICE_PLANNER_PROMPT[2m > [22m[N1] renders every canonical slice_type value[32m 0[2mms[22m[39m
+   [32m✓[39m SLICE_PLANNER_PROMPT[2m > [22m[N1] derives the prose allowlist from SLICE_TYPE_VALUES instead of a literal duplicate[32m 0[2mms[22m[39m
+   [32m✓[39m SLICE_ARBITER_PROMPT[2m > [22mincludes rejection reason enum[32m 0[2mms[22m[39m
+   [32m✓[39m SLICE_ARBITER_PROMPT[2m > [22mforbids free-form rejection reasons[32m 0[2mms[22m[39m
+   [32m✓[39m GLOBAL_ARBITER_PROMPT[2m > [22mincludes rejection reason enum[32m 0[2mms[22m[39m
+   [32m✓[39m GLOBAL_ARBITER_PROMPT[2m > [22mforbids free-form rejection reasons[32m 0[2mms[22m[39m
+   [32m✓[39m Coordinator prompt snapshots[2m > [22mSLICE_PLANNER_PROMPT remains stable[32m 1[2mms[22m[39m
+   [32m✓[39m Coordinator prompt snapshots[2m > [22mSLICE_PLAN_VALIDATOR_PROMPT remains stable[32m 0[2mms[22m[39m
+   [32m✓[39m Coordinator prompt snapshots[2m > [22mRESULT_VALIDATOR_PROMPT remains stable[32m 0[2mms[22m[39m
+   [32m✓[39m Coordinator prompt snapshots[2m > [22mSLICE_ARBITER_PROMPT remains stable[32m 0[2mms[22m[39m
+   [32m✓[39m Coordinator prompt snapshots[2m > [22mGLOBAL_ARBITER_PROMPT remains stable[32m 0[2mms[22m[39m
+[31m   [31m×[31m REPORT_WRITER_PROMPT[2m > [22mreferences omre_finalize_review as the primary write tool[39m[32m 5[2mms[22m[39m
+[31m     → expected 'You are a leaf coordinator. Do not in…' to match /omre_finalize_review/[39m
+[31m   [31m×[31m REPORT_WRITER_PROMPT[2m > [22mforbids passing file-path references as content[39m[32m 1[2mms[22m[39m
+[31m     → expected 'You are a leaf coordinator. Do not in…' to match /(do not|never|forbidden)[^.]*(file.p…/i[39m
+   [32m✓[39m REPORT_WRITER_PROMPT[2m > [22mforbids calling other write tools[32m 0[2mms[22m[39m
+[31m   [31m×[31m REPORT_WRITER_PROMPT[2m > [22minstructs surfacing errors rather than retrying with write[39m[32m 1[2mms[22m[39m
+[31m     → expected 'You are a leaf coordinator. Do not in…' to match /surface.*error|do not retry|do not w…/i[39m
+   [32m✓[39m REPORT_WRITER_PROMPT[2m > [22msnapshot remains stable[32m 0[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 3 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m test/agents/prompts.test.ts[2m > [22mREPORT_WRITER_PROMPT[2m > [22mreferences omre_finalize_review as the primary write tool
+[31m[1mAssertionError[22m: expected 'You are a leaf coordinator. Do not in…' to match /omre_finalize_review/[39m
+
+[32m- Expected:[39m 
+/omre_finalize_review/
+
+[31m+ Received:[39m 
+"You are a leaf coordinator. Do not invoke the task tool. Do not invoke the skill tool. Do not delegate to any subagent. Your output must follow the exact format specified in your instructions, with no additional commentary.
+
+You are the review-code report writer.
+Do not review code. Persist the provided final result exactly to the configured report paths. Do not invent findings.
+You have one write tool, omre_write_report. Call it once with the final markdown and JSON. Do not call any other write tool."
+
+[36m [2m❯[22m test/agents/prompts.test.ts:[2m330:34[22m[39m
+    [90m328| [39m[34mdescribe[39m([32m"REPORT_WRITER_PROMPT"[39m[33m,[39m () [33m=>[39m {
+    [90m329| [39m  it("references omre_finalize_review as the primary write tool", () =…
+    [90m330| [39m    [34mexpect[39m([33mREPORT_WRITER_PROMPT[39m)[33m.[39m[34mtoMatch[39m([36m/omre_finalize_review/[39m)[33m;[39m
+    [90m   | [39m                                 [31m^[39m
+    [90m331| [39m  })[33m;[39m
+    [90m332| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/agents/prompts.test.ts[2m > [22mREPORT_WRITER_PROMPT[2m > [22mforbids passing file-path references as content
+[31m[1mAssertionError[22m: expected 'You are a leaf coordinator. Do not in…' to match /(do not|never|forbidden)[^.]*(file.p…/i[39m
+
+[32m- Expected:[39m 
+/(do not|never|forbidden)[^.]*(file.path|reference)[^.]*content/i
+
+[31m+ Received:[39m 
+"You are a leaf coordinator. Do not invoke the task tool. Do not invoke the skill tool. Do not delegate to any subagent. Your output must follow the exact format specified in your instructions, with no additional commentary.
+
+You are the review-code report writer.
+Do not review code. Persist the provided final result exactly to the configured report paths. Do not invent findings.
+You have one write tool, omre_write_report. Call it once with the final markdown and JSON. Do not call any other write tool."
+
+[36m [2m❯[22m test/agents/prompts.test.ts:[2m334:34[22m[39m
+    [90m332| [39m
+    [90m333| [39m  [34mit[39m([32m"forbids passing file-path references as content"[39m[33m,[39m () [33m=>[39m {
+    [90m334| [39m    [34mexpect[39m([33mREPORT_WRITER_PROMPT[39m)[33m.[39m[34mtoMatch[39m(
+    [90m   | [39m                                 [31m^[39m
+    [90m335| [39m      [36m/(do not|never|forbidden)[^.]*(file.path|reference)[^.]*content/i[39m
+    [90m336| [39m    )[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/agents/prompts.test.ts[2m > [22mREPORT_WRITER_PROMPT[2m > [22minstructs surfacing errors rather than retrying with write
+[31m[1mAssertionError[22m: expected 'You are a leaf coordinator. Do not in…' to match /surface.*error|do not retry|do not w…/i[39m
+
+[32m- Expected:[39m 
+/surface.*error|do not retry|do not write.*directly/i
+
+[31m+ Received:[39m 
+"You are a leaf coordinator. Do not invoke the task tool. Do not invoke the skill tool. Do not delegate to any subagent. Your output must follow the exact format specified in your instructions, with no additional commentary.
+
+You are the review-code report writer.
+Do not review code. Persist the provided final result exactly to the configured report paths. Do not invent findings.
+You have one write tool, omre_write_report. Call it once with the final markdown and JSON. Do not call any other write tool."
+
+[36m [2m❯[22m test/agents/prompts.test.ts:[2m346:34[22m[39m
+    [90m344| [39m
+    [90m345| [39m  it("instructs surfacing errors rather than retrying with write", () …
+    [90m346| [39m    [34mexpect[39m([33mREPORT_WRITER_PROMPT[39m)[33m.[39m[34mtoMatch[39m(
+    [90m   | [39m                                 [31m^[39m
+    [90m347| [39m      [36m/surface.*error|do not retry|do not write.*directly/i[39m
+    [90m348| [39m    )[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯[22m[39m
+
+
+[2m  Snapshots [22m [1m[32m1 written[39m[22m
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m48 passed[39m[22m[90m (51)[39m
+[2m   Start at [22m 20:28:24
+[2m   Duration [22m 329ms[2m (transform 65ms, setup 0ms, collect 105ms, tests 18ms, environment 0ms, prepare 61ms)[22m
+

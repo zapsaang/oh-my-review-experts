@@ -1,0 +1,223 @@
+Command: npm run typecheck && npx vitest run test/tools/report.test.ts
+
+$ npm run typecheck
+> oh-my-review-experts@0.1.9 typecheck
+> tsc --noEmit
+
+$ npx vitest run test/tools/report.test.ts
+
+ RUN  v3.2.4 /home/ricardom/code/github.com/zapsaang/oh-my-review-experts
+
+ ❯ test/tools/report.test.ts (22 tests | 13 failed) 24ms
+   ✓ writeReport > writes latest.md and latest.json 3ms
+   ✓ writeReport > blocks path traversal in report.directory 1ms
+   ✓ writeReport > writes timestamped history files when enabled 1ms
+   ✓ writeReport > renders coverage warning when degraded slices present 1ms
+   ✓ writeReport > renders coverage warning when only missingDimensionsGlobal present 0ms
+   ✓ writeReport > does not render coverage warning when no degraded coverage 0ms
+   ✓ writeReport > replaces 'No issues found' headline when coverage is degraded 0ms
+   ✓ writeReport > [Fix 4] markdown validation > accepts a real-shaped report (>= 50 lines, '#' heading) 1ms
+   ✓ writeReport > [Fix 4] markdown validation > coverage warning prepend still passes validation with a valid report payload 1ms
+   × writeReport > [Fix 4] markdown validation > rejects 'Report persisted to …' reference markdown 6ms
+     → expected [Function] to throw an error
+   × writeReport > [Fix 4] markdown validation > rejects 'Saved to …' reference markdown 1ms
+     → expected [Function] to throw an error
+   × writeReport > [Fix 4] markdown validation > rejects 'See file: …' reference markdown 1ms
+     → expected [Function] to throw an error
+   × writeReport > [Fix 4] markdown validation > rejects 'See report: …' reference markdown 1ms
+     → expected [Function] to throw an error
+   × writeReport > [Fix 4] markdown validation > rejects Chinese reference variant '报告已保存到 …' 1ms
+     → expected [Function] to throw an error
+   × writeReport > [Fix 4] markdown validation > rejects Chinese reference variant '报告写入至 …' 1ms
+     → expected [Function] to throw an error
+   × writeReport > [Fix 4] markdown validation > rejects 'The full report is at …' 1ms
+     → expected [Function] to throw an error
+   × writeReport > [Fix 4] markdown validation > rejects 'The full report can be found at …' 1ms
+     → expected [Function] to throw an error
+   × writeReport > [Fix 4] markdown validation > rejects empty markdown 1ms
+     → expected [Function] to throw an error
+   × writeReport > [Fix 4] markdown validation > rejects whitespace-only markdown 1ms
+     → expected [Function] to throw an error
+   × writeReport > [Fix 4] markdown validation > rejects markdown shorter than MIN_REPORT_LENGTH 1ms
+     → expected [Function] to throw an error
+   × writeReport > [Fix 4] markdown validation > rejects markdown with fewer than MIN_REPORT_LINES non-blank lines 1ms
+     → expected [Function] to throw an error
+   × writeReport > [Fix 4] markdown validation > rejects markdown with no leading '#' heading 1ms
+     → expected [Function] to throw an error
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 13 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/tools/report.test.ts > writeReport > [Fix 4] markdown validation > rejects 'Report persisted to …' reference markdown
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ test/tools/report.test.ts:199:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/13]⎯
+
+ FAIL  test/tools/report.test.ts > writeReport > [Fix 4] markdown validation > rejects 'Saved to …' reference markdown
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ test/tools/report.test.ts:206:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/13]⎯
+
+ FAIL  test/tools/report.test.ts > writeReport > [Fix 4] markdown validation > rejects 'See file: …' reference markdown
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ test/tools/report.test.ts:213:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/13]⎯
+
+ FAIL  test/tools/report.test.ts > writeReport > [Fix 4] markdown validation > rejects 'See report: …' reference markdown
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ test/tools/report.test.ts:220:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/13]⎯
+
+ FAIL  test/tools/report.test.ts > writeReport > [Fix 4] markdown validation > rejects Chinese reference variant '报告已保存到 …'
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ test/tools/report.test.ts:227:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/13]⎯
+
+ FAIL  test/tools/report.test.ts > writeReport > [Fix 4] markdown validation > rejects Chinese reference variant '报告写入至 …'
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ test/tools/report.test.ts:234:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/13]⎯
+
+ FAIL  test/tools/report.test.ts > writeReport > [Fix 4] markdown validation > rejects 'The full report is at …'
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ test/tools/report.test.ts:241:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/13]⎯
+
+ FAIL  test/tools/report.test.ts > writeReport > [Fix 4] markdown validation > rejects 'The full report is at …'
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ test/tools/report.test.ts:248:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/13]⎯
+
+ FAIL  test/tools/report.test.ts > writeReport > [Fix 4] markdown validation > rejects empty markdown
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ test/tools/report.test.ts:255:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/13]⎯
+
+ FAIL  test/tools/report.test.ts > writeReport > [Fix 4] markdown validation > rejects whitespace-only markdown
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ test/tools/report.test.ts:262:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/13]⎯
+
+ FAIL  test/tools/report.test.ts > writeReport > [Fix 4] markdown validation > rejects markdown shorter than MIN_REPORT_LENGTH
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ test/tools/report.test.ts:269:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/13]⎯
+
+ FAIL  test/tools/report.test.ts > writeReport > [Fix 4] markdown validation > rejects markdown with fewer than MIN_REPORT_LINES non-blank lines
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ test/tools/report.test.ts:278:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/13]⎯
+
+ FAIL  test/tools/report.test.ts > writeReport > [Fix 4] markdown validation > rejects markdown with no leading '#' heading
+AssertionError: expected [Function] to throw an error
+
+- Expected: 
+null
+
++ Received: 
+undefined
+
+ ❯ test/tools/report.test.ts:287:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/13]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  13 failed | 9 passed (22)
+   Start at  16:22:53
+   Duration  402ms (transform 69ms, setup 0ms, collect 80ms, tests 24ms, environment 0ms, prepare 61ms)
