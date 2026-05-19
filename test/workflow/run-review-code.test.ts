@@ -1,53 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { execFileSync } from "node:child_process";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { buildReviewCodePrompt, renderLocalDryRun } from "../../src/workflow/run-review-code.js";
 import { clearLoadConfigCache } from "../../src/config/load-config.js";
-
-function withCleanGitRepo<T>(fn: (cwd: string) => T): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-review-prompt-"));
-  try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
-    fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
-    execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
-    execFileSync(
-      "git",
-      ["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "init"],
-      { cwd: tmpDir, stdio: "ignore" }
-    );
-    return fn(tmpDir);
-  } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  }
-}
-
-function withHierarchicalRepo<T>(fn: (cwd: string) => T): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-hier-"));
-  try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
-    fs.writeFileSync(path.join(tmpDir, ".gitignore"), ".omre/\nnode_modules/\n", "utf8");
-    fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
-    fs.writeFileSync(
-      path.join(tmpDir, ".omre", "config.json"),
-      JSON.stringify({
-        costGuardrail: { compactModeThreshold: 100 },
-        arbitration: { hierarchicalThreshold: 3 },
-      }),
-      "utf8"
-    );
-    fs.mkdirSync(path.join(tmpDir, "src", "auth"), { recursive: true });
-    fs.mkdirSync(path.join(tmpDir, "src", "payment"), { recursive: true });
-    fs.mkdirSync(path.join(tmpDir, "src", "user"), { recursive: true });
-    fs.writeFileSync(path.join(tmpDir, "src", "auth", "login.ts"), "// auth\n", "utf8");
-    fs.writeFileSync(path.join(tmpDir, "src", "payment", "process.ts"), "// payment\n", "utf8");
-    fs.writeFileSync(path.join(tmpDir, "src", "user", "profile.ts"), "// user\n", "utf8");
-    return fn(tmpDir);
-  } finally {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  }
-}
+import {
+  withCleanGitRepo,
+  withHierarchicalRepo,
+} from "../_helpers/fixture-repo.js";
 
 function getExecutionRequirements(prompt: string): string {
   const afterExecution = prompt.split("Execution requirements:")[1] ?? "";
