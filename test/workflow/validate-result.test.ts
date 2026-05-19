@@ -10,9 +10,8 @@ import {
   type ReviewerHandoff,
   type ReviewerFinding,
   type ExpectedValues,
-  NormalizedReviewerHandoffSchema,
 } from "../../src/workflow/validate-result.js";
-import { SCHEMA_VERSION, UnifiedFindingSchema, UnifiedHandoffSchema } from "../../src/agents/schemas.js";
+import { SCHEMA_VERSION, UnifiedFindingSchema, UnifiedHandoffSchema, NormalizedUnifiedHandoffSchema } from "../../src/agents/schemas.js";
 
 function createMockHandoffFile(content: string): string {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-test-"));
@@ -501,7 +500,7 @@ describe("UnifiedFindingSchema defaults", () => {
   });
 });
 
-describe("NormalizedReviewerHandoffSchema validation", () => {
+describe("NormalizedUnifiedHandoffSchema validation", () => {
   it("reports invalid_type for missing meta.total_findings", () => {
     const raw: Record<string, unknown> = {
       schema_version: SCHEMA_VERSION,
@@ -514,7 +513,7 @@ describe("NormalizedReviewerHandoffSchema validation", () => {
       findings: [],
       meta: { notes: "no findings" },
     };
-    const result = NormalizedReviewerHandoffSchema.safeParse(raw);
+    const result = NormalizedUnifiedHandoffSchema.safeParse(raw);
     expect(result.success).toBe(false);
     if (!result.success) {
       const issue = result.error.issues[0];
@@ -600,7 +599,7 @@ describe("UnifiedHandoffSchema direct validation", () => {
   });
 });
 
-describe("NormalizedReviewerHandoffSchema direct validation", () => {
+describe("NormalizedUnifiedHandoffSchema direct validation", () => {
   const validHandoff = {
     schema_version: SCHEMA_VERSION,
     task_id: "task-123",
@@ -626,7 +625,7 @@ describe("NormalizedReviewerHandoffSchema direct validation", () => {
   };
 
   it("safeParse succeeds for valid handoff and returns typed findings", () => {
-    const result = NormalizedReviewerHandoffSchema.safeParse(validHandoff);
+    const result = NormalizedUnifiedHandoffSchema.safeParse(validHandoff);
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.findings).toHaveLength(1);
@@ -641,8 +640,8 @@ describe("Type equivalence", () => {
     expectTypeOf<ReviewerFinding>().toEqualTypeOf<z.infer<typeof UnifiedFindingSchema>>();
   });
 
-  it("ReviewerHandoff equals z.infer of NormalizedReviewerHandoffSchema", () => {
-    expectTypeOf<ReviewerHandoff>().toEqualTypeOf<z.infer<typeof NormalizedReviewerHandoffSchema>>();
+  it("ReviewerHandoff equals z.infer of NormalizedUnifiedHandoffSchema", () => {
+    expectTypeOf<ReviewerHandoff>().toEqualTypeOf<z.infer<typeof NormalizedUnifiedHandoffSchema>>();
   });
 });
 

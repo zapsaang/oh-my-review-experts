@@ -14,13 +14,6 @@ import {
 } from "../agents/schemas.js";
 import { parseHandoffJsonHeader } from "../tools/handoff.js";
 
-
-/**
- * @deprecated Use `NormalizedUnifiedHandoffSchema`. Kept for compatibility
- * through the v0.x line; remove by v1.0.
- */
-export const NormalizedReviewerHandoffSchema = NormalizedUnifiedHandoffSchema;
-
 export type ReviewerFinding = z.infer<typeof UnifiedFindingSchema>;
 export type ReviewerHandoff = z.infer<typeof NormalizedUnifiedHandoffSchema>;
 
@@ -199,7 +192,7 @@ function validateSchemaShape(data: unknown): { valid: boolean; partial: boolean;
 }
 
 function normalizeHandoff(data: unknown): ReviewerHandoff {
-  return NormalizedReviewerHandoffSchema.parse(data);
+  return NormalizedUnifiedHandoffSchema.parse(data);
 }
 
 /**
