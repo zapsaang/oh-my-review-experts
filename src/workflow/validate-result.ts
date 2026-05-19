@@ -14,12 +14,6 @@ import {
 } from "../agents/schemas.js";
 import { parseHandoffJsonHeader } from "../tools/handoff.js";
 
-/**
- * @deprecated Use `UnifiedFindingSchema` from `src/agents/schemas.js`. Kept
- * for compatibility through the v0.x line; remove by v1.0. Track migration
- * via the `Unified*` schema imports.
- */
-export const ReviewerFindingSchema = UnifiedFindingSchema;
 
 /**
  * @deprecated Use `UnifiedHandoffSchema`. Same removal policy as

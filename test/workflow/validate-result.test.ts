@@ -10,11 +10,10 @@ import {
   type ReviewerHandoff,
   type ReviewerFinding,
   type ExpectedValues,
-  ReviewerFindingSchema,
   ReviewerHandoffSchema,
   NormalizedReviewerHandoffSchema,
 } from "../../src/workflow/validate-result.js";
-import { SCHEMA_VERSION } from "../../src/agents/schemas.js";
+import { SCHEMA_VERSION, UnifiedFindingSchema } from "../../src/agents/schemas.js";
 
 function createMockHandoffFile(content: string): string {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-test-"));
@@ -466,7 +465,7 @@ describe("validateReviewerHandoff", () => {
   });
 });
 
-describe("ReviewerFindingSchema defaults", () => {
+describe("UnifiedFindingSchema defaults", () => {
   it("applies default 'N/A' to omitted file field", () => {
     const raw = {
       id: "sec-1",
@@ -478,7 +477,7 @@ describe("ReviewerFindingSchema defaults", () => {
       confidence: "high",
       classification: "injection",
     };
-    const result = ReviewerFindingSchema.safeParse(raw);
+    const result = UnifiedFindingSchema.safeParse(raw);
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.file).toBe("N/A");
@@ -495,7 +494,7 @@ describe("ReviewerFindingSchema defaults", () => {
       confidence: "high",
       classification: "injection",
     };
-    const result = ReviewerFindingSchema.safeParse(raw);
+    const result = UnifiedFindingSchema.safeParse(raw);
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.line).toBe("N/A");
@@ -527,7 +526,7 @@ describe("NormalizedReviewerHandoffSchema validation", () => {
   });
 });
 
-describe("ReviewerFindingSchema direct validation", () => {
+describe("UnifiedFindingSchema direct validation", () => {
   const validFinding = {
     id: "sec-1",
     severity: "critical" as const,
@@ -541,7 +540,7 @@ describe("ReviewerFindingSchema direct validation", () => {
   };
 
   it("safeParse succeeds for valid input and preserves severity/confidence", () => {
-    const result = ReviewerFindingSchema.safeParse(validFinding);
+    const result = UnifiedFindingSchema.safeParse(validFinding);
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.severity).toBe("critical");
@@ -551,7 +550,7 @@ describe("ReviewerFindingSchema direct validation", () => {
   });
 
   it("safeParse({}) fails for missing required string fields but tolerates enum fields via .catch()", () => {
-    const result = ReviewerFindingSchema.safeParse({});
+    const result = UnifiedFindingSchema.safeParse({});
     expect(result.success).toBe(false);
     if (!result.success) {
       const stringPaths = ["id", "title", "description", "evidence", "classification"];
@@ -568,7 +567,7 @@ describe("ReviewerFindingSchema direct validation", () => {
   });
 
   it("safeParse downgrades bogus severity to 'medium' via .catch()", () => {
-    const result = ReviewerFindingSchema.safeParse({ ...validFinding, severity: "BOGUS" });
+    const result = UnifiedFindingSchema.safeParse({ ...validFinding, severity: "BOGUS" });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.severity).toBe("medium");
@@ -639,8 +638,8 @@ describe("NormalizedReviewerHandoffSchema direct validation", () => {
 });
 
 describe("Type equivalence", () => {
-  it("ReviewerFinding equals z.infer of ReviewerFindingSchema", () => {
-    expectTypeOf<ReviewerFinding>().toEqualTypeOf<z.infer<typeof ReviewerFindingSchema>>();
+  it("ReviewerFinding equals z.infer of UnifiedFindingSchema", () => {
+    expectTypeOf<ReviewerFinding>().toEqualTypeOf<z.infer<typeof UnifiedFindingSchema>>();
   });
 
   it("ReviewerHandoff equals z.infer of NormalizedReviewerHandoffSchema", () => {
