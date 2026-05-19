@@ -74,11 +74,41 @@ With focus guidance:
 /review-code focus on disk format compatibility and concurrency hazards
 ```
 
+With explicit scope:
+
+```text
+/review-code branch:main
+/review-code commit:abc1234
+/review-code path:src/auth
+/review-code staged
+```
+
 Preview the generated prompt without calling any model:
 
 ```text
 /review-code --echo-prompt
 ```
+
+---
+
+## Scope syntax
+
+`/review-code` accepts optional scope prefixes that control which changes are reviewed:
+
+| Input | Resolved scope | Equivalent git command |
+|-------|----------------|------------------------|
+| (empty) | working tree + staged + untracked | `git diff HEAD` + `git ls-files --others --exclude-standard` |
+| `staged` / `--staged` / `--cached` | staged only | `git diff --cached` |
+| `commit:<ref>` | one commit | `git show <ref>` |
+| `branch:<name>` | branch vs HEAD | `git diff <name>...HEAD` |
+| `range:<from>..<to>` | commit range | `git diff <from>...<to>` |
+| `path:<paths>` | filtered by path (comma-separated) | `git diff HEAD -- <paths>` |
+| bare `<sha>` | resolves to commit if exists | same as `commit:` |
+| bare `<branch>` | resolves to branch if exists (else falls through) | same as `branch:` |
+| bare `<path>` | resolves to path if exists (else falls through) | same as `path:` |
+| anything else | guidance text (default scope still reviewed) | `git diff HEAD` |
+
+Ambiguous bare-form inputs (e.g., a name that is both branch and dir) require explicit prefix.
 
 ---
 
@@ -139,7 +169,8 @@ Full schema:
     "enabled": true,
     "name": "review-code",
     "aliases": ["rc"],
-    "injection": "both"
+    "injection": "both",
+    "scopeResolution": "auto"
   },
   "models": {
     "spec":           "minimax-cn/MiniMax-M2.7",
@@ -209,11 +240,11 @@ Full schema:
 - `"disabled"` — No command registration or interception. Useful for temporarily muting the plugin.
 - `"tool"` — Disables slash commands; plugin tools (`omre_write_handoff`, `omre_write_report`, etc.) remain available via `hooks.tool`.
 
+`scopeResolution: 'guidance-only'` reproduces pre-0.x behavior — args treated as opaque guidance text, scope is always `git diff HEAD`.
+
 ---
 
 ## CLI
-
-Everything from the command line:
 
 ```bash
 omre init                  # scaffold .opencode/oh-my-review-experts.jsonc
@@ -269,6 +300,7 @@ The plugin exposes six tools for programmatic use:
 
 - **Path traversal** — `assertSafePath()` and `assertSafeCwd()` reject `..`, absolute paths, and non-UTF-8 byte sequences. Applied at every file-write boundary.
 - **Prompt injection** — User arguments pass through `validateAndSanitizeArgs()` with a regex blacklist; long arguments are truncated at 4KB with a visible warning.
+- **Scope-arg sanitization** — `validateAndSanitizeArgs()` rejects shell metacharacters in path-shaped args, `..` segments, and leading `--` to prevent option-injection.
 - **Secret redaction** — `redactSecrets()` scrubs common credential patterns (API keys, tokens, private keys, connection strings) from diffs *before* they reach any model.
 - **Command injection** — Command names are validated against `SAFE_COMMAND_PATTERN` and a forbidden list (`__proto__`, `constructor`, `prototype`).
 - **Diff bounds** — Unified diff is capped at 180KB with a visible truncation marker.
