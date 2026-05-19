@@ -13,7 +13,7 @@ import {
   SLICE_PLANNER_PROMPT,
   SLICE_PLAN_VALIDATOR_PROMPT,
   composePrompt,
-  buildHandoffProtocol,
+  buildHandoffRuntime,
   buildReportWriterInputRule,
   buildSubagentCatalog,
 } from "../../src/agents/prompts.js";
@@ -147,46 +147,47 @@ describe("COMPLETE_REVIEWER_PROMPTS", () => {
   });
 });
 
-describe("buildHandoffProtocol", () => {
-  it("includes runId in the prompt", () => {
-    const prompt = buildHandoffProtocol(".omre/handoffs", "run-20260507-001");
+describe("buildHandoffRuntime (per-run runtime stanza)", () => {
+  it("includes runId and handoff directory", () => {
+    const prompt = buildHandoffRuntime(".omre/handoffs", "run-20260507-001");
     expect(prompt).toContain("run-20260507-001");
     expect(prompt).toContain(".omre/handoffs/run-20260507-001/");
-    expect(prompt).toContain("Review Code Handoff Protocol");
+    expect(prompt).toContain("Review Code Handoff Runtime");
   });
 
-  it("includes handoff directory", () => {
-    const prompt = buildHandoffProtocol("custom/handoffs", "run-001");
+  it("includes custom handoff directory", () => {
+    const prompt = buildHandoffRuntime("custom/handoffs", "run-001");
     expect(prompt).toContain("custom/handoffs/run-001/");
+  });
+});
+
+describe("STATIC_HANDOFF_PROTOCOL (channel/format rules)", () => {
+  it("contains protocol header", () => {
+    expect(STATIC_HANDOFF_PROTOCOL).toContain("Review Code Handoff Protocol");
   });
 
   it("mandates omre_write_handoff tool usage", () => {
-    const prompt = buildHandoffProtocol(".omre/handoffs", "run-001");
-    expect(prompt).toContain("omre_write_handoff");
-    expect(prompt).toMatch(/MUST|must/);
+    expect(STATIC_HANDOFF_PROTOCOL).toContain("omre_write_handoff");
+    expect(STATIC_HANDOFF_PROTOCOL).toMatch(/MUST|must/);
   });
 
   it("does not contain file naming convention for direct writes", () => {
-    const prompt = buildHandoffProtocol(".omre/handoffs", "run-001");
-    expect(prompt).not.toContain("File naming convention");
+    expect(STATIC_HANDOFF_PROTOCOL).not.toContain("File naming convention");
   });
 
   it("[L1.5 fix] does not say the chat reply must 'contain only' the receipt block AND 'also include' a fallback fence", () => {
-    const prompt = buildHandoffProtocol(".omre/handoffs", "run-001");
-    const hasContainOnly = /contain\s+only/i.test(prompt);
-    const hasAlsoInclude = /MUST also include/i.test(prompt);
+    const hasContainOnly = /contain\s+only/i.test(STATIC_HANDOFF_PROTOCOL);
+    const hasAlsoInclude = /MUST also include/i.test(STATIC_HANDOFF_PROTOCOL);
     expect(hasContainOnly && hasAlsoInclude).toBe(false);
   });
 
   it("[L1.5 fix] removes the subagent-facing chat-fallback instruction (recovery is the orchestrator's job)", () => {
-    const prompt = buildHandoffProtocol(".omre/handoffs", "run-001");
-    expect(prompt).not.toMatch(/Chat Fallback/i);
-    expect(prompt).not.toMatch(/include the complete handoff JSON\s+header inside a/i);
+    expect(STATIC_HANDOFF_PROTOCOL).not.toMatch(/Chat Fallback/i);
+    expect(STATIC_HANDOFF_PROTOCOL).not.toMatch(/include the complete handoff JSON\s+header inside a/i);
   });
 
   it("[L1.5 fix] explicitly forbids the subagent from including a json fence in chat", () => {
-    const prompt = buildHandoffProtocol(".omre/handoffs", "run-001");
-    expect(prompt).toMatch(/never include[^.]*json fence[^.]*chat/i);
+    expect(STATIC_HANDOFF_PROTOCOL).toMatch(/never include[^.]*json fence[^.]*chat/i);
   });
 
   it("[N3] tells reviewers to pass runId when calling omre_write_handoff", () => {

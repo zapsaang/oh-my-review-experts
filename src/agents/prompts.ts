@@ -92,16 +92,6 @@ not duplicated here.
 `;
 }
 
-/**
- * @deprecated Compose `STATIC_HANDOFF_PROTOCOL` (in reviewer staticPrompt) and
- * `buildHandoffRuntime(handoffDir, runId)` (in orchestrator prompt) instead.
- * Kept so legacy callers and existing tests continue to receive the combined
- * runtime+protocol text in one string.
- */
-export function buildHandoffProtocol(handoffDir: string, runId: string): string {
-  return renderHandoffProtocol(handoffDir, runId);
-}
-
 function renderHandoffProtocol(handoffDir: string, runId: string): string {
   return `
 ## Review Code Handoff Protocol
