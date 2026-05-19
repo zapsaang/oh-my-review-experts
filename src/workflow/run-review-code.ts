@@ -56,8 +56,8 @@ export function buildReviewCodePrompt(input: ReviewCodeInput = {}, trusted = fal
   const config = loadConfig(cwd, trusted);
   // Capture git state in a tight sequence for best-effort consistency.
   const files = getChangedFiles(cwd);
-  const rawDiff = getUnifiedDiff(cwd, files);
-  const summary = getDiffSummary(cwd, files);
+  const rawDiff = getUnifiedDiff(cwd, undefined, files);
+  const summary = getDiffSummary(cwd, undefined, files);
   const plan = estimatePlan(files, config);
   const diff = redactSecrets(rawDiff);
   const reviewersBySlice = JSON.stringify(plan.selectedReviewers, null, 2);
