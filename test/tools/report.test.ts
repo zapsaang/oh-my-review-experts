@@ -8,7 +8,7 @@ import { OmreConfig } from "../../src/config/schema.js";
 function createTestConfig(overrides: Partial<OmreConfig["report"]> = {}): OmreConfig {
   return {
     enabled: true,
-    command: { name: "review-code", aliases: ["rc"], enabled: true, injection: "both" },
+    command: { name: "review-code", aliases: ["rc"], enabled: true, injection: "both", scopeResolution: "auto" },
     models: {
       orchestrator: "test",
       spec: "test",

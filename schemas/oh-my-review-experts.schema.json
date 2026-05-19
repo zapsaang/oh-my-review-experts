@@ -18,7 +18,8 @@
         "aliases": [
           "rc"
         ],
-        "injection": "both"
+        "injection": "both",
+        "scopeResolution": "auto"
       },
       "type": "object",
       "properties": {
@@ -67,6 +68,15 @@
             "tool",
             "both",
             "disabled"
+          ]
+        },
+        "scopeResolution": {
+          "description": "How user-provided args drive review scope. 'auto' (default) parses commit/branch/path/staged forms deterministically. 'guidance-only' treats args as opaque guidance text and uses the default git diff HEAD scope (preserves pre-0.x behavior).",
+          "default": "auto",
+          "type": "string",
+          "enum": [
+            "auto",
+            "guidance-only"
           ]
         }
       },

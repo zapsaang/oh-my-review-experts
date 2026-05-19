@@ -60,6 +60,7 @@ const DEFAULT_COMMAND = {
   name: "review-code",
   aliases: ["rc"],
   injection: "both" as const,
+  scopeResolution: "auto" as const,
 };
 
 const DEFAULT_MODELS = {
@@ -153,6 +154,9 @@ export const OmreConfigSchema = z.object({
     ).default(["rc"]).describe("Alternative names for the slash command."),
     injection: z.enum(["hook", "tool", "both", "disabled"]).default("both").describe(
       "How the command is wired: 'both' registers via config hook and intercepts execution; 'hook' same as both; 'disabled' mutes the plugin; 'tool' disables slash commands but keeps plugin tools available."
+    ),
+    scopeResolution: z.enum(["auto", "guidance-only"]).default("auto").describe(
+      "How user-provided args drive review scope. 'auto' (default) parses commit/branch/path/staged forms deterministically. 'guidance-only' treats args as opaque guidance text and uses the default git diff HEAD scope (preserves pre-0.x behavior)."
     ),
   }).default(() => structuredClone(DEFAULT_COMMAND)).describe("Slash command registration settings."),
   models: ModelConfig.default(() => structuredClone(DEFAULT_MODELS)).describe("Model assignments for each agent role in the review pipeline."),
