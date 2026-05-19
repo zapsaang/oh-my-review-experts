@@ -11,7 +11,7 @@ export class GitError extends Error {
   }
 }
 
-function git(args: string[], cwd = process.cwd()): string {
+export function git(args: string[], cwd = process.cwd()): string {
   try {
     return execFileSync("git", args, {
       cwd,
