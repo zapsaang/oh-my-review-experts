@@ -155,8 +155,10 @@ export function withRepoWithOversizedDiff<T>(fn: (cwd: string) => T): T {
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
 
-    // Generate ~250KB of deterministic content
-    const line = "x".repeat(100) + "\n";
+    // Generate ~250KB of deterministic content.
+    // Use a pattern that breaks secret-scanner regex runs (>31 alphanumeric chars)
+    // so truncation tests are not silently defeated by redaction shrinking the diff.
+    const line = ("x".repeat(31) + " ").repeat(3) + "x".repeat(7) + "\n";
     const linesNeeded = Math.ceil((250 * 1024) / line.length);
     const content = line.repeat(linesNeeded);
     fs.writeFileSync(path.join(tmpDir, "large.txt"), content, "utf8");
