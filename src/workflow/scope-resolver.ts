@@ -37,6 +37,19 @@ export class ScopeResolutionError extends Error {
   }
 }
 
+/**
+ * Error thrown when a bare input could be resolved as more than one kind of scope.
+ */
+export class AmbiguousScopeError extends Error {
+  constructor(
+    message: string,
+    public readonly candidates: ReviewScope[]
+  ) {
+    super(message);
+    this.name = "AmbiguousScopeError";
+  }
+}
+
 // Mirrors SAFE_DIR_PATTERN from src/config/schema.ts: no leading "/", no ".." segments.
 const SAFE_PATH_PATTERN = /^(?!\/)((?!\.\.)[a-zA-Z0-9_\-\.\/])+$/;
 const SHA_BARE_PATTERN = /^[A-Fa-f0-9]{7,40}$/;
@@ -59,6 +72,7 @@ const STAGED_KEYWORDS = new Set(["staged", "--staged", "--cached"]);
  * 6. Explicit prefix `range:<from>..<to>`→ `{ kind: "range", from, to }` (throws on invalid format)
  * 7. Bare-form SHA / HEAD~N / HEAD^      → `{ kind: "commit", ref }`   (only if `git cat-file -e` succeeds)
  * 8. Bare-form branch name               → `{ kind: "branch", name }`  (only if `git show-ref` succeeds, local then remote)
+ *    – If the same input also resolves as bare paths, returns `{ kind: "ambiguous" }` instead.
  * 9. Bare-form comma-separated paths     → `{ kind: "paths", paths }`  (only if all parts exist on disk under cwd)
  * 10. Otherwise                          → `{ kind: "guidance", text: trimmed }`
  *
@@ -66,7 +80,8 @@ const STAGED_KEYWORDS = new Set(["staged", "--staged", "--cached"]);
  * {@link SAFE_PATH_PATTERN} and `path.resolve(cwd, p)` must remain under `cwd`.
  *
  * Ambiguity resolution and precedence wiring (e.g. SHA-vs-branch coincidences)
- * are handled by callers; this function returns the first concrete match it finds.
+ * are handled by callers; this function returns the first concrete match it finds,
+ * except for the branch-vs-paths ambiguity case which is surfaced explicitly.
  *
  * @throws {ScopeResolutionError} when an explicit prefix is malformed or a
  * bare path partially exists / escapes `cwd`.
@@ -103,6 +118,19 @@ export function parseReviewScope(args: string, cwd: string): ReviewScope {
   if (BRANCH_NAME_PATTERN.test(trimmed) && !trimmed.startsWith("-")) {
     const branchName = resolveBranch(trimmed, cwd);
     if (branchName !== null) {
+      if (wouldBarePathsResolve(trimmed, cwd)) {
+        const pathParts = trimmed
+          .split(",")
+          .map((segment) => segment.trim())
+          .filter((segment) => segment.length > 0);
+        return {
+          kind: "ambiguous",
+          candidates: [
+            { kind: "branch", name: branchName },
+            { kind: "paths", paths: pathParts },
+          ],
+        };
+      }
       return { kind: "branch", name: branchName };
     }
   }
@@ -272,6 +300,31 @@ function verifyRef(fullRef: string, cwd: string): boolean {
 }
 
 /**
+ * Check whether `arg` would resolve as a valid bare-form path list
+ * without throwing. Returns `true` only when every part passes
+ * {@link SAFE_PATH_PATTERN}, resolves under `cwd`, and exists on disk.
+ */
+function wouldBarePathsResolve(arg: string, cwd: string): boolean {
+  const parts = arg
+    .split(",")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+  if (parts.length === 0) return false;
+  for (const part of parts) {
+    if (!SAFE_PATH_PATTERN.test(part)) return false;
+  }
+  const cwdResolved = path.resolve(cwd);
+  for (const part of parts) {
+    const resolved = path.resolve(cwdResolved, part);
+    const rel = path.relative(cwdResolved, resolved);
+    if (rel === "..") return false;
+    if (rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) return false;
+    if (!fs.existsSync(resolved)) return false;
+  }
+  return true;
+}
+
+/**
  * Try to interpret `arg` as a comma-separated bare-form path list.
  * Returns the validated paths if every part exists on disk, `null` if all
  * parts fail validation or none exist (caller should fall through to
@@ -284,6 +337,13 @@ function tryBarePaths(arg: string, cwd: string): string[] | null {
     .filter((segment) => segment.length > 0);
   if (parts.length === 0) return null;
   for (const part of parts) {
+    if (part.includes("..")) {
+      throw new ScopeResolutionError(
+        `Path traversal not allowed: ${JSON.stringify(part)}`,
+        "PATH_TRAVERSAL",
+        arg
+      );
+    }
     if (!SAFE_PATH_PATTERN.test(part)) return null;
   }
   const cwdResolved = path.resolve(cwd);

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { parseReviewScope, ScopeResolutionError } from "../../src/workflow/scope-resolver.js";
+import { parseReviewScope, ScopeResolutionError, AmbiguousScopeError } from "../../src/workflow/scope-resolver.js";
 import {
   withCleanGitRepo,
   withRepoOnBranch,
@@ -453,6 +453,56 @@ describe("parseReviewScope", () => {
           kind: "commit",
           ref: short,
         });
+      }));
+  });
+
+  describe("ambiguity detection", () => {
+    it("returns ambiguous when branch and directory share a name", () =>
+      withRepoWithBranches(
+        { auth: { "auth/index.ts": "// auth\n" } },
+        (cwd) => {
+          const result = parseReviewScope("auth", cwd);
+          expect(result.kind).toBe("ambiguous");
+          if (result.kind === "ambiguous") {
+            expect(result.candidates).toEqual([
+              { kind: "branch", name: "auth" },
+              { kind: "paths", paths: ["auth"] },
+            ]);
+          }
+        }
+      ));
+
+    it("explicit branch: prefix bypasses ambiguity", () =>
+      withRepoWithBranches(
+        { auth: { "auth/index.ts": "// auth\n" } },
+        (cwd) => {
+          expect(parseReviewScope("branch:auth", cwd)).toEqual({
+            kind: "branch",
+            name: "auth",
+          });
+        }
+      ));
+
+    it("explicit path: prefix bypasses ambiguity", () =>
+      withRepoWithBranches(
+        { auth: { "auth/index.ts": "// auth\n" } },
+        (cwd) => {
+          expect(parseReviewScope("path:auth", cwd)).toEqual({
+            kind: "paths",
+            paths: ["auth"],
+          });
+        }
+      ));
+
+    it("throws PATH_TRAVERSAL on bare path with .. segment", () =>
+      withCleanGitRepo((cwd) => {
+        try {
+          parseReviewScope("../etc", cwd);
+          expect.fail("expected throw");
+        } catch (err) {
+          expect(err).toBeInstanceOf(ScopeResolutionError);
+          expect((err as ScopeResolutionError).code).toBe("PATH_TRAVERSAL");
+        }
       }));
   });
 });
