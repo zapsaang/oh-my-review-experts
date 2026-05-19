@@ -10,10 +10,9 @@ import {
   type ReviewerHandoff,
   type ReviewerFinding,
   type ExpectedValues,
-  ReviewerHandoffSchema,
   NormalizedReviewerHandoffSchema,
 } from "../../src/workflow/validate-result.js";
-import { SCHEMA_VERSION, UnifiedFindingSchema } from "../../src/agents/schemas.js";
+import { SCHEMA_VERSION, UnifiedFindingSchema, UnifiedHandoffSchema } from "../../src/agents/schemas.js";
 
 function createMockHandoffFile(content: string): string {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-test-"));
@@ -575,7 +574,7 @@ describe("UnifiedFindingSchema direct validation", () => {
   });
 });
 
-describe("ReviewerHandoffSchema direct validation", () => {
+describe("UnifiedHandoffSchema direct validation", () => {
   const validHandoff = {
     schema_version: SCHEMA_VERSION,
     task_id: "task-123",
@@ -590,7 +589,7 @@ describe("ReviewerHandoffSchema direct validation", () => {
 
   it("safeParse fails with invalid_type for missing meta", () => {
     const { meta: _meta, ...missingMeta } = validHandoff;
-    const result = ReviewerHandoffSchema.safeParse(missingMeta);
+    const result = UnifiedHandoffSchema.safeParse(missingMeta);
     expect(result.success).toBe(false);
     if (!result.success) {
       const issue = result.error.issues.find((i) => i.path[0] === "meta");

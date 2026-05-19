@@ -16,12 +16,6 @@ import { parseHandoffJsonHeader } from "../tools/handoff.js";
 
 
 /**
- * @deprecated Use `UnifiedHandoffSchema`. Kept for compatibility through the
- * v0.x line; remove by v1.0.
- */
-export const ReviewerHandoffSchema = UnifiedHandoffSchema;
-
-/**
  * @deprecated Use `NormalizedUnifiedHandoffSchema`. Kept for compatibility
  * through the v0.x line; remove by v1.0.
  */
@@ -186,7 +180,7 @@ function validateFindings(findings: unknown[]): { valid: boolean; partial: boole
 }
 
 function validateSchemaShape(data: unknown): { valid: boolean; partial: boolean; reason?: string } {
-  const topLevelResult = ReviewerHandoffSchema.safeParse(data);
+  const topLevelResult = UnifiedHandoffSchema.safeParse(data);
   if (!topLevelResult.success) {
     return { valid: false, partial: false, reason: "invalid-schema" };
   }
@@ -289,7 +283,7 @@ function validateParsedHandoff(
     return { isValid: false, failureReason: "invalid-schema", retryRecommended: false };
   }
 
-  const topLevelResult = ReviewerHandoffSchema.safeParse(data);
+  const topLevelResult = UnifiedHandoffSchema.safeParse(data);
   if (!topLevelResult.success) {
     return { isValid: false, failureReason: "invalid-schema", retryRecommended: false };
   }
