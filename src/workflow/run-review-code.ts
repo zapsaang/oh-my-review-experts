@@ -177,11 +177,69 @@ ${prompt}
   return { prompt, estimatedTasks: plan.estimatedTasks, files, runId };
 }
 
+function formatResolvedScopeLine(scope: ReviewScope): string {
+  switch (scope.kind) {
+    case "default":
+      return "Resolved scope: default";
+    case "guidance":
+      return `Resolved scope: guidance (${scope.text})`;
+    case "branch":
+      return `Resolved scope: branch (${scope.name})`;
+    case "commit":
+      return `Resolved scope: commit (${scope.ref})`;
+    case "range":
+      return `Resolved scope: range (${scope.from}..${scope.to})`;
+    case "paths":
+      return `Resolved scope: paths (${scope.paths.join(", ")})`;
+    case "staged":
+      return "Resolved scope: staged";
+    case "ambiguous": {
+      const hints = scope.candidates
+        .map((c) => {
+          if (c.kind === "branch") return `branch:${c.name}`;
+          if (c.kind === "paths") return `path:${c.paths.join(",")}`;
+          return String(c);
+        })
+        .join(" or ");
+      return `Resolved scope: ambiguous\nInput is ambiguous. Use explicit prefix: ${hints}`;
+    }
+  }
+}
+
 export function renderLocalDryRun(input: ReviewCodeInput = {}, trusted = false): string {
   const cwd = input.cwd ?? process.cwd();
   const config = loadConfig(cwd, trusted);
-  const files = getChangedFiles(cwd);
+
+  let scopeLine = "";
+  let scope: ReviewScope | undefined;
+
+  if (input.args) {
+    if (config.command.scopeResolution === "auto") {
+      try {
+        scope = parseReviewScope(input.args, cwd);
+        scopeLine = formatResolvedScopeLine(scope);
+      } catch (err) {
+        if (err instanceof ScopeResolutionError) {
+          scopeLine = `Resolved scope: error (${err.code})\n${err.message}`;
+        } else if (err instanceof AmbiguousScopeError) {
+          scopeLine = `Resolved scope: ambiguous\n${err.message}`;
+        } else {
+          scopeLine = `Resolved scope: error\n${err instanceof Error ? err.message : String(err)}`;
+        }
+      }
+    } else if (config.command.scopeResolution === "guidance-only") {
+      scopeLine = `Resolved scope: guidance (${input.args})`;
+    }
+  }
+
+  const safeScope = scope?.kind === "ambiguous" ? undefined : scope;
+  const files = getChangedFiles(cwd, safeScope);
   const plan = estimatePlan(files, config);
+
+  if (scopeLine) {
+    return `# Review Code Dry Run\n\n${scopeLine}\nEstimated tasks: ${plan.estimatedTasks}\n\nFiles:\n${formatFileList(files)}\n`;
+  }
+
   return `# Review Code Dry Run\n\nEstimated tasks: ${plan.estimatedTasks}\n\nFiles:\n${formatFileList(files)}\n`;
 }
 

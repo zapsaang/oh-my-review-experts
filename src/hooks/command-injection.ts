@@ -1,6 +1,8 @@
 import { buildReviewCodePrompt } from "../workflow/run-review-code.js";
 import { loadConfig } from "../config/load-config.js";
 import { OmreConfig } from "../config/schema.js";
+import { ScopeResolutionError, AmbiguousScopeError } from "../workflow/scope-resolver.js";
+import type { ReviewScope } from "../workflow/scope-resolver.js";
 
 export interface ReviewCodeMatch {
   matched: boolean;
@@ -90,6 +92,19 @@ export interface InjectReviewCodeInput {
   trusted?: boolean;
 }
 
+function formatAmbiguousScopeError(args: string, candidates: ReviewScope[]): string {
+  const branch = candidates.find((c): c is Extract<ReviewScope, { kind: "branch" }> => c.kind === "branch");
+  const paths = candidates.find((c): c is Extract<ReviewScope, { kind: "paths" }> => c.kind === "paths");
+  const lines = [
+    `/review-code: input "${args}" is ambiguous (matches both a branch and a path).`,
+    `Use one of:`,
+  ];
+  if (branch) lines.push(`  /review-code branch:${branch.name}`);
+  if (paths) lines.push(`  /review-code path:${paths.paths.join(",")}`);
+  lines.push(`Or if you meant guidance: /review-code "review the ${args} module"`);
+  return lines.join("\n");
+}
+
 export function injectReviewCodePrompt(input: InjectReviewCodeInput): string | undefined {
   const cwd = input.cwd ?? process.cwd();
   const config = loadConfig(cwd, input.trusted ?? false);
@@ -102,7 +117,17 @@ export function injectReviewCodePrompt(input: InjectReviewCodeInput): string | u
     args = args.slice(0, MAX_ARGS_LENGTH) + "\n[WARNING: User guidance truncated due to excessive length]";
   }
   args = validateAndSanitizeArgs(args);
-  return buildReviewCodePrompt({ args, cwd }, input.trusted ?? false).prompt;
+  try {
+    return buildReviewCodePrompt({ args, cwd }, input.trusted ?? false).prompt;
+  } catch (err) {
+    if (err instanceof ScopeResolutionError) {
+      return `Error: ${err.message}`;
+    }
+    if (err instanceof AmbiguousScopeError) {
+      return formatAmbiguousScopeError(args, err.candidates);
+    }
+    throw err;
+  }
 }
 
 export function maybeInjectReviewCodePrompt(text: string, cwd = process.cwd()): string | undefined {
@@ -118,5 +143,15 @@ export function maybeInjectReviewCodePrompt(text: string, cwd = process.cwd()): 
     args = args.slice(0, MAX_ARGS_LENGTH) + "\n[WARNING: User guidance truncated due to excessive length]";
   }
   args = validateAndSanitizeArgs(args);
-  return buildReviewCodePrompt({ args, cwd }).prompt;
+  try {
+    return buildReviewCodePrompt({ args, cwd }).prompt;
+  } catch (err) {
+    if (err instanceof ScopeResolutionError) {
+      return `Error: ${err.message}`;
+    }
+    if (err instanceof AmbiguousScopeError) {
+      return formatAmbiguousScopeError(args, err.candidates);
+    }
+    throw err;
+  }
 }

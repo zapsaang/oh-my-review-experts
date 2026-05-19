@@ -1,7 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import path from "node:path";
 import { parseReviewCodeCommand, validateAndSanitizeArgs, maybeInjectReviewCodePrompt, injectReviewCodePrompt } from "../../src/hooks/command-injection.js";
 import { DEFAULT_CONFIG } from "../../src/config/schema.js";
+import { ScopeResolutionError, AmbiguousScopeError } from "../../src/workflow/scope-resolver.js";
+import * as runReviewCode from "../../src/workflow/run-review-code.js";
 
 describe("parseReviewCodeCommand", () => {
   it("matches exact command", () => {
@@ -185,5 +187,32 @@ describe("injectReviewCodePrompt (command-keyed)", () => {
   it("rejects path traversal cwd when not trusted", () => {
     expect(() => injectReviewCodePrompt({ command: "review-code", args: "", cwd: "../../etc", trusted: false }))
       .toThrow("Path traversal is not allowed");
+  });
+
+  it("returns error string for scope resolution error (path traversal)", () => {
+    const result = injectReviewCodePrompt({ command: "review-code", args: "path:/etc/passwd", cwd: process.cwd() });
+    expect(result).toMatch(/^Error: /);
+    expect(result).toContain("Absolute path not allowed");
+  });
+
+  it("returns formatted disambiguation for ambiguous scope", () => {
+    const spy = vi.spyOn(runReviewCode, "buildReviewCodePrompt").mockImplementation(() => {
+      throw new AmbiguousScopeError(
+        'Input "auth" is ambiguous (matches both a branch and a path). Use explicit prefix: branch:auth or path:auth',
+        [
+          { kind: "branch", name: "auth" },
+          { kind: "paths", paths: ["auth"] },
+        ]
+      );
+    });
+    try {
+      const result = injectReviewCodePrompt({ command: "review-code", args: "auth", cwd: process.cwd() });
+      expect(result).toContain('/review-code: input "auth" is ambiguous');
+      expect(result).toContain("branch:auth");
+      expect(result).toContain("path:auth");
+      expect(result).toContain("Or if you meant guidance");
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

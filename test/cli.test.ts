@@ -1,5 +1,7 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCliProgram, runDoctor, type DoctorContractChecks } from "../src/cli.js";
+import { ScopeResolutionError, AmbiguousScopeError } from "../src/workflow/scope-resolver.js";
+import * as scopeResolver from "../src/workflow/scope-resolver.js";
 
 const ansiPattern = /\x1B\[[0-9;]*m/g;
 const originalExitCode = process.exitCode;
@@ -67,5 +69,66 @@ describe("doctor CLI", () => {
     expect(helpText).toContain(
       "CI exit codes: 0 clean, 1 doctor errored, 2 contract self-check failed",
     );
+  });
+});
+
+describe("dry-run CLI", () => {
+  afterEach(() => {
+    process.exitCode = originalExitCode;
+  });
+
+  it("exits 1 with error message for invalid scope", () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
+      throw new Error(`EXIT_${code}`);
+    });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      const program = createCliProgram();
+      expect(() => {
+        program.parse(["node", "omre", "dry-run", "path:/etc/passwd"]);
+      }).toThrow("EXIT_1");
+
+      const errorCall = errorSpy.mock.calls[0]?.[0] as string;
+      expect(errorCall).toContain("Error:");
+      expect(errorCall).toContain("Absolute path not allowed");
+    } finally {
+      exitSpy.mockRestore();
+      errorSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+
+  it("exits 1 with formatted ambiguous scope error", () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
+      throw new Error(`EXIT_${code}`);
+    });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const parseSpy = vi.spyOn(scopeResolver, 'parseReviewScope').mockImplementation(() => {
+      throw new AmbiguousScopeError("ambiguous", [
+        { kind: "branch", name: "auth" },
+        { kind: "paths", paths: ["auth"] },
+      ]);
+    });
+
+    try {
+      const program = createCliProgram();
+      expect(() => {
+        program.parse(["node", "omre", "dry-run", "auth"]);
+      }).toThrow("EXIT_1");
+
+      const errorCall = errorSpy.mock.calls[0]?.[0] as string;
+      expect(errorCall).toContain('dry-run: input "auth" is ambiguous');
+      expect(errorCall).toContain("branch:auth");
+      expect(errorCall).toContain("path:auth");
+      expect(errorCall).toContain("Or if you meant guidance");
+    } finally {
+      exitSpy.mockRestore();
+      errorSpy.mockRestore();
+      logSpy.mockRestore();
+      parseSpy.mockRestore();
+    }
   });
 });

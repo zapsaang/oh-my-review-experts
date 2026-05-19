@@ -4,6 +4,7 @@ import { clearLoadConfigCache } from "../../src/config/load-config.js";
 import {
   withCleanGitRepo,
   withHierarchicalRepo,
+  withRepoWithBranches,
 } from "../_helpers/fixture-repo.js";
 
 function getExecutionRequirements(prompt: string): string {
@@ -172,5 +173,42 @@ describe("renderLocalDryRun", () => {
   it("includes args guidance when provided", () => {
     const markdown = renderLocalDryRun({ args: "focus on security", cwd: process.cwd() });
     expect(markdown).toContain("Estimated tasks");
+  });
+
+  it("with empty args, output is unchanged from today (no scope line)", () => {
+    withCleanGitRepo((cwd) => {
+      const markdown = renderLocalDryRun({ args: "", cwd }, true);
+      expect(markdown).toContain("Review Code Dry Run");
+      expect(markdown).toContain("Estimated tasks");
+      expect(markdown).not.toContain("Resolved scope");
+    });
+  });
+
+  it("with branch:main args, shows resolved branch scope", () => {
+    withCleanGitRepo((cwd) => {
+      const markdown = renderLocalDryRun({ args: "branch:main", cwd }, true);
+      expect(markdown).toContain("Resolved scope: branch (main)");
+      expect(markdown).toContain("Estimated tasks");
+    });
+  });
+
+  it("with ../etc args, shows path traversal error inline", () => {
+    withCleanGitRepo((cwd) => {
+      const markdown = renderLocalDryRun({ args: "../etc", cwd }, true);
+      expect(markdown).toContain("Resolved scope: error (PATH_TRAVERSAL)");
+      expect(markdown).toContain("Path traversal");
+    });
+  });
+
+  it("with ambiguous branch/path input, shows ambiguous scope with hints", () => {
+    withRepoWithBranches(
+      { auth: { "auth/index.ts": "// auth\n" } },
+      (cwd) => {
+        const markdown = renderLocalDryRun({ args: "auth", cwd }, true);
+        expect(markdown).toContain("Resolved scope: ambiguous");
+        expect(markdown).toContain("branch:auth");
+        expect(markdown).toContain("path:auth");
+      }
+    );
   });
 });
