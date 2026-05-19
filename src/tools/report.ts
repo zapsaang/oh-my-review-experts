@@ -34,15 +34,65 @@ export function renderCoverageWarning(degradedSlices: DegradedSlice[], missingDi
   return lines.join("\n");
 }
 
+export interface ContentValidationResult {
+  ok: boolean;
+  reason?: "empty" | "too-short" | "too-few-lines" | "no-heading" | "reference-only";
+}
+
+const MIN_REPORT_LENGTH = 200;
+const MIN_REPORT_LINES = 5;
+
+const REFERENCE_ONLY_PATTERNS: readonly RegExp[] = [
+  /^\s*Report persisted to\s+\S+\.?\s*$/i,
+  /^\s*Saved to\s+\S+\.?\s*$/i,
+  /^\s*See (?:file|report)\s*[:\-]?\s*\S+\.?\s*$/i,
+  /^\s*报告(?:已)?(?:保存|写入)(?:到|至)?\s*\S+\.?\s*$/i,
+  /^\s*The full report (?:is|can be found) at\s+\S+\.?\s*$/i,
+];
+
+export function validateReportMarkdown(md: string): ContentValidationResult {
+  const trimmed = md.trim();
+  if (trimmed.length === 0) {
+    return { ok: false, reason: "empty" };
+  }
+
+  for (const pattern of REFERENCE_ONLY_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      return { ok: false, reason: "reference-only" };
+    }
+  }
+
+  if (trimmed.length < MIN_REPORT_LENGTH) {
+    return { ok: false, reason: "too-short" };
+  }
+
+  const nonBlankLines = trimmed.split("\n").filter((line) => line.trim().length > 0).length;
+  if (nonBlankLines < MIN_REPORT_LINES) {
+    return { ok: false, reason: "too-few-lines" };
+  }
+
+  if (!trimmed.startsWith("#")) {
+    return { ok: false, reason: "no-heading" };
+  }
+
+  return { ok: true };
+}
+
 export interface ReportPayload {
   target: string;
   markdown: string;
   json: unknown;
   degradedSlices?: DegradedSlice[];
   missingDimensionsGlobal?: string[];
+  runId?: string;
 }
 
 export function writeReport(config: OmreConfig, payload: ReportPayload, cwd = process.cwd()) {
+  const validation = validateReportMarkdown(payload.markdown);
+  if (!validation.ok) {
+    throw new Error(`writeReport rejected markdown: reason=${validation.reason}`);
+  }
+
   const resolvedCwd = path.resolve(cwd);
   const dir = path.resolve(resolvedCwd, config.report.directory);
   assertSafePath(dir, resolvedCwd, "report.directory");
@@ -68,11 +118,13 @@ export function writeReport(config: OmreConfig, payload: ReportPayload, cwd = pr
   writeFileAtomicOverwrite(latestJson, JSON.stringify(payload.json, null, 2));
   const written = [latestMd, latestJson];
   if (config.report.timestamped) {
-    const t = formatTimestamp();
+    const stamp = payload.runId ?? formatTimestamp();
     const histDir = path.join(dir, "history");
     fs.mkdirSync(histDir, { recursive: true });
-    const md = path.join(histDir, `${t}-review.md`);
-    const js = path.join(histDir, `${t}-review.json`);
+    const md = path.join(histDir, `${stamp}-review.md`);
+    const js = path.join(histDir, `${stamp}-review.json`);
+    assertSafePath(md, histDir, "report.history");
+    assertSafePath(js, histDir, "report.history");
     const writtenMd = writeFileAtomic(md, markdown);
     const writtenJs = writeFileAtomic(js, JSON.stringify(payload.json, null, 2));
     written.push(writtenMd, writtenJs);
