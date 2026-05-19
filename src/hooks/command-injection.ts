@@ -28,6 +28,9 @@ export function parseReviewCodeCommand(text: string, config: OmreConfig): Review
  * final prompt (see buildReviewCodePrompt), so the model treats them as data, not
  * instructions. This layer catches obvious attempts and raises the barrier for casual
  * misuse.
+ *
+ * Additionally guards against scope-arg threats: shell metacharacters in path-shaped
+ * args, path traversal (".."), and option injection (leading "--").
  */
 export function validateAndSanitizeArgs(args: string): string {
   if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(args)) {
@@ -56,6 +59,23 @@ export function validateAndSanitizeArgs(args: string): string {
     if (pattern.test(args)) {
       throw new Error(`Invalid input: potential prompt injection detected (matched "${pattern.source}").`);
     }
+  }
+
+  const isPathShaped = /^(path:|\.|\/|src\/|test\/)/.test(args) || args.includes("/");
+
+  if (isPathShaped) {
+    const shellMetaMatch = args.match(/[;|&`><\\]|\$\(/);
+    if (shellMetaMatch) {
+      throw new Error(`Invalid input: shell metacharacters not allowed in path-shaped scope args (matched: ${shellMetaMatch[0]})`);
+    }
+  }
+
+  if (/\.\./.test(args)) {
+    throw new Error('Invalid input: path traversal not allowed (matched: "..")');
+  }
+
+  if (args.startsWith("--")) {
+    throw new Error('Invalid input: option injection not allowed (leading "--")');
   }
 
   return args;
