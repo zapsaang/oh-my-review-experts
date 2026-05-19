@@ -1,5 +1,5 @@
 import type { Plugin, Hooks, Config, PluginModule } from "@opencode-ai/plugin"
-import type { Part } from "@opencode-ai/sdk"
+import type { Part, Permission } from "@opencode-ai/sdk"
 import { injectReviewCodePrompt } from "./hooks/command-injection.js"
 import { tools } from "./tools/plugin-tools.js"
 import { loadConfig } from "./config/load-config.js"
@@ -136,6 +136,21 @@ const OhMyReviewExperts: Plugin = async (input) => {
         output.parts[idx] = textPart
       } else {
         output.parts.push(textPart)
+      }
+    },
+
+    "permission.ask": async (input: Permission, output: { status: "ask" | "deny" | "allow" }) => {
+      const deniedTypes = ["write", "edit"]
+      if (!deniedTypes.includes(input.type)) return
+      const patterns = Array.isArray(input.pattern) ? input.pattern : input.pattern ? [input.pattern] : []
+      // Match .omre/reports/ or .omre/handoffs/ as a path segment, handling both / and \ separators.
+      const protectedPattern = /(?:^|[/\\])\.omre[/\\](?:reports|handoffs)(?:[/\\]|$)/
+      for (const pattern of patterns) {
+        if (typeof pattern !== "string") continue
+        if (protectedPattern.test(pattern)) {
+          output.status = "deny"
+          return
+        }
       }
     },
 

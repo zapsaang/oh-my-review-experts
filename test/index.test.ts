@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import type { Config } from "@opencode-ai/plugin";
+import type { Config, Hooks } from "@opencode-ai/plugin";
 import type { Part, TextPart } from "@opencode-ai/sdk";
 import pluginModule from "../src/index.js";
 const OhMyReviewExperts = pluginModule.server;
@@ -215,5 +215,100 @@ describe("OpenCode 1.14 plugin factory", () => {
       cleanupTempConfig(configPath);
       fs.rmdirSync(tmpDir);
     }
+  });
+
+  describe("permission.ask hook", () => {
+    function makePermissionInput(overrides: { type: string; pattern?: string | string[] }): Parameters<NonNullable<Hooks["permission.ask"]>>[0] {
+      return {
+        id: "perm-1",
+        type: overrides.type,
+        pattern: overrides.pattern,
+        sessionID: "s1",
+        messageID: "m1",
+        title: "Test permission",
+        metadata: {},
+        time: { created: Date.now() },
+      }
+    }
+
+    it("denies write under .omre/reports/", async () => {
+      const hooks = await OhMyReviewExperts(stubPluginInput(process.cwd()));
+      const input = makePermissionInput({ type: "write", pattern: "/project/.omre/reports/latest.md" });
+      const output = { status: "ask" as const };
+      await hooks["permission.ask"]!(input, output);
+      expect(output.status).toBe("deny");
+    });
+
+    it("denies edit under .omre/handoffs/", async () => {
+      const hooks = await OhMyReviewExperts(stubPluginInput(process.cwd()));
+      const input = makePermissionInput({ type: "edit", pattern: "/project/.omre/handoffs/run-1/reviewer.md" });
+      const output = { status: "ask" as const };
+      await hooks["permission.ask"]!(input, output);
+      expect(output.status).toBe("deny");
+    });
+
+    it("allows write outside .omre/", async () => {
+      const hooks = await OhMyReviewExperts(stubPluginInput(process.cwd()));
+      const input = makePermissionInput({ type: "write", pattern: "/project/src/index.ts" });
+      const output = { status: "ask" as const };
+      await hooks["permission.ask"]!(input, output);
+      expect(output.status).toBe("ask");
+    });
+
+    it("allows non-write permissions under .omre/reports/", async () => {
+      const hooks = await OhMyReviewExperts(stubPluginInput(process.cwd()));
+      const input = makePermissionInput({ type: "read", pattern: "/project/.omre/reports/latest.md" });
+      const output = { status: "ask" as const };
+      await hooks["permission.ask"]!(input, output);
+      expect(output.status).toBe("ask");
+    });
+
+    it("denies write with Windows-style backslash separator", async () => {
+      const hooks = await OhMyReviewExperts(stubPluginInput(process.cwd()));
+      const input = makePermissionInput({ type: "write", pattern: "C:\\project\\.omre\\reports\\latest.md" });
+      const output = { status: "ask" as const };
+      await hooks["permission.ask"]!(input, output);
+      expect(output.status).toBe("deny");
+    });
+
+    it("allows write to foo.omre/reports/ (false positive guard)", async () => {
+      const hooks = await OhMyReviewExperts(stubPluginInput(process.cwd()));
+      const input = makePermissionInput({ type: "write", pattern: "/project/foo.omre/reports/latest.md" });
+      const output = { status: "ask" as const };
+      await hooks["permission.ask"]!(input, output);
+      expect(output.status).toBe("ask");
+    });
+
+    it("denies write with path traversal pattern", async () => {
+      const hooks = await OhMyReviewExperts(stubPluginInput(process.cwd()));
+      const input = makePermissionInput({ type: "write", pattern: "../.omre/reports/latest.md" });
+      const output = { status: "ask" as const };
+      await hooks["permission.ask"]!(input, output);
+      expect(output.status).toBe("deny");
+    });
+
+    it("denies write with glob pattern", async () => {
+      const hooks = await OhMyReviewExperts(stubPluginInput(process.cwd()));
+      const input = makePermissionInput({ type: "write", pattern: "**/.omre/reports/*" });
+      const output = { status: "ask" as const };
+      await hooks["permission.ask"]!(input, output);
+      expect(output.status).toBe("deny");
+    });
+
+    it("denies write when one pattern in array is protected", async () => {
+      const hooks = await OhMyReviewExperts(stubPluginInput(process.cwd()));
+      const input = makePermissionInput({ type: "write", pattern: ["/project/src/index.ts", ".omre/reports/x"] });
+      const output = { status: "ask" as const };
+      await hooks["permission.ask"]!(input, output);
+      expect(output.status).toBe("deny");
+    });
+
+    it("denies write targeting the protected directory itself", async () => {
+      const hooks = await OhMyReviewExperts(stubPluginInput(process.cwd()));
+      const input = makePermissionInput({ type: "write", pattern: ".omre/reports" });
+      const output = { status: "ask" as const };
+      await hooks["permission.ask"]!(input, output);
+      expect(output.status).toBe("deny");
+    });
   });
 });
