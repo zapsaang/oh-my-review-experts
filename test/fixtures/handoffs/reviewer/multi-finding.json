@@ -1,0 +1,45 @@
+{
+  "schema_version": "1",
+  "task_id": "task-multi-002",
+  "agent": "reviewer-security",
+  "dimension": "security",
+  "status": "completed",
+  "target": { "kind": "working-tree", "value": "src/example.ts" },
+  "slice_id": "slice-001",
+  "findings": [
+    {
+      "id": "sec-001",
+      "severity": "critical",
+      "file": "src/example.ts",
+      "line": 15,
+      "title": "Hardcoded API secret in source code",
+      "description": "A production API secret is committed in plaintext within the source file, accessible to anyone with repository access.",
+      "evidence": "const API_KEY = 'sk-live-abcdef1234567890';",
+      "confidence": "high",
+      "classification": "secret-exposure"
+    },
+    {
+      "id": "sec-002",
+      "severity": "high",
+      "file": "src/example.ts",
+      "line": 42,
+      "title": "Unvalidated redirect allows open redirect attack",
+      "description": "The redirect URL is taken from user input without an allow-list check, enabling phishing via trusted domain redirects.",
+      "evidence": "res.redirect(req.query.returnTo);",
+      "confidence": "medium",
+      "classification": "input-validation"
+    },
+    {
+      "id": "sec-003",
+      "severity": "low",
+      "file": "src/example.ts",
+      "line": 88,
+      "title": "Verbose error message leaks internal path",
+      "description": "Error response includes absolute filesystem path in the message, disclosing server directory structure to clients.",
+      "evidence": "error.message = `Failed to load ${__dirname}/config.yml`;",
+      "confidence": "low",
+      "classification": "information-disclosure"
+    }
+  ],
+  "meta": { "total_findings": 3, "notes": "" }
+}

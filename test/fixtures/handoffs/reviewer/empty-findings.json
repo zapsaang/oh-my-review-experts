@@ -1,0 +1,11 @@
+{
+  "schema_version": "1",
+  "task_id": "task-empty-003",
+  "agent": "reviewer-security",
+  "dimension": "security",
+  "status": "completed",
+  "target": { "kind": "working-tree", "value": "src/example.ts" },
+  "slice_id": "slice-001",
+  "findings": [],
+  "meta": { "total_findings": 0, "notes": "" }
+}
