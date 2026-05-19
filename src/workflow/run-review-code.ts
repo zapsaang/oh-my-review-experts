@@ -79,8 +79,8 @@ export function buildReviewCodePrompt(input: ReviewCodeInput = {}, trusted = fal
   const reportDelegationInstructions = `Delegate to the \`report-writer\` subagent. Pass it ONLY the runId (\`${runId}\`); do not include report content, file paths, or fenced JSON in the delegation message.\nThe report-writer will call \`omre_finalize_review\` with that runId. The plugin assembles the final Markdown and JSON from the handoff files and writes them to ${config.report.directory}.\nDO NOT call \`omre_write_report\` yourself. DO NOT use the \`write\` tool to persist any file under .omre/reports/. Do not pass a file-path reference in place of report content.\nIf \`report-writer\` returns an error, surface that error to the user verbatim — do not retry by writing files directly and do not invent report markdown.`;
 
   const arbitrationInstructions = plan.useHierarchicalArbitration
-    ? `7. For each slice, invoke a slice-arbiter subagent consuming ONLY that slice's validated reviewer handoffs.\n8. After all slice-arbiters complete, invoke the global-arbiter consuming all slice-arbiter outputs.\n9. The reviewers have already written handoff files to ${config.handoff.directory}/${runId}/.\n10. ${reportDelegationInstructions}`
-    : `7. Run slice-level arbitration, then global arbitration.\n8. The reviewers have already written handoff files to ${config.handoff.directory}/${runId}/.\n9. ${reportDelegationInstructions}`;
+    ? `7. For each slice, invoke a slice-arbiter subagent consuming ONLY that slice's validated reviewer handoffs.\n8. After all slice-arbiters complete, invoke the global-arbiter consuming all slice-arbiter outputs.\n9. ${reportDelegationInstructions}`
+    : `7. Run slice-level arbitration, then global arbitration.\n8. ${reportDelegationInstructions}`;
 
   const prompt = `
 You are Oh My Review Experts, a runtime-first review-code workflow orchestrator.
