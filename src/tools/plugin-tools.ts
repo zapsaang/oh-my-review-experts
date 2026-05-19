@@ -51,12 +51,6 @@ function resolveCwd(
   return { cwd: contextDir ?? process.cwd(), trusted: true };
 }
 
-/**
- * @deprecated Use `UnifiedFindingSchema` from `src/agents/schemas.js` instead.
- * This re-export exists for backward compatibility with existing tests/consumers.
- */
-export const HandoffFindingSchema = UnifiedFindingSchema;
-
 export const tools = {
   omre_build_review_code_prompt: tool({
     description: "Build the review code prompt bundle for the current changes",
@@ -123,7 +117,7 @@ export const tools = {
         }).optional(),
         slice_id: z.string().min(1, "slice_id must be non-empty").optional(),
         files_inspected: z.array(z.string()).optional(),
-        findings: z.array(HandoffFindingSchema),
+        findings: z.array(UnifiedFindingSchema),
         suggested_fixes: z.array(z.string()).optional(),
         open_questions: z.array(z.string()).optional(),
         notes_for_primary: z.string().optional(),

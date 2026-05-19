@@ -5,7 +5,8 @@ import os from "node:os";
 import type { ToolContext } from "@opencode-ai/plugin";
 import { Effect } from "effect";
 import { z } from "zod";
-import { tools, HandoffFindingSchema } from "../../src/tools/plugin-tools.js";
+import { tools } from "../../src/tools/plugin-tools.js";
+import { UnifiedFindingSchema } from "../../src/agents/schemas.js";
 
 function mockContext(directory: string): ToolContext {
   return {
@@ -649,7 +650,7 @@ describe("plugin tools", () => {
     }
   });
 
-  it("HandoffFindingSchema preserves unknown fields via safeParse", () => {
+  it("UnifiedFindingSchema preserves unknown fields via safeParse", () => {
     const validFinding = {
       id: "f1",
       severity: "high",
@@ -661,7 +662,7 @@ describe("plugin tools", () => {
       extraField: "should be preserved",
       anotherUnknown: 42,
     };
-    const result = HandoffFindingSchema.safeParse(validFinding);
+    const result = UnifiedFindingSchema.safeParse(validFinding);
     expect(result.success).toBe(true);
     if (result.success) {
       expect((result.data as Record<string, unknown>).extraField).toBe("should be preserved");
