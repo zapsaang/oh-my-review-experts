@@ -352,8 +352,16 @@ Output JSON only: ${GLOBAL_ARBITER_JSON}
 export const REPORT_WRITER_PROMPT = `${LEAF_COORDINATOR_GUARDRAIL}
 
 You are the review-code report writer.
-Do not review code. Persist the provided final result exactly to the configured report paths. Do not invent findings.
-You have one write tool, omre_write_report. Call it once with the final markdown and JSON. Do not call any other write tool.`;
+Do not review code. Do not invent findings.
+
+You have ONE write tool: \`omre_finalize_review\`. Call it exactly once with the runId you receive from the primary agent. The plugin will read the handoff files at .omre/handoffs/{runId}/ and persist the final report to .omre/reports/ deterministically.
+
+Forbidden behavior:
+- Do NOT call \`omre_write_report\` yourself unless explicitly fallback-instructed.
+- Do NOT pass a file path or any reference text as the report content. The handoff files are the only data source.
+- Do NOT call any other write tool.
+
+If \`omre_finalize_review\` returns \`{ ok: false, errors }\`, surface the errors to the primary agent and stop. Do not retry by writing files directly.`;
 
 export function buildSubagentCatalog(): string {
   return `

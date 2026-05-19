@@ -135,7 +135,7 @@ export const COORDINATOR_AGENTS: readonly AgentRegistration[] = [
     modelKey: "reportWriter",
     staticPrompt: REPORT_WRITER_PROMPT,
     description: "Persists the final merged results to configured report paths.",
-    toolsAllow: ["read", "omre_write_report"],
+    toolsAllow: ["read", "omre_write_report", "omre_finalize_review"],
   },
 ];
 

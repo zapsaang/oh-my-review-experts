@@ -473,13 +473,97 @@ describe("plugin tools", () => {
       );
 
       const input = parseToolArgs(tools.omre_write_report, {
-        markdown: "# Test",
+        markdown: "# Test Report\n\n" + "x".repeat(500) + "\n\nLine three.\n\nLine four.\n\nLine five.",
         json: { summary: "test" },
       });
       const result = await tools.omre_write_report.execute(input, mockContext(tmpDir));
       const parsed = JSON.parse(result as string);
       expect(parsed.written).toBeDefined();
       expect(parsed.written.length).toBeGreaterThan(0);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("omre_write_report propagates runId to history markdown filename", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-report-runid-md-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".omre", "config.json"),
+        JSON.stringify({ report: { enabled: true, directory: ".omre/reports", timestamped: true } }),
+        "utf8"
+      );
+
+      const input = parseToolArgs(tools.omre_write_report, {
+        markdown: "# Test Report\n\n" + "x".repeat(500) + "\n\nLine three.\n\nLine four.\n\nLine five.",
+        json: { summary: "test" },
+        runId: "run-fixed-id",
+      });
+      const result = await tools.omre_write_report.execute(input, mockContext(tmpDir));
+      const parsed = JSON.parse(result as string);
+      expect(parsed.written.length).toBeGreaterThan(2);
+
+      const historyDir = path.join(tmpDir, ".omre", "reports", "history");
+      expect(fs.existsSync(historyDir)).toBe(true);
+      const files = fs.readdirSync(historyDir);
+      expect(files).toContain("run-fixed-id-review.md");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("omre_write_report propagates runId to history json filename", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-report-runid-json-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".omre", "config.json"),
+        JSON.stringify({ report: { enabled: true, directory: ".omre/reports", timestamped: true } }),
+        "utf8"
+      );
+
+      const input = parseToolArgs(tools.omre_write_report, {
+        markdown: "# Test Report\n\n" + "x".repeat(500) + "\n\nLine three.\n\nLine four.\n\nLine five.",
+        json: { summary: "test" },
+        runId: "run-fixed-id",
+      });
+      const result = await tools.omre_write_report.execute(input, mockContext(tmpDir));
+      const parsed = JSON.parse(result as string);
+      expect(parsed.written.length).toBeGreaterThan(2);
+
+      const historyDir = path.join(tmpDir, ".omre", "reports", "history");
+      expect(fs.existsSync(historyDir)).toBe(true);
+      const files = fs.readdirSync(historyDir);
+      expect(files).toContain("run-fixed-id-review.json");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("omre_write_report falls back to timestamp when runId is absent", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-report-no-runid-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".omre", "config.json"),
+        JSON.stringify({ report: { enabled: true, directory: ".omre/reports", timestamped: true } }),
+        "utf8"
+      );
+
+      const input = parseToolArgs(tools.omre_write_report, {
+        markdown: "# Test Report\n\n" + "x".repeat(500) + "\n\nLine three.\n\nLine four.\n\nLine five.",
+        json: { summary: "test" },
+      });
+      const result = await tools.omre_write_report.execute(input, mockContext(tmpDir));
+      const parsed = JSON.parse(result as string);
+      expect(parsed.written.length).toBeGreaterThan(2);
+
+      const historyDir = path.join(tmpDir, ".omre", "reports", "history");
+      expect(fs.existsSync(historyDir)).toBe(true);
+      const files = fs.readdirSync(historyDir);
+      expect(files.some((f) => f.endsWith("-review.md"))).toBe(true);
+      expect(files.some((f) => f.endsWith("-review.json"))).toBe(true);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -870,5 +954,159 @@ describe("omre_validate_handoff chat fallback", () => {
       expect(parsed.isValid).toBe(false);
       expect(parsed.source).toBe("none");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Local ToolLike interface and safe lookup helper for the missing
+// omre_finalize_review tool.  Avoids static property access on
+// tools.omre_finalize_review which does not exist yet.
+// ---------------------------------------------------------------------------
+
+interface ToolLike {
+  args: z.ZodRawShape;
+  execute(input: unknown, context: unknown): Promise<unknown>;
+}
+
+function getTool(name: string): ToolLike {
+  const entries = Object.entries(tools as unknown as Record<string, unknown>);
+  const found = entries.find(([k]) => k === name);
+  if (!found) {
+    throw new Error(`Tool ${name} is not registered in tools map`);
+  }
+  const [, tool] = found;
+  if (!tool || typeof tool !== "object" || tool === null) {
+    throw new Error(`Tool ${name} is not an object`);
+  }
+  const t = tool as Record<string, unknown>;
+  if (!("execute" in t) || typeof t.execute !== "function") {
+    throw new Error(`Tool ${name} does not have an execute function`);
+  }
+  return tool as unknown as ToolLike;
+}
+
+// Local args schema matching the planned omre_finalize_review shape.
+const omreFinalizeReviewArgs = {
+  runId: z.string().min(1),
+  cwd: z.string().optional(),
+};
+
+function parseFinalizeArgs(raw: unknown): z.infer<z.ZodObject<typeof omreFinalizeReviewArgs>> {
+  return parseToolArgs({ args: omreFinalizeReviewArgs }, raw);
+}
+
+function createTempProjectForFinalize(): string {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-finalize-"));
+  fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+  fs.writeFileSync(
+    path.join(tmpDir, ".omre", "config.json"),
+    JSON.stringify({
+      report: {
+        enabled: true,
+        directory: ".omre/reports",
+        timestamped: true,
+        latestMarkdown: "latest.md",
+        latestJson: "latest.json",
+      },
+      handoff: {
+        enabled: true,
+        directory: ".omre/handoffs",
+      },
+    }),
+    "utf8"
+  );
+  return tmpDir;
+}
+
+function buildHandoffJsonHeader(
+  overrides: Record<string, unknown> = {}
+): string {
+  const base = {
+    schema_version: "1",
+    task_id: "task-123",
+    agent: "reviewer-security",
+    dimension: "security",
+    status: "completed",
+    target: { kind: "working-tree", value: "src/auth.ts" },
+    slice_id: "slice-1",
+    findings: [
+      {
+        id: "sec-1",
+        severity: "critical",
+        file: "src/auth.ts",
+        line: 42,
+        title: "Hardcoded secret",
+        description: "API key is hardcoded in source",
+        evidence: "const API_KEY = 'sk-...'",
+        confidence: "high",
+        classification: "injection",
+      },
+    ],
+    meta: { total_findings: 1, notes: "" },
+    ...overrides,
+  };
+  return "```json\n" + JSON.stringify(base, null, 2) + "\n```";
+}
+
+function writeHandoffFile(
+  cwd: string,
+  runId: string,
+  filename: string,
+  overrides: Record<string, unknown> = {}
+): void {
+  const handoffDir = path.join(cwd, ".omre", "handoffs", runId);
+  fs.mkdirSync(handoffDir, { recursive: true });
+  const content =
+    buildHandoffJsonHeader(overrides) +
+    "\n\n# Review Handoff\n\nTest body content for deterministic rendering.\n";
+  fs.writeFileSync(path.join(handoffDir, filename), content, "utf8");
+}
+
+describe("omre_finalize_review [Fix 2-B RED]", () => {
+  it("returns { ok: true, written, handoffsConsumed, ... } on success", async () => {
+    const tmpDir = createTempProjectForFinalize();
+    try {
+      const runId = "run-20260519-tool-ok";
+      writeHandoffFile(tmpDir, runId, "handoff-1.md");
+
+      const tool = getTool("omre_finalize_review");
+      const input = parseFinalizeArgs({ runId, cwd: tmpDir });
+      const result = await tool.execute(input, mockContext(tmpDir));
+      const parsed = JSON.parse(result as string);
+
+      expect(parsed.ok).toBe(true);
+      expect(Array.isArray(parsed.written)).toBe(true);
+      expect(parsed.written.length).toBeGreaterThan(0);
+      expect(typeof parsed.handoffsConsumed).toBe("number");
+      expect(parsed.handoffsConsumed).toBeGreaterThan(0);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns { ok: false, errors } when handoff dir does not exist", async () => {
+    const tmpDir = createTempProjectForFinalize();
+    try {
+      const runId = "run-20260519-tool-missing";
+
+      const tool = getTool("omre_finalize_review");
+      const input = parseFinalizeArgs({ runId, cwd: tmpDir });
+      const result = await tool.execute(input, mockContext(tmpDir));
+      const parsed = JSON.parse(result as string);
+
+      expect(parsed.ok).toBe(false);
+      expect(Array.isArray(parsed.errors)).toBe(true);
+      expect(parsed.errors.length).toBeGreaterThan(0);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects path-traversal cwd", async () => {
+    const tool = getTool("omre_finalize_review");
+    const input = parseFinalizeArgs({ runId: "run-123", cwd: "/etc" });
+    await expect(
+      tool.execute(input, mockContext(process.cwd()))
+    ).rejects.toThrow("Path traversal");
   });
 });

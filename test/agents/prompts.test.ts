@@ -16,6 +16,7 @@ import {
   buildHandoffRuntime,
   buildReportWriterInputRule,
   buildSubagentCatalog,
+  REPORT_WRITER_PROMPT,
 } from "../../src/agents/prompts.js";
 import { SLICE_TYPE_VALUES } from "../../src/agents/schemas.js";
 import type { ReviewDimensionType } from "../../src/config/schema.js";
@@ -321,5 +322,33 @@ describe("Coordinator prompt snapshots", () => {
 
   it("GLOBAL_ARBITER_PROMPT remains stable", () => {
     expect(GLOBAL_ARBITER_PROMPT).toMatchSnapshot();
+  });
+});
+
+describe("REPORT_WRITER_PROMPT", () => {
+  it("references omre_finalize_review as the primary write tool", () => {
+    expect(REPORT_WRITER_PROMPT).toMatch(/omre_finalize_review/);
+  });
+
+  it("forbids passing file-path references as content", () => {
+    expect(REPORT_WRITER_PROMPT).toMatch(
+      /(do not|never|forbidden)[^.]*(file.path|reference)[^.]*content/i
+    );
+  });
+
+  it("forbids calling other write tools", () => {
+    expect(REPORT_WRITER_PROMPT).toMatch(
+      /(do not|never|forbidden)[^.]*write.tool|omre_write_report/i
+    );
+  });
+
+  it("instructs surfacing errors rather than retrying with write", () => {
+    expect(REPORT_WRITER_PROMPT).toMatch(
+      /surface.*error|do not retry|do not write.*directly/i
+    );
+  });
+
+  it("snapshot remains stable", () => {
+    expect(REPORT_WRITER_PROMPT).toMatchSnapshot();
   });
 });

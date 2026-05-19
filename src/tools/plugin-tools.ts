@@ -3,6 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 import { UnifiedFindingSchema } from "../agents/schemas.js";
 import { buildReviewCodePrompt, persistReport, renderLocalDryRun } from "../workflow/run-review-code.js";
+import { finalizeReview } from "../workflow/finalize-review.js";
 import { loadConfig } from "../config/load-config.js";
 import { validateAndSanitizeArgs, MAX_ARGS_LENGTH } from "../hooks/command-injection.js";
 import { writeHandoff, type HandoffPayload } from "./handoff.js";
@@ -80,6 +81,7 @@ export const tools = {
       markdown: z.string(),
       json: z.record(z.string(), z.unknown()).optional(),
       cwd: z.string().optional(),
+      runId: z.string().optional(),
       degradedSlices: z.array(z.object({
         slice_id: z.string(),
         missing_dimensions: z.array(z.string()),
@@ -94,7 +96,8 @@ export const tools = {
         cwd,
         input.degradedSlices,
         input.missingDimensionsGlobal,
-        trusted
+        trusted,
+        input.runId
       );
       return JSON.stringify({ written });
     },
@@ -183,6 +186,36 @@ export const tools = {
       const { cwd, trusted } = resolveCwd(input.cwd, context.directory);
       const markdown = renderLocalDryRun({ ...input, cwd }, trusted);
       return markdown;
+    },
+  }),
+
+  omre_finalize_review: tool({
+    description:
+      "Assemble and persist the final review report from handoff files under .omre/handoffs/{runId}/. Returns { ok: true, written, handoffsConsumed, degradedSlices, missingDimensionsGlobal } on success, or { ok: false, errors } on failure.",
+    args: {
+      runId: z.string().min(1),
+      cwd: z.string().optional(),
+    },
+    async execute(input, context) {
+      const { cwd, trusted } = resolveCwd(input.cwd, context.directory);
+      const resolvedCwd = path.resolve(cwd);
+      if (!trusted) {
+        const trustedBase = path.resolve(context.directory ?? process.cwd());
+        assertSafePath(resolvedCwd, trustedBase, "omre_finalize_review cwd");
+      }
+      try {
+        const result = finalizeReview({ runId: input.runId, cwd, trusted: true });
+        return JSON.stringify({
+          ok: true,
+          written: result.written,
+          handoffsConsumed: result.handoffsConsumed,
+          degradedSlices: result.degradedSlices,
+          missingDimensionsGlobal: result.missingDimensionsGlobal,
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        return JSON.stringify({ ok: false, errors: [message], retryRecommended: false });
+      }
     },
   }),
 

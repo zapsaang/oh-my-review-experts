@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { buildReviewCodePrompt, renderLocalDryRun } from "../../src/workflow/run-review-code.js";
+import { clearLoadConfigCache } from "../../src/config/load-config.js";
 
 function withCleanGitRepo<T>(fn: (cwd: string) => T): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-review-prompt-"));
@@ -20,6 +21,37 @@ function withCleanGitRepo<T>(fn: (cwd: string) => T): T {
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
+}
+
+function withHierarchicalRepo<T>(fn: (cwd: string) => T): T {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-hier-"));
+  try {
+    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    fs.writeFileSync(path.join(tmpDir, ".gitignore"), ".omre/\nnode_modules/\n", "utf8");
+    fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".omre", "config.json"),
+      JSON.stringify({
+        costGuardrail: { compactModeThreshold: 100 },
+        arbitration: { hierarchicalThreshold: 3 },
+      }),
+      "utf8"
+    );
+    fs.mkdirSync(path.join(tmpDir, "src", "auth"), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, "src", "payment"), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, "src", "user"), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, "src", "auth", "login.ts"), "// auth\n", "utf8");
+    fs.writeFileSync(path.join(tmpDir, "src", "payment", "process.ts"), "// payment\n", "utf8");
+    fs.writeFileSync(path.join(tmpDir, "src", "user", "profile.ts"), "// user\n", "utf8");
+    return fn(tmpDir);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+function getExecutionRequirements(prompt: string): string {
+  const afterExecution = prompt.split("Execution requirements:")[1] ?? "";
+  return afterExecution.split("Unified diff follows")[0] ?? "";
 }
 
 describe("buildReviewCodePrompt", () => {
@@ -108,6 +140,68 @@ describe("buildReviewCodePrompt", () => {
     const hasPerSlice = beforeDiff.includes("For each slice, invoke a slice-arbiter");
     expect(hasDirectGlobal || hasPerSlice).toBe(true);
     expect(hasDirectGlobal && hasPerSlice).toBe(false);
+  });
+
+  it("[Fix 2-A] orchestrator prompt does NOT instruct calling omre_write_report directly", () => {
+    withCleanGitRepo((cwd) => {
+      clearLoadConfigCache();
+      const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      const executionBlock = getExecutionRequirements(bundle.prompt);
+      expect(executionBlock).not.toMatch(/Call\s+[`']?omre_write_report[`']?\s+tool/i);
+    });
+  });
+
+  it("[Fix 2-A] orchestrator prompt instructs delegating to report-writer with runId only", () => {
+    withCleanGitRepo((cwd) => {
+      clearLoadConfigCache();
+      const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      expect(bundle.prompt).toMatch(/(Delegate|Invoke|Hand off)[^\n]*report-writer[^\n]*runId/i);
+    });
+  });
+
+  it("[Fix 2-A] orchestrator prompt forbids using write tool for .omre/reports/", () => {
+    withCleanGitRepo((cwd) => {
+      clearLoadConfigCache();
+      const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      expect(bundle.prompt).toMatch(/DO NOT use[^.]*write[^.]*\.omre\/reports/i);
+    });
+  });
+
+  it("[Fix 2-A] orchestrator prompt forbids passing a file-path reference as content", () => {
+    withCleanGitRepo((cwd) => {
+      clearLoadConfigCache();
+      const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      expect(bundle.prompt).toMatch(/(do not|never)[^.]*(reference|file.path)[^.]*report/i);
+    });
+  });
+
+  it("[Fix 2-A] orchestrator prompt requires surfacing report-writer errors instead of falling back to write", () => {
+    withCleanGitRepo((cwd) => {
+      clearLoadConfigCache();
+      const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      const executionBlock = getExecutionRequirements(bundle.prompt);
+      expect(executionBlock).toMatch(/surface.*error|report-writer.*error|do not retry|do not write.*directly/i);
+    });
+  });
+
+  it("[Fix 2-A] both arbitration branches end at report-writer delegation", () => {
+    withCleanGitRepo((cwd) => {
+      clearLoadConfigCache();
+      const flatBundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      expect(flatBundle.prompt).toContain("useHierarchicalArbitration: false");
+      const flatExecution = getExecutionRequirements(flatBundle.prompt);
+      expect(flatExecution).not.toMatch(/Call\s+[`']?omre_write_report[`']?\s+tool/i);
+      expect(flatExecution).toMatch(/(Delegate|Invoke|Hand off)[^\n]*report-writer[^\n]*runId/i);
+    });
+
+    withHierarchicalRepo((cwd) => {
+      clearLoadConfigCache();
+      const hierBundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      expect(hierBundle.prompt).toContain("useHierarchicalArbitration: true");
+      const hierExecution = getExecutionRequirements(hierBundle.prompt);
+      expect(hierExecution).not.toMatch(/Call\s+[`']?omre_write_report[`']?\s+tool/i);
+      expect(hierExecution).toMatch(/(Delegate|Invoke|Hand off)[^\n]*report-writer[^\n]*runId/i);
+    });
   });
 });
 
