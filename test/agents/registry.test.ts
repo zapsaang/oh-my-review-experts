@@ -127,7 +127,7 @@ describe.each(REVIEWER_NAMES)("registry: reviewer %s prompt + tools", (name) => 
     return (config.agent as Record<string, unknown>)[name] as Record<string, unknown>;
   }
 
-  it("[step 6] prompt contains the CONTRACT signature", () => {
+  it("[step 6] prompt contains the FILE_HANDOFF_CONTRACT signature", () => {
     const prompt = String(reviewerSlot().prompt ?? "");
     expect(prompt).toContain("Output strict JSON only when asked");
   });

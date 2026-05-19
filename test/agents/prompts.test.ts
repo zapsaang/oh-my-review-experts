@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import {
-  CONTRACT,
   CHAT_JSON_CONTRACT,
   FILE_HANDOFF_CONTRACT,
   GLOBAL_ARBITER_PROMPT,
@@ -50,12 +49,6 @@ describe("FILE_HANDOFF_CONTRACT (reviewer-facing, file-primary)", () => {
   });
 });
 
-describe("CONTRACT (deprecated alias kept for back-compat)", () => {
-  it("aliases FILE_HANDOFF_CONTRACT (reviewers were the only consumer)", () => {
-    expect(CONTRACT).toBe(FILE_HANDOFF_CONTRACT);
-  });
-});
-
 describe("REVIEWER_PROMPTS", () => {
   it("contains all expected dimensions", () => {
     const dimensions: ReviewDimensionType[] = ["spec", "quality", "security", "performance", "concurrency"];
@@ -65,9 +58,9 @@ describe("REVIEWER_PROMPTS", () => {
     }
   });
 
-  it("does not include CONTRACT in individual prompts", () => {
+  it("does not include FILE_HANDOFF_CONTRACT in individual prompts", () => {
     for (const [dimension, prompt] of Object.entries(REVIEWER_PROMPTS)) {
-      expect(prompt, `dimension ${dimension} should not contain CONTRACT`).not.toContain(CONTRACT.trim());
+      expect(prompt, `dimension ${dimension} should not contain FILE_HANDOFF_CONTRACT`).not.toContain(FILE_HANDOFF_CONTRACT.trim());
     }
   });
 

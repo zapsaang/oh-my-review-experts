@@ -47,13 +47,6 @@ Do not emit commentary outside JSON.
 export const FILE_HANDOFF_CONTRACT = `${BASE_JSON_RULES.trim()}
 `;
 
-/**
- * @deprecated Use CHAT_JSON_CONTRACT (coordinators) or FILE_HANDOFF_CONTRACT
- * (reviewers) explicitly. Kept as an alias of FILE_HANDOFF_CONTRACT because
- * reviewers were CONTRACT's only direct consumer prior to this split.
- */
-export const CONTRACT = FILE_HANDOFF_CONTRACT;
-
 export const LEAF_GUARDRAIL = `You are a leaf reviewer. Do not invoke the task tool. Do not invoke the skill tool. Do not delegate to any subagent. Your output must be a single handoff file per the handoff protocol, followed by the short chat reply specified by that protocol.`;
 
 export const LEAF_COORDINATOR_GUARDRAIL = `You are a leaf coordinator. Do not invoke the task tool. Do not invoke the skill tool. Do not delegate to any subagent. Your output must follow the exact format specified in your instructions, with no additional commentary.`;
