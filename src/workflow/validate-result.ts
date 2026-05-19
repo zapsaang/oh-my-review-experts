@@ -16,14 +16,14 @@ import { parseHandoffJsonHeader } from "../tools/handoff.js";
 
 
 /**
- * @deprecated Use `UnifiedHandoffSchema`. Same removal policy as
- * `ReviewerFindingSchema` above (remove by v1.0).
+ * @deprecated Use `UnifiedHandoffSchema`. Kept for compatibility through the
+ * v0.x line; remove by v1.0.
  */
 export const ReviewerHandoffSchema = UnifiedHandoffSchema;
 
 /**
- * @deprecated Use `NormalizedUnifiedHandoffSchema`. Same removal policy as
- * `ReviewerFindingSchema` above (remove by v1.0).
+ * @deprecated Use `NormalizedUnifiedHandoffSchema`. Kept for compatibility
+ * through the v0.x line; remove by v1.0.
  */
 export const NormalizedReviewerHandoffSchema = NormalizedUnifiedHandoffSchema;
 
