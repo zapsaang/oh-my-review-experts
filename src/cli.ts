@@ -14,6 +14,7 @@ import {
   checkAgentToolWhitelist,
   checkOpencodeConfig,
   checkPromptExampleSchemaIdentity,
+  checkReportLayout,
 } from "./tools/doctor.js"
 import { makeTempPath } from "./tools/fs-utils.js"
 import { registerAgents } from "./agents/registry.js"
@@ -122,6 +123,8 @@ export interface RunDoctorOptions {
   cwd?: string
   output?: DoctorOutput
   contractChecks?: DoctorContractChecks
+  cleanReports?: boolean
+  strict?: boolean
 }
 
 const CONTRACT_CHECK_LABEL_WIDTH = 40
@@ -225,7 +228,21 @@ export function runDoctor(options: RunDoctorOptions = {}): void {
   output.log(`  ${formatContractStatus("agent tool whitelists clean", toolWarnings)}`)
   for (const warning of contractWarnings) output.log(pc.yellow(`  ${warning}`))
 
+  output.log("\nReport layout:")
+  const layoutWarnings = checkReportLayout(cwd, { apply: !!options.cleanReports, reportDirectory: config.report.directory })
+  if (layoutWarnings.length === 0) {
+    output.log(pc.green("  clean (no stray *-report.{md,json}; latest.md valid or absent)"))
+  } else {
+    for (const warning of layoutWarnings) output.log(pc.yellow(`  ${warning}`))
+    if (options.cleanReports) {
+      output.log(pc.gray("  --clean-reports applied: stray artifacts removed"))
+    }
+  }
+
   if (contractWarnings.length > 0) process.exitCode = 2
+  if (options.strict && (contractWarnings.length > 0 || layoutWarnings.length > 0)) {
+    process.exitCode = process.exitCode === 2 ? 2 : 1
+  }
 }
 
 export function createCliProgram(): Command {
@@ -278,10 +295,12 @@ export function createCliProgram(): Command {
     })
 
   program.command("doctor")
-    .description("Check plugin configuration. CI exit codes: 0 clean, 1 doctor errored, 2 contract self-check failed")
-    .action(() => {
+    .description("Check plugin configuration. CI exit codes: 0 clean, 1 doctor errored, 2 contract self-check failed. With --strict, layout warnings also exit 1.")
+    .option("--clean-reports", "remove stray *-report.{md,json} artifacts in cwd and .omre/reports/", false)
+    .option("--strict", "exit non-zero when any warning is reported (CI guard)", false)
+    .action((opts: { cleanReports?: boolean; strict?: boolean }) => {
       try {
-        runDoctor()
+        runDoctor({ cleanReports: !!opts.cleanReports, strict: !!opts.strict })
       } catch (err) {
         console.error(pc.red(`doctor failed: ${err instanceof Error ? err.message : String(err)}`))
         process.exit(1)

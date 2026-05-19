@@ -45,6 +45,7 @@
     "test": "vitest run",
     "preversion": "npm run typecheck && npm run test",
     "postversion": "git push && git push --tags",
+    "doctor:strict": "node dist/cli.js doctor --strict",
     "publish:dry-run": "node scripts/publish-dual.js --dry-run",
     "publish:both": "node scripts/publish-dual.js",
     "pack:local": "npm pack"

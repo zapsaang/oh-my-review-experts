@@ -20,6 +20,7 @@
  * limitation so users do not interpret a clean check as proof of full coverage.
  */
 import fs from "node:fs";
+import path from "node:path";
 import { parse as parseJsonc } from "jsonc-parser";
 import type { Config } from "@opencode-ai/plugin";
 import { AGENT_NAMES, ALL_AGENTS, TOOL_DENY_BASELINE, registerAgents, type AgentRegistration } from "../agents/registry.js";
@@ -37,6 +38,7 @@ import {
   zodToExample,
 } from "../agents/schemas.js";
 import { DEFAULT_CONFIG } from "../config/schema.js";
+import { validateReportMarkdown } from "./report.js";
 
 const PLUGIN_NAME = "oh-my-review-experts";
 
@@ -288,4 +290,89 @@ export function checkAgentRegistration(config: Config): AgentRegistrationStatus 
   const missing = AGENT_NAMES.filter((name) => !agentMap[name]);
   const registered = expected - missing.length;
   return { registered, expected, missing: [...missing] };
+}
+
+export interface CheckReportLayoutOptions {
+  /** When true, delete flagged stray report artifacts. `latest.{md,json}` are never deleted. */
+  apply?: boolean;
+  reportDirectory?: string;
+}
+
+const STRAY_REPORT_PATTERN = /^.+-report\.(md|json)$/i;
+
+function listFilesIfExists(dir: string): string[] {
+  try {
+    return fs.readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
+function readFileIfExists(file: string): string | undefined {
+  try {
+    return fs.readFileSync(file, "utf-8");
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Detect stray `*-report.{md,json}` artifacts at the repo root and inside
+ * `.omre/reports/` (excluding `latest.{md,json}` and the `history/` directory),
+ * and validate `.omre/reports/latest.md` content via `validateReportMarkdown`.
+ *
+ * Returns a list of human-readable warnings. Empty array means clean layout.
+ *
+ * When `options.apply` is `true`, flagged stray files are deleted. The
+ * canonical `latest.md` / `latest.json` are never deleted, even when the
+ * markdown content fails validation; instead, a warning is emitted so the
+ * operator can repair or re-run finalization.
+ */
+export function checkReportLayout(cwd: string, options?: CheckReportLayoutOptions): string[] {
+  const warnings: string[] = [];
+  const apply = options?.apply === true;
+  const flaggedStray: string[] = [];
+
+  const rootEntries = listFilesIfExists(cwd);
+  for (const name of rootEntries) {
+    if (STRAY_REPORT_PATTERN.test(name)) {
+      flaggedStray.push(path.join(cwd, name));
+    }
+  }
+
+  const reportsDir = path.resolve(cwd, options?.reportDirectory ?? ".omre/reports");
+  const reportEntries = listFilesIfExists(reportsDir);
+  for (const name of reportEntries) {
+    if (name === "latest.md" || name === "latest.json") continue;
+    if (STRAY_REPORT_PATTERN.test(name)) {
+      flaggedStray.push(path.join(reportsDir, name));
+    }
+  }
+
+  for (const file of flaggedStray) {
+    warnings.push(`stray report artifact: ${file}`);
+  }
+
+  const latestMd = path.join(reportsDir, "latest.md");
+  const latestContent = readFileIfExists(latestMd);
+  if (latestContent !== undefined) {
+    const validation = validateReportMarkdown(latestContent);
+    if (!validation.ok) {
+      warnings.push(`latest.md is invalid: reason=${validation.reason ?? "unknown"} (${latestMd})`);
+    }
+  }
+
+  if (apply) {
+    for (const file of flaggedStray) {
+      try {
+        fs.unlinkSync(file);
+      } catch (err) {
+        warnings.push(`failed to remove ${file}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+
+  return warnings;
 }

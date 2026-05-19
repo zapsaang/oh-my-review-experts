@@ -295,3 +295,115 @@ describe("checkAgentToolWhitelist", () => {
     expect(warnings).toContain("reviewer-spec: missing deny for bash");
   });
 });
+
+describe("checkReportLayout [Fix 6]", () => {
+  interface CheckReportLayoutOptions {
+    apply?: boolean;
+  }
+  type CheckReportLayoutFn = (cwd: string, options?: CheckReportLayoutOptions) => string[];
+
+  async function loadCheckReportLayout(): Promise<CheckReportLayoutFn> {
+    const segments = ["..", "..", "src", "tools", "doctor.js"];
+    const mod = (await import(segments.join("/"))) as { checkReportLayout?: CheckReportLayoutFn };
+    if (typeof mod.checkReportLayout !== "function") {
+      throw new Error("checkReportLayout is not exported from src/tools/doctor.ts");
+    }
+    return mod.checkReportLayout;
+  }
+
+  function createValidLatestMarkdown(): string {
+    const lines: string[] = [];
+    lines.push("# Review Results");
+    lines.push("");
+    lines.push("## Run");
+    lines.push("");
+    lines.push("- Target: current-change");
+    lines.push("- Run ID: 20260519-141258-095");
+    lines.push("");
+    lines.push("## Coverage");
+    lines.push("");
+    lines.push("All dimensions reviewed.");
+    lines.push("");
+    lines.push("## Findings");
+    lines.push("");
+    lines.push("No issues found.");
+    lines.push("");
+    lines.push("### Detail");
+    lines.push("");
+    for (let i = 0; i < 40; i++) {
+      lines.push(`- Item ${i + 1}: reviewed.`);
+    }
+    lines.push("");
+    lines.push("## Summary");
+    lines.push("");
+    lines.push("Clean report.");
+    return lines.join("\n");
+  }
+
+  function withTempCwd<T>(fn: (cwd: string) => T): T {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-doctor-layout-"));
+    try {
+      return fn(dir);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("flags stray X-report.md at repo root", async () => {
+    const checkReportLayout = await loadCheckReportLayout();
+    withTempCwd((cwd) => {
+      const stray = path.join(cwd, "foo-report.md");
+      fs.writeFileSync(stray, "# Stray", "utf8");
+      const warnings = checkReportLayout(cwd);
+      expect(warnings.some((w: string) => w.includes("foo-report.md"))).toBe(true);
+    });
+  });
+
+  it("flags stray X-report.json under .omre/reports/", async () => {
+    const checkReportLayout = await loadCheckReportLayout();
+    withTempCwd((cwd) => {
+      const reportsDir = path.join(cwd, ".omre", "reports");
+      fs.mkdirSync(reportsDir, { recursive: true });
+      const stray = path.join(reportsDir, "foo-report.json");
+      fs.writeFileSync(stray, "{}", "utf8");
+      const warnings = checkReportLayout(cwd);
+      expect(warnings.some((w: string) => w.includes("foo-report.json"))).toBe(true);
+    });
+  });
+
+  it("--apply removes flagged files", async () => {
+    const checkReportLayout = await loadCheckReportLayout();
+    withTempCwd((cwd) => {
+      const stray = path.join(cwd, "foo-report.md");
+      fs.writeFileSync(stray, "# Stray", "utf8");
+      checkReportLayout(cwd, { apply: true });
+      expect(fs.existsSync(stray)).toBe(false);
+    });
+  });
+
+  it("flags latest.md when validateReportMarkdown rejects it (reference-only)", async () => {
+    const checkReportLayout = await loadCheckReportLayout();
+    withTempCwd((cwd) => {
+      const reportsDir = path.join(cwd, ".omre", "reports");
+      fs.mkdirSync(reportsDir, { recursive: true });
+      const latest = path.join(reportsDir, "latest.md");
+      fs.writeFileSync(latest, "Report persisted to /tmp/foo.md", "utf8");
+      const warnings = checkReportLayout(cwd);
+      expect(
+        warnings.some((w: string) => /latest\.md is invalid/i.test(w) && /reference-only/i.test(w)),
+      ).toBe(true);
+    });
+  });
+
+  it("exits 0 when layout is clean", async () => {
+    const checkReportLayout = await loadCheckReportLayout();
+    withTempCwd((cwd) => {
+      const reportsDir = path.join(cwd, ".omre", "reports");
+      fs.mkdirSync(reportsDir, { recursive: true });
+      fs.writeFileSync(path.join(reportsDir, "latest.md"), createValidLatestMarkdown(), "utf8");
+      fs.writeFileSync(path.join(reportsDir, "latest.json"), JSON.stringify({ slices: [] }), "utf8");
+      const warnings = checkReportLayout(cwd);
+      expect(warnings).toEqual([]);
+    });
+  });
+});
