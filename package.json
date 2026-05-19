@@ -1,6 +1,6 @@
 {
   "name": "oh-my-review-experts",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Runtime-first OpenCode review-code plugin with built-in expert agents, slicing, partial rerun, and report export.",
   "type": "module",
   "license": "MIT",

@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] — 2026-05-19
+
+### Removed (BREAKING)
+
+以下 6 个 `@deprecated` 兼容别名已删除。请使用对应正名：
+
+- `CONTRACT` → `FILE_HANDOFF_CONTRACT`（reviewers）或 `CHAT_JSON_CONTRACT`（coordinators）
+- `buildHandoffProtocol(handoffDir, runId)` → 在 reviewer staticPrompt 中拼 `STATIC_HANDOFF_PROTOCOL`，在 orchestrator user-turn 中拼 `buildHandoffRuntime(handoffDir, runId)`
+- `HandoffFindingSchema` → `UnifiedFindingSchema`（来自 `src/agents/schemas.js`）
+- `ReviewerFindingSchema` → `UnifiedFindingSchema`
+- `ReviewerHandoffSchema` → `UnifiedHandoffSchema`
+- `NormalizedReviewerHandoffSchema` → `NormalizedUnifiedHandoffSchema`
+
+注：上述符号未通过 `package.json` 的 `exports` 表面公开，但内部子路径导入（包括下游 plugin 仓库）需要替换 import 名称。
+
+### Migration
+
+- 仅替换 import 名称即可；运行时行为完全等价（这些符号都是 `=` 别名或简单 wrapper）。
+- 内部 src 调用者也已迁移（共 3 处：`validate-result.ts:196,215,299`）。
+
+### Deprecated (将在 v0.3.0 移除)
+
+- `type ReviewerFinding`（`src/workflow/validate-result.ts` 导出）
+- `type ReviewerHandoff`（`src/workflow/validate-result.ts` + `src/index.ts:13` 重导出，**公共类型 API**）
+
+这两个类型别名仍保留以避免一次性破坏过大；它们在 v0.3.0 移除时会有独立 PR（计划文件：将在适当时机创建）。请新代码直接使用 `z.infer<typeof UnifiedFindingSchema>` / `z.infer<typeof NormalizedUnifiedHandoffSchema>`。
+
 ## [0.1.7] — 2026-05-18
 
 ### Changed (BREAKING)
