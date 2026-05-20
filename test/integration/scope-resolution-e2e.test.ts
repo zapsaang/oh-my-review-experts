@@ -22,7 +22,7 @@ describe("scope resolution e2e", () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-scope-e2e-"));
     cwd = tmpDir;
 
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
 
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });

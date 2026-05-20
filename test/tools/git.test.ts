@@ -57,7 +57,7 @@ describe("getChangedFiles — backward compat (no scope)", () => {
   it("returns empty array in fresh repo with no commits and no files", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "omre-fresh-"));
     try {
-      execFileSync("git", ["init"], { cwd: tmp, stdio: "ignore" });
+      execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmp, stdio: "ignore" });
       const files = getChangedFiles(tmp);
       expect(files).toEqual([]);
     } finally {
@@ -236,7 +236,7 @@ describe("getDiffSummary — backward compat (no scope)", () => {
   it("returns empty string in fresh repo with no commits", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "omre-fresh-summary-"));
     try {
-      execFileSync("git", ["init"], { cwd: tmp, stdio: "ignore" });
+      execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmp, stdio: "ignore" });
       const summary = getDiffSummary(tmp);
       expect(summary).toBe("");
     } finally {
@@ -443,7 +443,7 @@ describe("getUnifiedDiff — backward compat (no scope)", () => {
   it("returns empty string in fresh repo with no commits", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "omre-fresh-diff-"));
     try {
-      execFileSync("git", ["init"], { cwd: tmp, stdio: "ignore" });
+      execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmp, stdio: "ignore" });
       const diff = getUnifiedDiff(tmp);
       expect(diff).toBe("");
     } finally {

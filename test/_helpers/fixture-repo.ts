@@ -14,9 +14,10 @@ function gitCommit(cwd: string, message: string) {
 export function withCleanGitRepo<T>(fn: (cwd: string) => T): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-review-prompt-"));
   try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
+    fs.writeFileSync(path.join(tmpDir, ".gitignore"), ".omre/\nnode_modules/\n", "utf8");
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
-    execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["add", "."], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
     return fn(tmpDir);
   } finally {
@@ -31,7 +32,7 @@ export function withRepoOnBranch<T>(
 ): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-branch-"));
   try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
@@ -57,7 +58,7 @@ export function withRepoWithBranches<T>(
 ): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-branches-"));
   try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
@@ -86,7 +87,7 @@ export function withRepoWithStagedFile<T>(
 ): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-staged-"));
   try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
@@ -105,7 +106,7 @@ export function withRepoWithStagedFile<T>(
 export function withRepoWithSecret<T>(fn: (cwd: string) => T): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-secret-"));
   try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
@@ -124,7 +125,7 @@ export function withRepoWithSecret<T>(fn: (cwd: string) => T): T {
 export function withHierarchicalRepo<T>(fn: (cwd: string) => T): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-hier-"));
   try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, ".gitignore"), ".omre/\nnode_modules/\n", "utf8");
     fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
     fs.writeFileSync(
@@ -150,7 +151,7 @@ export function withHierarchicalRepo<T>(fn: (cwd: string) => T): T {
 export function withRepoWithOversizedDiff<T>(fn: (cwd: string) => T): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-oversized-"));
   try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");

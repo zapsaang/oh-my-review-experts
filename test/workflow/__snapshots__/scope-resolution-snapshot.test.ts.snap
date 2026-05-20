@@ -29,8 +29,9 @@ Changed files:
 
 Diff summary:
 COMMIT_HASH init
- README.md | 1 +
- 1 file changed, 1 insertion(+)
+ .gitignore | 2 ++
+ README.md  | 1 +
+ 2 files changed, 3 insertions(+)
 
 
 Heuristic slices selected by plugin runtime:
@@ -149,6 +150,14 @@ Author: Test <test@example.com>
 
     init
 
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..COMMIT_HASH
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,2 @@
++.omre/
++node_modules/
 diff --git a/README.md b/README.md
 new file mode 100644
 index 0000000..COMMIT_HASH
@@ -191,8 +200,9 @@ Changed files:
 
 Diff summary:
 COMMIT_HASH init
- README.md | 1 +
- 1 file changed, 1 insertion(+)
+ .gitignore | 2 ++
+ README.md  | 1 +
+ 2 files changed, 3 insertions(+)
 
 
 Heuristic slices selected by plugin runtime:
@@ -311,6 +321,14 @@ Author: Test <test@example.com>
 
     init
 
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..COMMIT_HASH
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,2 @@
++.omre/
++node_modules/
 diff --git a/README.md b/README.md
 new file mode 100644
 index 0000000..COMMIT_HASH
@@ -353,8 +371,9 @@ Changed files:
 
 Diff summary:
 COMMIT_HASH init
- README.md | 1 +
- 1 file changed, 1 insertion(+)
+ .gitignore | 2 ++
+ README.md  | 1 +
+ 2 files changed, 3 insertions(+)
 
 
 Heuristic slices selected by plugin runtime:
@@ -473,6 +492,14 @@ Author: Test <test@example.com>
 
     init
 
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..COMMIT_HASH
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,2 @@
++.omre/
++node_modules/
 diff --git a/README.md b/README.md
 new file mode 100644
 index 0000000..COMMIT_HASH
@@ -515,8 +542,9 @@ Changed files:
 
 Diff summary:
 COMMIT_HASH init
- README.md | 1 +
- 1 file changed, 1 insertion(+)
+ .gitignore | 2 ++
+ README.md  | 1 +
+ 2 files changed, 3 insertions(+)
 
 
 Heuristic slices selected by plugin runtime:
@@ -635,6 +663,14 @@ Author: Test <test@example.com>
 
     init
 
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..COMMIT_HASH
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,2 @@
++.omre/
++node_modules/
 diff --git a/README.md b/README.md
 new file mode 100644
 index 0000000..COMMIT_HASH
@@ -677,8 +713,9 @@ Changed files:
 
 Diff summary:
 COMMIT_HASH init
- README.md | 1 +
- 1 file changed, 1 insertion(+)
+ .gitignore | 2 ++
+ README.md  | 1 +
+ 2 files changed, 3 insertions(+)
 
 
 Heuristic slices selected by plugin runtime:
@@ -797,6 +834,14 @@ Author: Test <test@example.com>
 
     init
 
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..COMMIT_HASH
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,2 @@
++.omre/
++node_modules/
 diff --git a/README.md b/README.md
 new file mode 100644
 index 0000000..COMMIT_HASH

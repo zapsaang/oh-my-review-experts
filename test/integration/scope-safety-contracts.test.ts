@@ -39,7 +39,7 @@ function writeManyFiles(cwd: string, opts: { skipRoot?: boolean } = {}) {
 function withManyFilesRepo<T>(fn: (cwd: string) => T): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-many-"));
   try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
@@ -57,7 +57,7 @@ function withManyFilesRepo<T>(fn: (cwd: string) => T): T {
 function withBranchWithSecret<T>(fn: (cwd: string) => T): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-branch-secret-"));
   try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
@@ -76,7 +76,7 @@ function withBranchWithSecret<T>(fn: (cwd: string) => T): T {
 function withBranchWithOversizedDiff<T>(fn: (cwd: string) => T): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-branch-oversized-"));
   try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
@@ -96,7 +96,7 @@ function withBranchWithOversizedDiff<T>(fn: (cwd: string) => T): T {
 function withBranchWithManyFiles<T>(fn: (cwd: string) => T): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-branch-many-"));
   try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
@@ -115,7 +115,7 @@ function withBranchWithManyFiles<T>(fn: (cwd: string) => T): T {
 function withPathsWithSecret<T>(fn: (cwd: string) => T): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-paths-secret-"));
   try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
@@ -136,7 +136,7 @@ function withPathsWithSecret<T>(fn: (cwd: string) => T): T {
 function withPathsWithOversizedDiff<T>(fn: (cwd: string) => T): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-paths-oversized-"));
   try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
@@ -158,7 +158,7 @@ function withPathsWithOversizedDiff<T>(fn: (cwd: string) => T): T {
 function withPathsWithManyFiles<T>(fn: (cwd: string) => T): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-paths-many-"));
   try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
@@ -176,7 +176,7 @@ function withPathsWithManyFiles<T>(fn: (cwd: string) => T): T {
 function withStagedWithOversizedDiff<T>(fn: (cwd: string) => T): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-staged-oversized-"));
   try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
@@ -194,7 +194,7 @@ function withStagedWithOversizedDiff<T>(fn: (cwd: string) => T): T {
 function withStagedWithManyFiles<T>(fn: (cwd: string) => T): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-staged-many-"));
   try {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
+    execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
