@@ -305,23 +305,11 @@ function verifyRef(fullRef: string, cwd: string): boolean {
  * {@link SAFE_PATH_PATTERN}, resolves under `cwd`, and exists on disk.
  */
 function wouldBarePathsResolve(arg: string, cwd: string): boolean {
-  const parts = arg
-    .split(",")
-    .map((segment) => segment.trim())
-    .filter((segment) => segment.length > 0);
-  if (parts.length === 0) return false;
-  for (const part of parts) {
-    if (!SAFE_PATH_PATTERN.test(part)) return false;
+  try {
+    return tryBarePaths(arg, cwd) !== null;
+  } catch {
+    return false;
   }
-  const cwdResolved = path.resolve(cwd);
-  for (const part of parts) {
-    const resolved = path.resolve(cwdResolved, part);
-    const rel = path.relative(cwdResolved, resolved);
-    if (rel === "..") return false;
-    if (rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) return false;
-    if (!fs.existsSync(resolved)) return false;
-  }
-  return true;
 }
 
 /**
@@ -348,23 +336,8 @@ function tryBarePaths(arg: string, cwd: string): string[] | null {
   }
   const cwdResolved = path.resolve(cwd);
   const existence = parts.map((part) => {
-    const resolved = path.resolve(cwdResolved, part);
-    const rel = path.relative(cwdResolved, resolved);
-    if (rel === "..") {
-      throw new ScopeResolutionError(
-        `Path escapes cwd: ${JSON.stringify(part)}`,
-        "PATH_TRAVERSAL",
-        arg
-      );
-    }
-    if (rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
-      throw new ScopeResolutionError(
-        `Path escapes cwd: ${JSON.stringify(part)}`,
-        "PATH_TRAVERSAL",
-        arg
-      );
-    }
-    return fs.existsSync(resolved);
+    assertResolvedUnderCwd(part, cwdResolved, arg);
+    return fs.existsSync(path.resolve(cwdResolved, part));
   });
   const allExist = existence.every(Boolean);
   if (allExist) return parts;

@@ -26,6 +26,16 @@ function makeLargeContent(): string {
   return line.repeat(linesNeeded);
 }
 
+function writeManyFiles(cwd: string, opts: { skipRoot?: boolean } = {}) {
+  for (let i = 1; i <= 25; i++) {
+    const dir = i === 1 && !opts.skipRoot ? "" : `src/module${String(i).padStart(2, "0")}`;
+    const filePath = dir ? path.join(dir, "file.ts") : `root${i}.ts`;
+    const fullPath = path.join(cwd, filePath);
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(fullPath, `// file ${i}\n`, "utf8");
+  }
+}
+
 function withManyFilesRepo<T>(fn: (cwd: string) => T): T {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-many-"));
   try {
@@ -34,13 +44,7 @@ function withManyFilesRepo<T>(fn: (cwd: string) => T): T {
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
 
-    for (let i = 1; i <= 25; i++) {
-      const dir = i === 1 ? "" : `src/module${String(i).padStart(2, "0")}`;
-      const filePath = dir ? path.join(dir, "file.ts") : `root${i}.ts`;
-      const fullPath = path.join(tmpDir, filePath);
-      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-      fs.writeFileSync(fullPath, `// file ${i}\n`, "utf8");
-    }
+    writeManyFiles(tmpDir);
     execFileSync("git", ["add", "."], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "add many files");
 
@@ -98,13 +102,7 @@ function withBranchWithManyFiles<T>(fn: (cwd: string) => T): T {
     gitCommit(tmpDir, "init");
 
     execFileSync("git", ["checkout", "-b", "feature"], { cwd: tmpDir, stdio: "ignore" });
-    for (let i = 1; i <= 25; i++) {
-      const dir = i === 1 ? "" : `src/module${String(i).padStart(2, "0")}`;
-      const filePath = dir ? path.join(dir, "file.ts") : `root${i}.ts`;
-      const fullPath = path.join(tmpDir, filePath);
-      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-      fs.writeFileSync(fullPath, `// file ${i}\n`, "utf8");
-    }
+    writeManyFiles(tmpDir);
     execFileSync("git", ["add", "."], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "add many files");
 
@@ -165,13 +163,7 @@ function withPathsWithManyFiles<T>(fn: (cwd: string) => T): T {
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
 
-    for (let i = 1; i <= 25; i++) {
-      const dir = `src/module${String(i).padStart(2, "0")}`;
-      const filePath = path.join(dir, "file.ts");
-      const fullPath = path.join(tmpDir, filePath);
-      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-      fs.writeFileSync(fullPath, `// file ${i}\n`, "utf8");
-    }
+    writeManyFiles(tmpDir, { skipRoot: true });
     execFileSync("git", ["add", "."], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "add many files");
 
@@ -207,13 +199,7 @@ function withStagedWithManyFiles<T>(fn: (cwd: string) => T): T {
     execFileSync("git", ["add", "README.md"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
 
-    for (let i = 1; i <= 25; i++) {
-      const dir = i === 1 ? "" : `src/module${String(i).padStart(2, "0")}`;
-      const filePath = dir ? path.join(dir, "file.ts") : `root${i}.ts`;
-      const fullPath = path.join(tmpDir, filePath);
-      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-      fs.writeFileSync(fullPath, `// file ${i}\n`, "utf8");
-    }
+    writeManyFiles(tmpDir);
     execFileSync("git", ["add", "."], { cwd: tmpDir, stdio: "ignore" });
 
     return fn(tmpDir);
@@ -389,5 +375,36 @@ describe("scope safety contracts", () => {
         expect(bundle.prompt).toContain("compactMode: true");
       });
     });
+  });
+});
+
+describe("[P4] writeManyFiles helper", () => {
+  it("creates 25 files with expected directory structure", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-write-many-"));
+    try {
+      writeManyFiles(tmpDir);
+
+      expect(fs.existsSync(path.join(tmpDir, "root1.ts"))).toBe(true);
+      expect(fs.existsSync(path.join(tmpDir, "src", "module02", "file.ts"))).toBe(true);
+      expect(fs.existsSync(path.join(tmpDir, "src", "module25", "file.ts"))).toBe(true);
+
+      const content = fs.readFileSync(path.join(tmpDir, "src", "module02", "file.ts"), "utf8");
+      expect(content).toBe("// file 2\n");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("skipRoot option omits root file and starts numbering in src/module01", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-write-many-"));
+    try {
+      writeManyFiles(tmpDir, { skipRoot: true });
+
+      expect(fs.existsSync(path.join(tmpDir, "root1.ts"))).toBe(false);
+      expect(fs.existsSync(path.join(tmpDir, "src", "module01", "file.ts"))).toBe(true);
+      expect(fs.existsSync(path.join(tmpDir, "src", "module25", "file.ts"))).toBe(true);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });

@@ -107,10 +107,13 @@ describe("dry-run CLI", () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const parseSpy = vi.spyOn(scopeResolver, 'parseReviewScope').mockImplementation(() => {
-      throw new AmbiguousScopeError("ambiguous", [
-        { kind: "branch", name: "auth" },
-        { kind: "paths", paths: ["auth"] },
-      ]);
+      throw new AmbiguousScopeError(
+        'Input "auth" is ambiguous (matches both a branch and a path). Use explicit prefix: branch:auth or path:auth',
+        [
+          { kind: "branch", name: "auth" },
+          { kind: "paths", paths: ["auth"] },
+        ]
+      );
     });
 
     try {
@@ -120,13 +123,34 @@ describe("dry-run CLI", () => {
       }).toThrow("EXIT_1");
 
       const errorCall = errorSpy.mock.calls[0]?.[0] as string;
-      expect(errorCall).toContain('dry-run: input "auth" is ambiguous');
+      expect(errorCall).toContain('Input "auth" is ambiguous');
       expect(errorCall).toContain("branch:auth");
       expect(errorCall).toContain("path:auth");
-      expect(errorCall).toContain("Or if you meant guidance");
     } finally {
       exitSpy.mockRestore();
       errorSpy.mockRestore();
+      logSpy.mockRestore();
+      parseSpy.mockRestore();
+    }
+  });
+
+  it("[P1] does not call parseReviewScope directly — avoids double parsing", () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const parseSpy = vi.spyOn(scopeResolver, 'parseReviewScope').mockImplementation(() => ({
+      kind: "guidance",
+      text: "test",
+    } as ReturnType<typeof scopeResolver.parseReviewScope>));
+
+    try {
+      const program = createCliProgram();
+      program.parse(["node", "omre", "dry-run", "focus on tests"]);
+
+      // parseReviewScope must be called exactly once (by renderLocalDryRun only),
+      // never directly by cli.ts action handler.
+      expect(parseSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      exitSpy.mockRestore();
       logSpy.mockRestore();
       parseSpy.mockRestore();
     }

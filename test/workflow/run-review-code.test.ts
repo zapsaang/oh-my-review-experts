@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { buildReviewCodePrompt, renderLocalDryRun } from "../../src/workflow/run-review-code.js";
 import { clearLoadConfigCache } from "../../src/config/load-config.js";
 import {
@@ -210,5 +213,45 @@ describe("renderLocalDryRun", () => {
         expect(markdown).toContain("path:auth");
       }
     );
+  });
+});
+
+describe("[P2] formatScopeDetail — prompt scope readability", () => {
+  it("branch scope shows name in parentheses", () => {
+    withCleanGitRepo((cwd) => {
+      const bundle = buildReviewCodePrompt({ args: "branch:main", cwd }, true);
+      expect(bundle.prompt).toContain("Resolved review scope: branch (main)");
+    });
+  });
+
+  it("commit scope shows ref in parentheses", () => {
+    withCleanGitRepo((cwd) => {
+      const sha = execFileSync("git", ["rev-parse", "HEAD"], {
+        cwd,
+        encoding: "utf8",
+      }).trim();
+      const bundle = buildReviewCodePrompt({ args: `commit:${sha}`, cwd }, true);
+      expect(bundle.prompt).toContain(`Resolved review scope: commit (${sha})`);
+    });
+  });
+
+  it("range scope shows from..to in parentheses", () => {
+    withCleanGitRepo((cwd) => {
+      fs.writeFileSync(path.join(cwd, "second.txt"), "second\n", "utf8");
+      execFileSync("git", ["add", "second.txt"], { cwd, stdio: "ignore" });
+      execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "second"], { cwd, stdio: "ignore" });
+      const bundle = buildReviewCodePrompt({ args: "range:HEAD~1..HEAD", cwd }, true);
+      expect(bundle.prompt).toContain("Resolved review scope: range (HEAD~1..HEAD)");
+    });
+  });
+
+  it("paths scope shows comma-separated paths in parentheses", () => {
+    withCleanGitRepo((cwd) => {
+      fs.mkdirSync(path.join(cwd, "src"), { recursive: true });
+      fs.writeFileSync(path.join(cwd, "src", "a.ts"), "// a\n", "utf8");
+      fs.writeFileSync(path.join(cwd, "src", "b.ts"), "// b\n", "utf8");
+      const bundle = buildReviewCodePrompt({ args: "src/a.ts,src/b.ts", cwd }, true);
+      expect(bundle.prompt).toContain("Resolved review scope: paths (src/a.ts, src/b.ts)");
+    });
   });
 });

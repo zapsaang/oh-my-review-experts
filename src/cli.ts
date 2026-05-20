@@ -9,8 +9,7 @@ import { modify, parse as parseJsonc, applyEdits } from "jsonc-parser"
 import type { Config } from "@opencode-ai/plugin"
 import { defaultConfigJsonc, findConfigFiles, loadConfig } from "./config/load-config.js"
 import { renderLocalDryRun } from "./workflow/run-review-code.js"
-import { parseReviewScope, ScopeResolutionError, AmbiguousScopeError } from "./workflow/scope-resolver.js"
-import type { ReviewScope } from "./workflow/scope-resolver.js"
+
 import {
   checkAgentRegistration,
   checkAgentToolWhitelist,
@@ -315,32 +314,20 @@ export function createCliProgram(): Command {
     .action((args: string[]) => {
       const argsText = args.join(" ")
       try {
-        const cwd = process.cwd()
-        const config = loadConfig(cwd)
-        if (config.command.scopeResolution === "auto") {
-          parseReviewScope(argsText, cwd)
+        const output = renderLocalDryRun({ args: argsText })
+        // Detect scope-resolution errors surfaced by renderLocalDryRun
+        const errorMatch = output.match(/^Resolved scope: error(?: \(([^)]+)\))?\n(.+)$/m)
+        if (errorMatch) {
+          console.error(pc.red(`Error: ${errorMatch[2]}`))
+          process.exit(1)
         }
-        console.log(renderLocalDryRun({ args: argsText }))
+        const ambiguousMatch = output.match(/^Resolved scope: ambiguous\n(.+)$/m)
+        if (ambiguousMatch) {
+          console.error(pc.red(ambiguousMatch[1]))
+          process.exit(1)
+        }
+        console.log(output)
       } catch (err) {
-        if (err instanceof ScopeResolutionError) {
-          console.error(pc.red(`Error: ${err.message}`))
-          process.exit(1)
-        }
-        if (err instanceof AmbiguousScopeError) {
-          const branch = err.candidates.find((c): c is Extract<ReviewScope, { kind: "branch" }> => c.kind === "branch")
-          const paths = err.candidates.find((c): c is Extract<ReviewScope, { kind: "paths" }> => c.kind === "paths")
-          const inputMatch = err.message.match(/"([^"]+)"/)
-          const inputText = inputMatch ? inputMatch[1] : argsText || "the input"
-          const lines = [
-            `dry-run: input "${inputText}" is ambiguous (matches both a branch and a path).`,
-            `Use one of:`,
-          ]
-          if (branch) lines.push(`  omre dry-run branch:${branch.name}`)
-          if (paths) lines.push(`  omre dry-run path:${paths.paths.join(",")}`)
-          lines.push(`Or if you meant guidance: omre dry-run "review the ${inputText} module"`)
-          console.error(pc.red(lines.join("\n")))
-          process.exit(1)
-        }
         console.error(pc.red(`dry-run failed: ${err instanceof Error ? err.message : String(err)}`))
         process.exit(1)
       }

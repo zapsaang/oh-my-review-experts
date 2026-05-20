@@ -504,5 +504,24 @@ describe("parseReviewScope", () => {
           expect((err as ScopeResolutionError).code).toBe("PATH_TRAVERSAL");
         }
       }));
+
+    it("[P3] ambiguity detection survives tryBarePaths exceptions via wrapper", () =>
+      withRepoWithBranches(
+        { auth: { "auth/index.ts": "// auth\n" } },
+        (cwd) => {
+          // Both branch "auth" and path "auth" exist → ambiguous.
+          // Before P3 fix, wouldBarePathsResolve had independent logic.
+          // After P3 fix, it wraps tryBarePaths and catches exceptions.
+          // This test guards against the wrapper leaking exceptions.
+          const result = parseReviewScope("auth", cwd);
+          expect(result.kind).toBe("ambiguous");
+          if (result.kind === "ambiguous") {
+            expect(result.candidates).toEqual([
+              { kind: "branch", name: "auth" },
+              { kind: "paths", paths: ["auth"] },
+            ]);
+          }
+        }
+      ));
   });
 });
