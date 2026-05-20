@@ -135,7 +135,7 @@ describe("dry-run CLI", () => {
   });
 
   it("[P1] does not call parseReviewScope directly — avoids double parsing", () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit') });
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const parseSpy = vi.spyOn(scopeResolver, 'parseReviewScope').mockImplementation(() => ({
       kind: "guidance",
