@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Auto provider inference: when an OpenCode-level provider is configured, OMRE picks tier-appropriate per-agent models automatically. New optional config fields: `provider` and `disable_provider_inference`.
+
 ## [0.1.8] — 2026-05-19
 
 ### Removed (BREAKING)

@@ -7,7 +7,12 @@ import { Command } from "commander"
 import pc from "picocolors"
 import { modify, parse as parseJsonc, applyEdits } from "jsonc-parser"
 import type { Config } from "@opencode-ai/plugin"
-import { defaultConfigJsonc, findConfigFiles, loadConfig } from "./config/load-config.js"
+import { defaultConfigJsonc, findConfigFiles, loadConfigWithOverrides } from "./config/load-config.js"
+import {
+  resolveProviderFromOpenCodeConfig,
+  resolveModelsWithInference,
+} from "./config/provider-presets.js"
+import type { ModelKey } from "./agents/registry.js"
 import { renderLocalDryRun } from "./workflow/run-review-code.js"
 
 import {
@@ -150,7 +155,7 @@ export function runDoctor(options: RunDoctorOptions = {}): void {
   output.log("Config files:")
   for (const f of files) output.log(`- ${f}`)
   if (!files.length) output.log(pc.yellow("- none found; defaults will be used"))
-  const config = loadConfig(cwd)
+  const { config, explicitModelOverrides } = loadConfigWithOverrides(cwd)
   output.log("Command:", `/${config.command.name}`, "aliases:", config.command.aliases.join(", "))
   output.log("Report dir:", config.report.directory)
   output.log("Max estimated tasks:", config.costGuardrail.maxEstimatedTasks)
@@ -170,14 +175,13 @@ export function runDoctor(options: RunDoctorOptions = {}): void {
   }
 
   output.log("\nConfig hook:")
-  const activeConfig = loadConfig(cwd)
-  if (!activeConfig.enabled) {
+  if (!config.enabled) {
     output.log(pc.yellow("  plugin disabled"))
-  } else if (!activeConfig.command.enabled) {
+  } else if (!config.command.enabled) {
     output.log(pc.yellow("  commands disabled"))
-  } else if (activeConfig.command.injection === "disabled") {
+  } else if (config.command.injection === "disabled") {
     output.log(pc.yellow("  injection disabled"))
-  } else if (activeConfig.command.injection === "tool") {
+  } else if (config.command.injection === "tool") {
     output.log(pc.yellow("  tool mode (commands not registered via config hook)"))
   } else {
     output.log(pc.green("  commands registered at runtime via config hook"))
@@ -208,7 +212,7 @@ export function runDoctor(options: RunDoctorOptions = {}): void {
 
   output.log("\nSubagent registration:")
   const probeConfig: Config = {}
-  registerAgents(probeConfig, activeConfig)
+  registerAgents(probeConfig, config)
   const agentStatus = checkAgentRegistration(probeConfig)
   const agentLine = `agents: ${agentStatus.registered}/${agentStatus.expected} registered`
   if (agentStatus.registered === agentStatus.expected) {
@@ -218,6 +222,39 @@ export function runDoctor(options: RunDoctorOptions = {}): void {
     if (agentStatus.missing.length > 0) {
       output.log(pc.yellow(`  missing: ${agentStatus.missing.join(", ")}`))
     }
+  }
+
+  output.log("\nProvider inference:")
+  const { config: omreConfigWithOverrides } = loadConfigWithOverrides(cwd)
+  const opencodeConfigPath = getOpencodeConfigPath(false, cwd)
+  const opencodeConfigText = readFileSafe(opencodeConfigPath)
+  let opencodeConfig: Record<string, unknown> = {}
+  if (opencodeConfigText) {
+    try {
+      const parsed = parseJsonc(opencodeConfigText)
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        opencodeConfig = parsed as Record<string, unknown>
+      }
+    } catch { /* ignore parse errors */ }
+  }
+  const providerID = omreConfigWithOverrides.provider ?? resolveProviderFromOpenCodeConfig(opencodeConfig as Config)
+  if (omreConfigWithOverrides.disable_provider_inference === true) {
+    output.log("  Auto provider inference: disabled (via omreConfig.disable_provider_inference).")
+  } else if (providerID) {
+    const source = omreConfigWithOverrides.provider ? "omre.provider" : "opencode-config"
+    output.log(`  Inferred provider: ${providerID}  (source: ${source})`)
+    const finalModels = resolveModelsWithInference(
+      omreConfigWithOverrides.models,
+      providerID,
+      opencodeConfig as Config,
+      explicitModelOverrides,
+    )
+    output.log("  Final model assignment per agent:")
+    for (const key of Object.keys(finalModels) as ModelKey[]) {
+      output.log(`    ${key.padEnd(14)} → ${finalModels[key]}`)
+    }
+  } else {
+    output.log("  Auto provider inference: no provider detected; using DEFAULT_MODEL for all unset agents.")
   }
 
   const promptWarnings = contractChecks.checkPromptExampleSchemaIdentity()

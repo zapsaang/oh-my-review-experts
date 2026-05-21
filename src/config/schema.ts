@@ -222,6 +222,12 @@ export const OmreConfigSchema = z.object({
       "Reviewer dimensions per slice type. Unknown slice types are rejected by design."
     ),
   }).default(() => structuredClone(DEFAULT_REVIEWERS)).describe("Reviewer dimension assignment settings."),
+  provider: z.string().min(1).optional().describe(
+    "Preferred provider ID for automatic per-agent model selection. When set and a model field is not explicitly overridden, OMRE uses the matching entry from PROVIDER_MODEL_PRESETS for each agent's tier. If omitted, OMRE attempts to auto-detect from OpenCode's config.model or config.provider."
+  ),
+  disable_provider_inference: z.boolean().optional().describe(
+    "When true, OMRE skips automatic provider/model inference entirely; only models.* fields the user explicitly sets are used (others fall back to DEFAULT_MODEL). Use this as a kill switch when explicit configuration is required."
+  ),
 }).meta({
   $id: "https://raw.githubusercontent.com/zapsaang/oh-my-review-experts/main/schemas/oh-my-review-experts.schema.json",
   title: "Oh My Review Experts Config",

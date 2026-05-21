@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { execSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { createCliProgram, runDoctor, type DoctorContractChecks } from "../src/cli.js";
-import { ScopeResolutionError, AmbiguousScopeError } from "../src/workflow/scope-resolver.js";
+import { AmbiguousScopeError } from "../src/workflow/scope-resolver.js";
 import * as scopeResolver from "../src/workflow/scope-resolver.js";
 
 const ansiPattern = /\x1B\[[0-9;]*m/g;
@@ -69,6 +73,41 @@ describe("doctor CLI", () => {
     expect(helpText).toContain(
       "CI exit codes: 0 clean, 1 doctor errored, 2 contract self-check failed",
     );
+  });
+
+  it("prints inferred provider from opencode.json model field", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-doctor-test-"));
+    try {
+      fs.writeFileSync(path.join(tmpDir, "opencode.json"), JSON.stringify({ model: "anthropic/claude-opus-4-7" }));
+      const cliPath = path.resolve(process.cwd(), "dist/cli.js");
+      const output = execSync(`node "${cliPath}" doctor`, {
+        cwd: tmpDir,
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      const text = stripAnsi(output);
+      expect(text).toContain("Inferred provider: anthropic");
+      expect(text).toContain("(source: opencode-config)");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("prints inferred provider when opencode.json has a model with provider prefix", () => {
+    const captured = captureOutput();
+    const tmpDir = fs.mkdtempSync(".omre-doctor-test-");
+    const opencodePath = path.join(tmpDir, "opencode.json");
+    fs.writeFileSync(opencodePath, JSON.stringify({ model: "anthropic/claude-opus-4-7" }), "utf8");
+
+    try {
+      runDoctor({ cwd: tmpDir, output: captured.output, contractChecks: cleanContractChecks });
+      const text = stripAnsi(captured.lines.join("\n"));
+      expect(text).toContain("Inferred provider: anthropic");
+      expect(text).toContain("spec           → anthropic/claude-opus-4-7");
+      expect(text).toContain("reportWriter   → anthropic/claude-haiku-4-5");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 

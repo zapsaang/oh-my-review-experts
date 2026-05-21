@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { deepMerge, findConfigFiles, loadConfig, clearLoadConfigCache, defaultConfigJsonc } from "../../src/config/load-config.js";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { deepMerge, findConfigFiles, loadConfig, clearLoadConfigCache, defaultConfigJsonc, loadConfigWithOverrides } from "../../src/config/load-config.js";
 import { OmreConfigSchema, DEFAULT_CONFIG } from "../../src/config/schema.js";
 import fs from "node:fs";
 import os from "node:os";
@@ -203,5 +203,106 @@ describe("defaultConfigJsonc", () => {
     const jsonc1 = defaultConfigJsonc();
     const jsonc2 = defaultConfigJsonc();
     expect(jsonc1).toBe(jsonc2);
+  });
+});
+
+describe("loadConfigWithOverrides", () => {
+  beforeEach(() => {
+    clearLoadConfigCache();
+  });
+
+  it("returns empty explicitModelOverrides when no user config files exist", () => {
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), ".omre-test-"));
+    try {
+      const result = loadConfigWithOverrides(tmpDir, true);
+      expect(result).toHaveProperty("config");
+      expect(result).toHaveProperty("explicitModelOverrides");
+      expect(result.explicitModelOverrides).toBeInstanceOf(Set);
+      expect(result.explicitModelOverrides.size).toBe(0);
+    } finally {
+      try {
+        fs.rmdirSync(tmpDir);
+      } catch { /* directory may not exist */ }
+    }
+  });
+
+  it("returns explicitModelOverrides with ['spec'] when .omre/config.json overrides models.spec", () => {
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), ".omre-test-"));
+    const configPath = path.join(tmpDir, ".omre", "config.json");
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ models: { spec: "x" } }), "utf8");
+
+    try {
+      const result = loadConfigWithOverrides(tmpDir, true);
+      expect(result.explicitModelOverrides).toBeInstanceOf(Set);
+      expect(Array.from(result.explicitModelOverrides)).toEqual(["spec"]);
+    } finally {
+      try {
+        fs.unlinkSync(configPath);
+      } catch { /* file may not exist */ }
+      try {
+        fs.rmdirSync(path.dirname(configPath));
+      } catch { /* directory may not exist */ }
+      try {
+        fs.rmdirSync(tmpDir);
+      } catch { /* directory may not exist */ }
+    }
+  });
+
+  it("returns explicitModelOverrides with both 'spec' and 'quality' from different config files", () => {
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), ".omre-test-"));
+    const opencodePath = path.join(tmpDir, ".opencode", "oh-my-review-experts.jsonc");
+    const omrePath = path.join(tmpDir, ".omre", "config.json");
+
+    fs.mkdirSync(path.dirname(opencodePath), { recursive: true });
+    fs.writeFileSync(opencodePath, JSON.stringify({ models: { spec: "y" } }), "utf8");
+
+    fs.mkdirSync(path.dirname(omrePath), { recursive: true });
+    fs.writeFileSync(omrePath, JSON.stringify({ models: { quality: "z" } }), "utf8");
+
+    try {
+      const result = loadConfigWithOverrides(tmpDir, true);
+      const overrides = Array.from(result.explicitModelOverrides).sort();
+      expect(overrides).toEqual(["quality", "spec"]);
+    } finally {
+      try {
+        fs.unlinkSync(opencodePath);
+      } catch { /* file may not exist */ }
+      try {
+        fs.rmdirSync(path.dirname(opencodePath));
+      } catch { /* directory may not exist */ }
+      try {
+        fs.unlinkSync(omrePath);
+      } catch { /* file may not exist */ }
+      try {
+        fs.rmdirSync(path.dirname(omrePath));
+      } catch { /* directory may not exist */ }
+      try {
+        fs.rmdirSync(tmpDir);
+      } catch { /* directory may not exist */ }
+    }
+  });
+
+  it("still includes 'spec' in explicitModelOverrides even when value matches DEFAULT_MODEL", () => {
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), ".omre-test-"));
+    const configPath = path.join(tmpDir, ".omre", "config.json");
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, JSON.stringify({ models: { spec: "minimax-cn/MiniMax-M2.7" } }), "utf8");
+
+    try {
+      const result = loadConfigWithOverrides(tmpDir, true);
+      expect(result.explicitModelOverrides).toBeInstanceOf(Set);
+      expect(Array.from(result.explicitModelOverrides)).toEqual(["spec"]);
+    } finally {
+      try {
+        fs.unlinkSync(configPath);
+      } catch { /* file may not exist */ }
+      try {
+        fs.rmdirSync(path.dirname(configPath));
+      } catch { /* directory may not exist */ }
+      try {
+        fs.rmdirSync(tmpDir);
+      } catch { /* directory may not exist */ }
+    }
   });
 });

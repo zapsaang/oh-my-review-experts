@@ -231,6 +231,63 @@ Full schema:
 }
 ```
 
+### Auto provider inference
+
+When no `models` are explicitly configured, `omre` falls back to a provider-inference chain that picks a model for each agent from the OpenCode config. The chain is strict: higher steps short-circuit lower ones.
+
+Priority pyramid (first match wins):
+
+1. `omreConfig.models[k]` — per-agent override in the OMRE config
+2. `omreConfig.disable_provider_inference: true` — short-circuits the entire chain; all agents fall through to their default
+3. `omreConfig.provider` — forces every agent to use this provider's default model
+4. `Config.model` — parsed as "provider/model"; the provider slot is extracted and used
+5. Sole enabled `Config.provider` key — single provider in `opencode.json`; all agents use that provider
+6. `Config.small_model` for coordination/utility tiers — used when the same provider is detected across the config
+7. `PROVIDER_MODEL_PRESETS[providerID][tier]` — the current preset for that provider and tier
+8. `DEFAULT_MODEL` fallback — final catch-all
+
+Agent tiers:
+
+| Tier | Agents |
+|------|--------|
+| critical | spec, quality, security, performance, concurrency |
+| standard | (same as critical; used when no tier annotation applies) |
+| coordination | slicePlanner, sliceArbiter, globalArbiter, validator |
+| utility | reportWriter |
+
+Worked example — given `opencode.json`:
+
+```json
+{
+  "model": "anthropic/claude-opus-4-7",
+  "small_model": "anthropic/claude-haiku-4-5"
+}
+```
+
+and an empty OMRE config (no `models`, no `provider`, no `disable_provider_inference`):
+
+| Agent | Assigned model |
+|-------|----------------|
+| spec, quality, security, performance, concurrency | anthropic/claude-opus-4-7 (from `Config.model`) |
+| slicePlanner, sliceArbiter, globalArbiter, validator | anthropic/claude-opus-4-7 (from `Config.small_model` tier, same provider) |
+| reportWriter | anthropic/claude-opus-4-7 (from `Config.small_model` tier, same provider) |
+
+Opt-out examples — force a specific provider for all agents:
+
+```jsonc
+{
+  "provider": "google"
+}
+```
+
+Kill switch — disable provider inference entirely and let every agent fall through to its built-in default:
+
+```jsonc
+{
+  "disable_provider_inference": true
+}
+```
+
 ### Injection modes
 
 `command.injection` controls how `/review-code` is wired up:

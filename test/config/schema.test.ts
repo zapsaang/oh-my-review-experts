@@ -230,3 +230,25 @@ describe("Forbidden command names", () => {
     }
   });
 });
+
+describe("OmreConfigSchema provider field", () => {
+  it("parses empty object with provider and disable_provider_inference undefined", () => {
+    const result = OmreConfigSchema.parse({});
+    expect(result.provider).toBeUndefined();
+    expect(result.disable_provider_inference).toBeUndefined();
+  });
+
+  it("accepts valid provider value", () => {
+    const result = OmreConfigSchema.parse({ provider: "openai" });
+    expect(result.provider).toBe("openai");
+  });
+
+  it("rejects empty provider string", () => {
+    expect(() => OmreConfigSchema.parse({ provider: "" })).toThrow();
+  });
+
+  it("accepts disable_provider_inference true", () => {
+    const result = OmreConfigSchema.parse({ disable_provider_inference: true });
+    expect(result.disable_provider_inference).toBe(true);
+  });
+});

@@ -10,7 +10,7 @@ import {
   REPORT_WRITER_PROMPT,
 } from "./prompts.js";
 
-type ModelKey = keyof OmreConfig["models"];
+export type ModelKey = keyof OmreConfig["models"];
 
 export interface AgentRegistration {
   readonly name: string;

@@ -2,8 +2,14 @@ import type { Plugin, Hooks, Config, PluginModule } from "@opencode-ai/plugin"
 import type { Part, Permission } from "@opencode-ai/sdk"
 import { injectReviewCodePrompt } from "./hooks/command-injection.js"
 import { tools } from "./tools/plugin-tools.js"
-import { loadConfig } from "./config/load-config.js"
+import { loadConfig, loadConfigWithOverrides } from "./config/load-config.js"
+import {
+  resolveProviderFromOpenCodeConfig,
+  resolveModelsWithInference,
+} from "./config/provider-presets.js"
 import { registerAgents } from "./agents/registry.js"
+import type { ModelKey } from "./agents/registry.js"
+import type { OmreConfig } from "./config/schema.js"
 import { VERSION } from "./version.js"
 
 export { buildReviewCodePrompt, persistReport, renderLocalDryRun } from "./workflow/run-review-code.js"
@@ -95,8 +101,45 @@ const OhMyReviewExperts: Plugin = async (input) => {
           })
         }
 
-        const omreConfig = loadConfig(input.directory, true)
-        const { registered: agentNames, skipped: agentSkipped } = registerAgents(config, omreConfig)
+        const { config: omreConfig, explicitModelOverrides } =
+          loadConfigWithOverrides(input.directory, true)
+
+        let finalConfig: OmreConfig = omreConfig
+        if (omreConfig.disable_provider_inference !== true) {
+          const providerID =
+            omreConfig.provider ??
+            resolveProviderFromOpenCodeConfig(config)
+          if (providerID) {
+            const finalModels = resolveModelsWithInference(
+              omreConfig.models,
+              providerID,
+              config,
+              explicitModelOverrides,
+            )
+            finalConfig = { ...omreConfig, models: finalModels }
+            await log("info", "Auto-inferred provider", {
+              provider: providerID,
+              source: omreConfig.provider ? "omre.provider" : "opencode-config",
+              finalModels,
+              respectedSmallModel: typeof config.small_model === "string" &&
+                config.small_model.startsWith(`${providerID}/`),
+            })
+            for (const key of Object.keys(finalModels) as ModelKey[]) {
+              if (
+                !explicitModelOverrides.has(key) &&
+                finalModels[key] !== omreConfig.models[key]
+              ) {
+                await log("debug", "Model auto-replaced for agent", {
+                  agent: key,
+                  before: omreConfig.models[key],
+                  after: finalModels[key],
+                })
+              }
+            }
+          }
+        }
+
+        const { registered: agentNames, skipped: agentSkipped } = registerAgents(config, finalConfig)
         if (agentNames.length > 0) {
           await log("info", "Subagents registered via config hook", {
             agents: agentNames,
