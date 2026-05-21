@@ -76,16 +76,12 @@ describe("doctor CLI", () => {
   });
 
   it("prints inferred provider from opencode.json model field", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-doctor-test-"));
+    const captured = captureOutput();
+    const tmpDir = fs.mkdtempSync(".omre-doctor-test-");
     try {
       fs.writeFileSync(path.join(tmpDir, "opencode.json"), JSON.stringify({ model: "anthropic/claude-opus-4-7" }));
-      const cliPath = path.resolve(process.cwd(), "dist/cli.js");
-      const output = execSync(`node "${cliPath}" doctor`, {
-        cwd: tmpDir,
-        encoding: "utf8",
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-      const text = stripAnsi(output);
+      runDoctor({ cwd: tmpDir, output: captured.output, contractChecks: cleanContractChecks });
+      const text = stripAnsi(captured.lines.join("\n"));
       expect(text).toContain("Inferred provider: anthropic");
       expect(text).toContain("(source: opencode-config)");
     } finally {
