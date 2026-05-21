@@ -5,14 +5,17 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { Command } from "commander"
 import pc from "picocolors"
+import Table from "cli-table3"
 import { modify, parse as parseJsonc, applyEdits } from "jsonc-parser"
 import type { Config } from "@opencode-ai/plugin"
 import { defaultConfigJsonc, findConfigFiles, loadConfigWithOverrides } from "./config/load-config.js"
 import {
   resolveProviderFromOpenCodeConfig,
   resolveModelsWithInference,
+  AGENT_TIER_MAP,
 } from "./config/provider-presets.js"
 import type { ModelKey } from "./agents/registry.js"
+import { ALL_AGENTS, registerAgents } from "./agents/registry.js"
 import { renderLocalDryRun } from "./workflow/run-review-code.js"
 
 import {
@@ -23,7 +26,6 @@ import {
   checkReportLayout,
 } from "./tools/doctor.js"
 import { makeTempPath } from "./tools/fs-utils.js"
-import { registerAgents } from "./agents/registry.js"
 import { VERSION } from "./version.js"
 
 const PLUGIN_NAME = "oh-my-review-experts"
@@ -211,21 +213,7 @@ export function runDoctor(options: RunDoctorOptions = {}): void {
   }
 
   output.log("\nSubagent registration:")
-  const probeConfig: Config = {}
-  registerAgents(probeConfig, config)
-  const agentStatus = checkAgentRegistration(probeConfig)
-  const agentLine = `agents: ${agentStatus.registered}/${agentStatus.expected} registered`
-  if (agentStatus.registered === agentStatus.expected) {
-    output.log(pc.green(`  ${agentLine}`))
-  } else {
-    output.log(pc.yellow(`  ${agentLine}`))
-    if (agentStatus.missing.length > 0) {
-      output.log(pc.yellow(`  missing: ${agentStatus.missing.join(", ")}`))
-    }
-  }
 
-  output.log("\nProvider inference:")
-  const { config: omreConfigWithOverrides } = loadConfigWithOverrides(cwd)
   const opencodeConfigPath = getOpencodeConfigPath(false, cwd)
   const opencodeConfigText = readFileSafe(opencodeConfigPath)
   let opencodeConfig: Record<string, unknown> = {}
@@ -237,18 +225,67 @@ export function runDoctor(options: RunDoctorOptions = {}): void {
       }
     } catch { /* ignore parse errors */ }
   }
-  const providerID = omreConfigWithOverrides.provider ?? resolveProviderFromOpenCodeConfig(opencodeConfig as Config)
-  if (omreConfigWithOverrides.disable_provider_inference === true) {
-    output.log("  Auto provider inference: disabled (via omreConfig.disable_provider_inference).")
-  } else if (providerID) {
-    const source = omreConfigWithOverrides.provider ? "omre.provider" : "opencode-config"
-    output.log(`  Inferred provider: ${providerID}  (source: ${source})`)
-    const finalModels = resolveModelsWithInference(
-      omreConfigWithOverrides.models,
+  const providerID = config.provider ?? resolveProviderFromOpenCodeConfig(opencodeConfig as Config)
+
+  let finalConfig = config
+  let finalModels = config.models
+  if (config.disable_provider_inference !== true && providerID) {
+    finalModels = resolveModelsWithInference(
+      config.models,
       providerID,
       opencodeConfig as Config,
       explicitModelOverrides,
     )
+    finalConfig = { ...config, models: finalModels }
+  }
+
+  const probeConfig: Config = {}
+  registerAgents(probeConfig, finalConfig)
+  const agentStatus = checkAgentRegistration(probeConfig)
+  const agentLine = `agents: ${agentStatus.registered}/${agentStatus.expected} registered`
+  if (agentStatus.registered === agentStatus.expected) {
+    output.log(pc.green(`  ${agentLine}`))
+  } else {
+    output.log(pc.yellow(`  ${agentLine}`))
+    if (agentStatus.missing.length > 0) {
+      output.log(pc.yellow(`  missing: ${agentStatus.missing.join(", ")}`))
+    }
+  }
+
+  output.log("\nAgent runtime models:")
+  const table = new Table({
+    head: ["Agent", "Model", "Tier", "Source"],
+    style: { head: [], border: [] },
+    colAligns: ["left", "left", "left", "left"],
+  })
+
+  for (const agent of ALL_AGENTS) {
+    const agentConfig = probeConfig.agent?.[agent.name] as Record<string, unknown> | undefined
+    const model = typeof agentConfig?.model === "string" ? agentConfig.model : "(not set)"
+    const tier = AGENT_TIER_MAP[agent.modelKey] ?? "unknown"
+    const isExplicit = explicitModelOverrides.has(agent.modelKey)
+    const source = isExplicit ? "explicit" : providerID ? "inferred" : "default"
+
+    const sourceColored = source === "explicit"
+      ? pc.cyan(source)
+      : source === "inferred"
+        ? pc.yellow(source)
+        : pc.gray(source)
+
+    table.push([agent.name, model, tier, sourceColored])
+  }
+
+  const tableLines = table.toString().split("\n")
+  for (const line of tableLines) {
+    output.log(`  ${line}`)
+  }
+
+  output.log("\nProvider inference:")
+  if (config.disable_provider_inference === true) {
+    output.log("  Auto provider inference: disabled (via omreConfig.disable_provider_inference).")
+  } else if (providerID) {
+    const source = config.provider ? "omre.provider" : "opencode-config"
+    output.log(`  Inferred provider: ${providerID}  (source: ${source})`)
     output.log("  Final model assignment per agent:")
     for (const key of Object.keys(finalModels) as ModelKey[]) {
       output.log(`    ${key.padEnd(14)} → ${finalModels[key]}`)
