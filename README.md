@@ -215,6 +215,8 @@ Full schema:
     "enabled": true,
     "directory": ".omre/handoffs"
   },
+  // "provider": "anthropic",           // optional: force a specific provider for auto model selection
+  // "disable_provider_inference": true, // optional: kill switch for provider inference
   "reviewers": {
     "default": ["spec", "quality", "security", "performance", "concurrency"],
     "bySliceType": {
@@ -304,10 +306,13 @@ Kill switch — disable provider inference entirely and let every agent fall thr
 ## CLI
 
 ```bash
-omre init                  # scaffold .opencode/oh-my-review-experts.jsonc
+omre init [--force]        # scaffold .opencode/oh-my-review-experts.jsonc
 omre install --global      # enable plugin in ~/.config/opencode/opencode.json
 omre install --project     # enable plugin in ./opencode.json
-omre doctor                # validate config + plugin wiring (used in CI)
+omre doctor [--clean-reports] [--strict]
+                           # validate config + plugin wiring (used in CI)
+                           # --clean-reports removes stray *-report.{md,json} artifacts
+                           # --strict exits non-zero on any warning
 omre dry-run               # build the prompt locally, no model calls
 ```
 
@@ -340,7 +345,7 @@ Written with `writeFileAtomicOverwrite` (temp + rename) for `latest.*`, and `O_E
 
 Each handoff carries: agent name, scope, files inspected, findings with evidence, risk level, suggested fixes, confidence, and open questions. The orchestrator reads these files to build the final report; subagent chat output is treated as a status receipt only.
 
-The plugin exposes six tools for programmatic use:
+The plugin exposes seven tools for programmatic use:
 
 - `omre_build_review_code_prompt` — assemble the review prompt bundle for the current changes
 - `omre_dry_run` — render the plan without invoking any model
@@ -348,6 +353,7 @@ The plugin exposes six tools for programmatic use:
 - `omre_write_handoff` — persist a reviewer's findings to `.omre/handoffs/{runId}/`
 - `omre_write_report` — persist the final report to `.omre/reports/`
 - `omre_validate_handoff` — validate a reviewer handoff (file first, chat-fence fallback)
+- `omre_finalize_review` — assemble and persist the final review report from handoff files under `.omre/handoffs/{runId}/`
 
 ---
 
@@ -389,10 +395,12 @@ None of these are optional or togglable — they're always on.
 
 ```bash
 npm install
-npm run dev         # tsx src/cli.ts
-npm run typecheck   # tsc --noEmit  (strict, no `as any`)
-npm run test        # vitest run
-npm run build       # tsup → dist/ (ESM + .d.ts + sourcemaps)
+npm run dev              # tsx src/cli.ts
+npm run typecheck        # tsc --noEmit  (strict, no `as any`)
+npm run test             # vitest run
+npm run generate-schema  # regenerate JSON schema from Zod types
+npm run build            # prebuild → tsup → postbuild (ESM + .d.ts + sourcemaps)
+npm run doctor:strict    # same as `doctor --strict`
 node dist/cli.js doctor
 ```
 
@@ -402,13 +410,14 @@ Local packaging:
 npm run pack:local
 ```
 
-Publish:
+Publish (dry-run first):
 
 ```bash
+npm run publish:dry-run
 npm run publish:both
 ```
 
-CI (Node 22, Ubuntu) runs: `npm ci && typecheck && test && build && doctor`.
+CI (Node 22, Ubuntu) runs: `npm ci && typecheck && test && build && doctor:strict`.
 
 ---
 
