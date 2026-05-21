@@ -214,7 +214,7 @@ export const REVIEWER_FINDING_JSON = `{
 export const REVIEWER_HANDOFF_JSON = `{
   "schema_version": "${SCHEMA_VERSION}",
   "task_id": "<subagent task id>",
-  "agent": "reviewer-security",
+  "agent": "omre-reviewer-security",
   "dimension": "security",
   "status": "completed",
   "target": { "kind": "working-tree", "value": "<summary>" },

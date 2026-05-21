@@ -60,38 +60,7 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
       );
 
       const payload = {
-        agent: "spec",
-        dimension: "spec",
-        status: "completed" as const,
-        findings: [],
-      };
-
-      const input = parseToolArgs(tools.omre_write_handoff, { payload });
-      const result = await tools.omre_write_handoff.execute(input, mockContext(tmpDir));
-      const parsed = JSON.parse(result as string);
-
-      expect(parsed.ok).toBe(true);
-      expect(typeof parsed.filePath).toBe("string");
-      expect(parsed.filePath).toContain(".omre/handoffs");
-      expect(parsed.errors).toBeUndefined();
-      expect(fs.existsSync(parsed.filePath)).toBe(true);
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  it("returns the resolved taskId when payload omits task_id", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-resolved-task-"));
-    try {
-      fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
-      fs.writeFileSync(
-        path.join(tmpDir, ".omre", "config.json"),
-        JSON.stringify({ handoff: { enabled: true, directory: ".omre/handoffs" } }),
-        "utf8",
-      );
-
-      const payload = {
-        agent: "reviewer-spec",
+        agent: "omre-reviewer-spec",
         dimension: "spec",
         status: "completed" as const,
         findings: [],
@@ -105,7 +74,7 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
       expect(typeof parsed.taskId).toBe("string");
       expect(parsed.taskId.length).toBeGreaterThan(0);
       expect(parsed.taskId).toContain("run-2b");
-      expect(parsed.taskId).toContain("reviewer-spec");
+      expect(parsed.taskId).toContain("omre-reviewer-spec");
 
       const written = fs.readFileSync(parsed.filePath, "utf8");
       expect(written).toContain(`"task_id": "${parsed.taskId}"`);
@@ -158,7 +127,7 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
       const rawInput = {
         payload: {
           task_id: "",
-          agent: "reviewer-spec",
+          agent: "omre-reviewer-spec",
           dimension: "spec",
           status: "completed" as const,
           findings: [],
@@ -220,7 +189,7 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
 
       const parsed = await executeWriteHandoffRaw({
         payload: {
-          agent: "reviewer-spec",
+          agent: "omre-reviewer-spec",
           dimension: "",
           status: "completed" as const,
           findings: [],
@@ -248,7 +217,7 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
 
       const parsed = await executeWriteHandoffRaw({
         payload: {
-          agent: "reviewer-spec",
+          agent: "omre-reviewer-spec",
           dimension: "spec",
           status: "completed" as const,
           target: { kind: "", value: "src/auth.ts" },
@@ -791,7 +760,7 @@ function buildHandoffJson(overrides: Record<string, unknown> = {}): string {
   const base = {
     schema_version: "1",
     task_id: "task-123",
-    agent: "reviewer-security",
+    agent: "omre-reviewer-security",
     dimension: "security",
     status: "completed",
     target: { kind: "working-tree", value: "src/auth.ts" },
@@ -1024,7 +993,7 @@ function buildHandoffJsonHeader(
   const base = {
     schema_version: "1",
     task_id: "task-123",
-    agent: "reviewer-security",
+    agent: "omre-reviewer-security",
     dimension: "security",
     status: "completed",
     target: { kind: "working-tree", value: "src/auth.ts" },

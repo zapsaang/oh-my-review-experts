@@ -165,7 +165,7 @@ describe("JSON schema constants", () => {
     const parsed = JSON.parse(REVIEWER_HANDOFF_JSON);
     expect(parsed.schema_version).toBe("1");
     expect(parsed.task_id).toBe("<subagent task id>");
-    expect(parsed.agent).toBe("reviewer-security");
+    expect(parsed.agent).toBe("omre-reviewer-security");
     expect(parsed.dimension).toBe("security");
     expect(parsed.status).toBe("completed");
     expect(parsed.target).toEqual({ kind: "working-tree", value: "<summary>" });
@@ -304,7 +304,7 @@ describe("UnifiedHandoffSchema", () => {
   const baseHandoff = {
     schema_version: "1",
     task_id: "task-123",
-    agent: "reviewer-security",
+    agent: "omre-reviewer-security",
     dimension: "security",
     status: "completed" as const,
     target: { kind: "working-tree", value: "src/auth.ts" },
@@ -374,7 +374,7 @@ describe("NormalizedUnifiedHandoffSchema", () => {
     const result = NormalizedUnifiedHandoffSchema.safeParse({
       schema_version: "1",
       task_id: "task-123",
-      agent: "reviewer-security",
+      agent: "omre-reviewer-security",
       dimension: "security",
       status: "completed",
       target: { kind: "working-tree", value: "src/auth.ts" },
@@ -405,7 +405,7 @@ describe("NormalizedUnifiedHandoffSchema", () => {
     const result = NormalizedUnifiedHandoffSchema.safeParse({
       schema_version: "1",
       task_id: "task-123",
-      agent: "reviewer-security",
+      agent: "omre-reviewer-security",
       dimension: "security",
       status: "completed",
       target: { kind: "working-tree", value: "src/auth.ts" },
@@ -525,7 +525,7 @@ describe("schema-wide non-empty hardening", () => {
   const handoffFixture = {
     schema_version: "1",
     task_id: "task-123",
-    agent: "reviewer-security",
+    agent: "omre-reviewer-security",
     dimension: "security",
     status: "completed" as const,
     target: { kind: "working-tree", value: "" },

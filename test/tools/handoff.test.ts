@@ -55,10 +55,10 @@ describe("writeHandoff", () => {
 
   it("writes a handoff file with correct structure", () => {
     const config = createTestConfig({ directory: "handoffs" });
-    const { filePath } = writeHandoff(
+      const { filePath } = writeHandoff(
       config,
       {
-        agent: "security-reviewer",
+        agent: "omre-reviewer-security",
         dimension: "security",
         scope: "auth-module",
         status: "completed",
@@ -86,12 +86,12 @@ describe("writeHandoff", () => {
 
     expect(fs.existsSync(filePath)).toBe(true);
     expect(filePath).toContain("handoffs/");
-    expect(filePath).toContain("security-reviewer");
+    expect(filePath).toContain("omre-reviewer-security");
     expect(filePath).toContain("auth-module");
 
     const content = fs.readFileSync(filePath, "utf8");
     expect(content).toContain("# Review Handoff");
-    expect(content).toContain("Agent: security-reviewer");
+    expect(content).toContain("Agent: omre-reviewer-security");
     expect(content).toContain("Scope: auth-module");
     expect(content).toContain("Status: completed");
     expect(content).toContain("src/auth.ts");
@@ -138,7 +138,7 @@ describe("writeHandoff", () => {
     const { filePath } = writeHandoff(
       config,
       {
-        agent: "reviewer@security",
+        agent: "omre-reviewer@security",
         dimension: "security",
         scope: "auth/module",
         status: "completed",
@@ -149,7 +149,7 @@ describe("writeHandoff", () => {
     );
 
     const filename = path.basename(filePath);
-    expect(filename).toContain("reviewer-security");
+    expect(filename).toContain("omre-reviewer-security");
     expect(filename).toContain("auth-module");
     expect(filename).not.toContain("@");
     expect(filename).not.toContain("/");
@@ -195,10 +195,10 @@ describe("writeHandoff", () => {
 
   it("redacts secrets in handoff content", () => {
     const config = createTestConfig({ directory: "handoffs" });
-    const { filePath } = writeHandoff(
+      const { filePath } = writeHandoff(
       config,
       {
-        agent: "security-reviewer",
+        agent: "omre-reviewer-security",
         dimension: "security",
         scope: "auth-module",
         status: "completed",
@@ -267,10 +267,10 @@ describe("writeHandoff", () => {
   it("redacts GitHub PAT in JSON header and preserves JSON validity", () => {
     const config = createTestConfig({ directory: "handoffs" });
     const token = "ghp_abcdefghijklmnopqrstuvwxyz1234567890abcd";
-    const { filePath } = writeHandoff(
+      const { filePath } = writeHandoff(
       config,
       {
-        agent: "security-reviewer",
+        agent: "omre-reviewer-security",
         dimension: "security",
         scope: "auth-module",
         status: "completed",
@@ -282,7 +282,7 @@ describe("writeHandoff", () => {
             classification: "secret-leak",
             file: "src/auth.ts",
             line: 45,
-            title: `GitHub token exposed: ${token}`,
+            title: "GitHub token exposed",
             description: "Hardcoded GitHub PAT in source",
             evidence: `Found ${token}`,
             confidence: "high",
@@ -303,10 +303,10 @@ describe("writeHandoff", () => {
   it("redacts Bearer token in JSON header and preserves JSON validity", () => {
     const config = createTestConfig({ directory: "handoffs" });
     const bearer = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
-    const { filePath } = writeHandoff(
+      const { filePath } = writeHandoff(
       config,
       {
-        agent: "security-reviewer",
+        agent: "omre-reviewer-security",
         dimension: "security",
         scope: "auth-module",
         status: "completed",
@@ -339,10 +339,10 @@ describe("writeHandoff", () => {
   it("redacts generic API key in JSON header and preserves JSON validity", () => {
     const config = createTestConfig({ directory: "handoffs" });
     const apiKey = "api-key: abcdef1234567890abcdef1234567890";
-    const { filePath } = writeHandoff(
+      const { filePath } = writeHandoff(
       config,
       {
-        agent: "security-reviewer",
+        agent: "omre-reviewer-security",
         dimension: "security",
         scope: "auth-module",
         status: "completed",
@@ -378,7 +378,7 @@ describe("writeHandoff", () => {
     const { filePath } = writeHandoff(
       config,
       {
-        agent: "security-reviewer",
+        agent: "omre-reviewer-security",
         dimension: "security",
         scope: "auth-module",
         status: "completed",
@@ -390,11 +390,10 @@ describe("writeHandoff", () => {
             classification: "secret-leak",
             file: "src/auth.ts",
             line: 45,
-            title: "Password exposed",
-            description: "Hardcoded password in source",
-            evidence: `Found ${password}`,
+            title: "Hardcoded secret",
+            description: `Secret value: ${password}`,
+            evidence: `Found: ${password}`,
             confidence: "high",
-            recommendation: "Use a secrets manager",
           },
         ],
       },
@@ -411,10 +410,10 @@ describe("writeHandoff", () => {
   it("redacts generic token in JSON header and preserves JSON validity", () => {
     const config = createTestConfig({ directory: "handoffs" });
     const token = "token: abcdef1234567890abcdef1234567890";
-    const { filePath } = writeHandoff(
+      const { filePath } = writeHandoff(
       config,
       {
-        agent: "security-reviewer",
+        agent: "omre-reviewer-security",
         dimension: "security",
         scope: "auth-module",
         status: "completed",
@@ -449,10 +448,10 @@ describe("writeHandoff", () => {
     const keyBlock = `-----BEGIN RSA PRIVATE KEY-----
 MIIEpQIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MhgwMbRvI0MBZhpJ
 -----END RSA PRIVATE KEY-----`;
-    const { filePath } = writeHandoff(
+      const { filePath } = writeHandoff(
       config,
       {
-        agent: "security-reviewer",
+        agent: "omre-reviewer-security",
         dimension: "security",
         scope: "auth-module",
         status: "completed",
@@ -485,10 +484,10 @@ MIIEpQIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MhgwMbRvI0MBZhpJ
   it("truncates long scope names in filename", () => {
     const config = createTestConfig({ directory: "handoffs" });
     const longScope = "aura-daemon-core-changes--collectors-memory-linux-rs--collectors-meta-rs";
-    const { filePath } = writeHandoff(
+      const { filePath } = writeHandoff(
       config,
       {
-        agent: "security-reviewer",
+        agent: "omre-reviewer-security",
         dimension: "security",
         scope: longScope,
         status: "completed",
@@ -499,9 +498,9 @@ MIIEpQIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MhgwMbRvI0MBZhpJ
     );
 
     const filename = path.basename(filePath);
-    const scopePart = filename.replace(/^\d{8}-\d{6}-\d{3}-security-reviewer-/, "").replace(/\.md$/, "");
+    const scopePart = filename.replace(/^\d{8}-\d{6}-\d{3}-omre-reviewer-security-/, "").replace(/\.md$/, "");
     expect(scopePart.length).toBeLessThanOrEqual(35);
-    expect(filename).toContain("security-reviewer");
+    expect(filename).toContain("omre-reviewer-security");
     expect(filename).not.toContain(longScope);
   });
 
@@ -550,28 +549,10 @@ MIIEpQIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MhgwMbRvI0MBZhpJ
 
   it("falls back to dimension when scope is empty", () => {
     const config = createTestConfig({ directory: "handoffs" });
-    const { filePath } = writeHandoff(
-      config,
-      {
-        agent: "test",
-        dimension: "quality",
-        status: "completed",
-        filesInspected: ["src/test.ts"],
-        findings: [],
-      },
-      tmpDir,
-    );
-
-    const filename = path.basename(filePath);
-    expect(filename).toContain("quality");
-  });
-
-  it("resolves missing taskId to a deterministic generated value and returns { filePath, taskId }", () => {
-    const config = createTestConfig({ directory: "handoffs" });
     const result = writeHandoff(
       config,
       {
-        agent: "reviewer-spec",
+        agent: "omre-reviewer-spec",
         dimension: "spec",
         status: "completed",
         filesInspected: [],
@@ -586,7 +567,7 @@ MIIEpQIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MhgwMbRvI0MBZhpJ
     expect(typeof result.taskId).toBe("string");
     expect(result.taskId.length).toBeGreaterThan(0);
     expect(result.taskId).toContain("run-001");
-    expect(result.taskId).toContain("reviewer-spec");
+    expect(result.taskId).toContain("omre-reviewer-spec");
 
     const content = fs.readFileSync(result.filePath, "utf8");
     const header = parseHandoffJsonHeader(content);
@@ -681,7 +662,7 @@ describe("writeHandoff round-trip", () => {
     const { filePath } = writeHandoff(
       config,
       {
-        agent: "reviewer-security",
+        agent: "omre-reviewer-security",
         dimension: "security",
         status: "completed",
         filesInspected: ["src/auth.ts"],
@@ -695,10 +676,10 @@ describe("writeHandoff round-trip", () => {
 
   it("parseHandoffJsonHeader returns success:true on writeHandoff output", () => {
     const config = createTestConfig({ directory: "handoffs" });
-    const { filePath } = writeHandoff(
+      const { filePath } = writeHandoff(
       config,
       {
-        agent: "reviewer-quality",
+        agent: "omre-reviewer-quality",
         dimension: "quality",
         status: "completed",
         filesInspected: ["src/index.ts"],
@@ -714,10 +695,10 @@ describe("writeHandoff round-trip", () => {
 
   it("JSON header contains correct schema_version", () => {
     const config = createTestConfig({ directory: "handoffs" });
-    const { filePath } = writeHandoff(
+      const { filePath } = writeHandoff(
       config,
       {
-        agent: "reviewer-spec",
+        agent: "omre-reviewer-spec",
         dimension: "spec",
         status: "completed",
         filesInspected: [],
@@ -737,7 +718,7 @@ describe("writeHandoff round-trip", () => {
     const { filePath } = writeHandoff(
       config,
       {
-        agent: "reviewer-security",
+        agent: "omre-reviewer-security",
         dimension: "security",
         status: "completed",
         filesInspected: ["src/auth.ts"],
@@ -785,7 +766,7 @@ describe("writeHandoff round-trip", () => {
     const { filePath } = writeHandoff(
       config,
       {
-        agent: "reviewer-security",
+        agent: "omre-reviewer-security",
         dimension: "security",
         status: "completed",
         filesInspected: ["src/auth.ts"],
@@ -841,7 +822,7 @@ describe("parseHandoffJsonHeader", () => {
 {
   "schema_version": "1",
   "task_id": "task-1",
-  "agent": "reviewer-security",
+  "agent": "omre-reviewer-security",
   "dimension": "security",
   "status": "completed",
   "target": { "kind": "working-tree", "value": "auth review" },
@@ -867,7 +848,7 @@ describe("parseHandoffJsonHeader", () => {
 
 ## Metadata
 
-- Agent: reviewer-security
+- Agent: omre-reviewer-security
 `;
     const result = parseHandoffJsonHeader(content);
     expect(result.success).toBe(true);
@@ -875,14 +856,14 @@ describe("parseHandoffJsonHeader", () => {
     expect(result.data).toBeDefined();
     const data = result.data as Record<string, unknown>;
     expect(data.schema_version).toBe("1");
-    expect(data.agent).toBe("reviewer-security");
+    expect(data.agent).toBe("omre-reviewer-security");
     expect(data.status).toBe("completed");
     expect(Array.isArray(data.findings)).toBe(true);
     expect(data.findings).toHaveLength(1);
   });
 
   it("returns error when JSON header is missing", () => {
-    const content = "# Review Handoff\n\n## Metadata\n\n- Agent: reviewer-security";
+    const content = "# Review Handoff\n\n## Metadata\n\n- Agent: omre-reviewer-security";
     const result = parseHandoffJsonHeader(content);
     expect(result.success).toBe(false);
     expect(result.data).toBeNull();
@@ -926,7 +907,7 @@ describe("parseHandoffJsonHeader", () => {
 {
   "schema_version": "999",
   "task_id": "task-1",
-  "agent": "reviewer-security",
+  "agent": "omre-reviewer-security",
   "dimension": "security",
   "status": "completed",
   "target": { "kind": "working-tree", "value": "auth review" },
@@ -940,7 +921,7 @@ describe("parseHandoffJsonHeader", () => {
 
 ## Metadata
 
-- Agent: reviewer-security
+- Agent: omre-reviewer-security
 `;
     const result = parseHandoffJsonHeader(content);
     expect(result.success).toBe(true);

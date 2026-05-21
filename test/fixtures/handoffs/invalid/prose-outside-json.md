@@ -5,7 +5,7 @@ The prose here is non-whitespace text that appears before the first fenced code 
 {
   "schema_version": "1",
   "task_id": "task-123",
-  "agent": "reviewer-security",
+  "agent": "omre-reviewer-security",
   "dimension": "security",
   "status": "completed",
   "target": { "kind": "working-tree", "value": "src/example.ts" },

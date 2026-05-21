@@ -171,13 +171,13 @@ describe("[step 18] checkAgentRegistration", () => {
   it("reports a partial registration when only one agent is present", () => {
     const config = {
       agent: {
-        "reviewer-spec": { mode: "subagent" },
+        "omre-reviewer-spec": { mode: "subagent" },
       },
     } as unknown as Config;
     const result = checkAgentRegistration(config);
     expect(result.expected).toBe(11);
     expect(result.registered).toBe(1);
-    expect(result.missing).not.toContain("reviewer-spec");
+    expect(result.missing).not.toContain("omre-reviewer-spec");
     expect(result.missing.length).toBe(10);
   });
 
@@ -272,18 +272,18 @@ describe("checkAgentToolWhitelist", () => {
 
   it("warns when a non-authorized agent is granted a writer tool", () => {
     const warnings = checkAgentToolWhitelistForAgents(
-      [fakeAgent("slice-planner", ["read", "omre_write_report"])],
-      { "slice-planner": requiredDenies },
+      [fakeAgent("omre-slice-planner", ["read", "omre_write_report"])],
+      { "omre-slice-planner": requiredDenies },
     );
 
-    expect(warnings).toContain("slice-planner: writer tool omre_write_report is not allowed for this agent");
+    expect(warnings).toContain("omre-slice-planner: writer tool omre_write_report is not allowed for this agent");
   });
 
   it("warns when an effective agent registration is missing a required permission deny", () => {
     const warnings = checkAgentToolWhitelistForAgents(
-      [fakeAgent("reviewer-spec", ["read"])],
+      [fakeAgent("omre-reviewer-spec", ["read"])],
       {
-        "reviewer-spec": {
+        "omre-reviewer-spec": {
           bash: "allow",
           edit: "deny",
           webfetch: "deny",
@@ -292,7 +292,7 @@ describe("checkAgentToolWhitelist", () => {
       },
     );
 
-    expect(warnings).toContain("reviewer-spec: missing deny for bash");
+    expect(warnings).toContain("omre-reviewer-spec: missing deny for bash");
   });
 });
 

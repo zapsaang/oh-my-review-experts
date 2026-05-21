@@ -44,17 +44,17 @@ describe("registry: registerAgents", () => {
     expect(AGENT_NAMES.length).toBe(11);
 
     const expected = [
-      "reviewer-spec",
-      "reviewer-quality",
-      "reviewer-security",
-      "reviewer-performance",
-      "reviewer-concurrency",
-      "slice-planner",
-      "slice-plan-validator",
-      "result-validator",
-      "slice-arbiter",
-      "global-arbiter",
-      "report-writer",
+      "omre-reviewer-spec",
+      "omre-reviewer-quality",
+      "omre-reviewer-security",
+      "omre-reviewer-performance",
+      "omre-reviewer-concurrency",
+      "omre-slice-planner",
+      "omre-slice-plan-validator",
+      "omre-result-validator",
+      "omre-slice-arbiter",
+      "omre-global-arbiter",
+      "omre-report-writer",
     ];
     expect([...AGENT_NAMES].sort()).toEqual([...expected].sort());
     expect([...result.registered].sort()).toEqual([...expected].sort());
@@ -174,12 +174,12 @@ describe("registry: tool-flag uniqueness", () => {
     }));
   }
 
-  it("[step 9] only report-writer has omre_write_report === true", () => {
+  it("[step 9] only omre-report-writer has omre_write_report === true", () => {
     const slots = allSlots();
     const writers = slots.filter((s) => s.tools.omre_write_report === true).map((s) => s.name);
-    expect(writers).toEqual(["report-writer"]);
+    expect(writers).toEqual(["omre-report-writer"]);
     for (const s of slots) {
-      if (s.name !== "report-writer") {
+      if (s.name !== "omre-report-writer") {
         expect(s.tools.omre_write_report ?? false).toBe(false);
       }
     }
@@ -205,7 +205,7 @@ describe("registry: coordinator chat-only output contract [L3 fix]", () => {
   }
 
   const COORDINATOR_NAMES_FOR_CHAT = COORDINATOR_AGENTS
-    .filter((a) => a.name !== "report-writer")
+    .filter((a) => a.name !== "omre-report-writer")
     .map((a) => a.name);
 
   it.each(COORDINATOR_NAMES_FOR_CHAT)(
@@ -229,8 +229,8 @@ describe("registry: coordinator chat-only output contract [L3 fix]", () => {
     },
   );
 
-  it("report-writer prompt does NOT declare chat-only (it persists via omre_write_report)", () => {
-    const prompt = String(coordinatorSlot("report-writer").prompt ?? "");
+  it("omre-report-writer prompt does NOT declare chat-only (it persists via omre_write_report)", () => {
+    const prompt = String(coordinatorSlot("omre-report-writer").prompt ?? "");
     expect(prompt).not.toContain("Output exactly one JSON object as your entire chat reply");
   });
 });
@@ -238,15 +238,15 @@ describe("registry: coordinator chat-only output contract [L3 fix]", () => {
 describe("registry: behavioral guarantees", () => {
   it("[step 12] user override at config.agent[name] is preserved (skip-on-conflict)", () => {
     const userEntry = { prompt: "USER_OVERRIDE_MARKER" };
-    const config = { agent: { "reviewer-security": userEntry } } as unknown as Config;
+    const config = { agent: { "omre-reviewer-security": userEntry } } as unknown as Config;
 
     const result = registerAgents(config, freshOmreConfig());
 
-    const slot = (config.agent as Record<string, unknown>)["reviewer-security"];
+    const slot = (config.agent as Record<string, unknown>)["omre-reviewer-security"];
     expect(slot).toBe(userEntry);
     expect((slot as { prompt: string }).prompt).toBe("USER_OVERRIDE_MARKER");
-    expect(result.skipped).toContain("reviewer-security");
-    expect(result.registered).not.toContain("reviewer-security");
+    expect(result.skipped).toContain("omre-reviewer-security");
+    expect(result.registered).not.toContain("omre-reviewer-security");
     expect(result.registered.length).toBe(10);
   });
 

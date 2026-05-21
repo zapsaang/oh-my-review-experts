@@ -71,15 +71,15 @@ describe("buildReviewCodePrompt", () => {
   it("includes subagent catalog instead of inline reviewer prompts", () => {
     const bundle = buildReviewCodePrompt({ args: "", cwd: process.cwd() });
     expect(bundle.prompt).toContain("Available Subagents");
-    expect(bundle.prompt).toContain("reviewer-spec");
-    expect(bundle.prompt).toContain("reviewer-quality");
-    expect(bundle.prompt).toContain("reviewer-security");
-    expect(bundle.prompt).toContain("reviewer-performance");
-    expect(bundle.prompt).toContain("reviewer-concurrency");
-    expect(bundle.prompt).toContain("slice-planner");
-    expect(bundle.prompt).toContain("slice-arbiter");
-    expect(bundle.prompt).toContain("global-arbiter");
-    expect(bundle.prompt).toContain("report-writer");
+    expect(bundle.prompt).toContain("omre-reviewer-spec");
+    expect(bundle.prompt).toContain("omre-reviewer-quality");
+    expect(bundle.prompt).toContain("omre-reviewer-security");
+    expect(bundle.prompt).toContain("omre-reviewer-performance");
+    expect(bundle.prompt).toContain("omre-reviewer-concurrency");
+    expect(bundle.prompt).toContain("omre-slice-planner");
+    expect(bundle.prompt).toContain("omre-slice-arbiter");
+    expect(bundle.prompt).toContain("omre-global-arbiter");
+    expect(bundle.prompt).toContain("omre-report-writer");
   });
 
   it("describes orchestrator role", () => {
@@ -98,7 +98,7 @@ describe("buildReviewCodePrompt", () => {
     const afterExecution = bundle.prompt.split("Execution requirements:")[1] ?? "";
     const beforeDiff = afterExecution.split("Unified diff follows")[0] ?? "";
     const hasDirectGlobal = beforeDiff.includes("Run slice-level arbitration, then global arbitration.");
-    const hasPerSlice = beforeDiff.includes("For each slice, invoke a slice-arbiter");
+    const hasPerSlice = beforeDiff.includes("For each slice, invoke an omre-slice-arbiter");
     expect(hasDirectGlobal || hasPerSlice).toBe(true);
     expect(hasDirectGlobal && hasPerSlice).toBe(false);
   });
@@ -112,11 +112,11 @@ describe("buildReviewCodePrompt", () => {
     });
   });
 
-  it("[Fix 2-A] orchestrator prompt instructs delegating to report-writer with runId only", () => {
+  it("[Fix 2-A] orchestrator prompt instructs delegating to omre-report-writer with runId only", () => {
     withCleanGitRepo((cwd) => {
       clearLoadConfigCache();
       const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
-      expect(bundle.prompt).toMatch(/(Delegate|Invoke|Hand off)[^\n]*report-writer[^\n]*runId/i);
+      expect(bundle.prompt).toMatch(/(Delegate|Invoke|Hand off)[^\n]*omre-report-writer[^\n]*runId/i);
     });
   });
 
@@ -136,12 +136,12 @@ describe("buildReviewCodePrompt", () => {
     });
   });
 
-  it("[Fix 2-A] orchestrator prompt requires surfacing report-writer errors instead of falling back to write", () => {
+  it("[Fix 2-A] orchestrator prompt requires surfacing omre-report-writer errors instead of falling back to write", () => {
     withCleanGitRepo((cwd) => {
       clearLoadConfigCache();
       const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
       const executionBlock = getExecutionRequirements(bundle.prompt);
-      expect(executionBlock).toMatch(/surface.*error|report-writer.*error|do not retry|do not write.*directly/i);
+      expect(executionBlock).toMatch(/surface.*error|omre-report-writer.*error|do not retry|do not write.*directly/i);
     });
   });
 
@@ -152,7 +152,7 @@ describe("buildReviewCodePrompt", () => {
       expect(flatBundle.prompt).toContain("useHierarchicalArbitration: false");
       const flatExecution = getExecutionRequirements(flatBundle.prompt);
       expect(flatExecution).not.toMatch(/Call\s+[`']?omre_write_report[`']?\s+tool/i);
-      expect(flatExecution).toMatch(/(Delegate|Invoke|Hand off)[^\n]*report-writer[^\n]*runId/i);
+      expect(flatExecution).toMatch(/(Delegate|Invoke|Hand off)[^\n]*omre-report-writer[^\n]*runId/i);
     });
 
     withHierarchicalRepo((cwd) => {
@@ -161,7 +161,7 @@ describe("buildReviewCodePrompt", () => {
       expect(hierBundle.prompt).toContain("useHierarchicalArbitration: true");
       const hierExecution = getExecutionRequirements(hierBundle.prompt);
       expect(hierExecution).not.toMatch(/Call\s+[`']?omre_write_report[`']?\s+tool/i);
-      expect(hierExecution).toMatch(/(Delegate|Invoke|Hand off)[^\n]*report-writer[^\n]*runId/i);
+      expect(hierExecution).toMatch(/(Delegate|Invoke|Hand off)[^\n]*omre-report-writer[^\n]*runId/i);
     });
   });
 });

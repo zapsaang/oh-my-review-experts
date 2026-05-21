@@ -228,21 +228,21 @@ describe("buildSubagentCatalog", () => {
   it("lists all reviewer subagents", () => {
     const catalog = buildSubagentCatalog();
     expect(catalog).toContain("Available Subagents");
-    expect(catalog).toContain("reviewer-spec");
-    expect(catalog).toContain("reviewer-quality");
-    expect(catalog).toContain("reviewer-security");
-    expect(catalog).toContain("reviewer-performance");
-    expect(catalog).toContain("reviewer-concurrency");
+    expect(catalog).toContain("omre-reviewer-spec");
+    expect(catalog).toContain("omre-reviewer-quality");
+    expect(catalog).toContain("omre-reviewer-security");
+    expect(catalog).toContain("omre-reviewer-performance");
+    expect(catalog).toContain("omre-reviewer-concurrency");
   });
 
   it("lists all coordination subagents", () => {
     const catalog = buildSubagentCatalog();
-    expect(catalog).toContain("slice-planner");
-    expect(catalog).toContain("slice-plan-validator");
-    expect(catalog).toContain("result-validator");
-    expect(catalog).toContain("slice-arbiter");
-    expect(catalog).toContain("global-arbiter");
-    expect(catalog).toContain("report-writer");
+    expect(catalog).toContain("omre-slice-planner");
+    expect(catalog).toContain("omre-slice-plan-validator");
+    expect(catalog).toContain("omre-result-validator");
+    expect(catalog).toContain("omre-slice-arbiter");
+    expect(catalog).toContain("omre-global-arbiter");
+    expect(catalog).toContain("omre-report-writer");
   });
 
   it("does not include full role prompts", () => {

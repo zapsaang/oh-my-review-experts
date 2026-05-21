@@ -20,7 +20,7 @@ function basePayload(overrides: Partial<HandoffPayload> = {}): HandoffPayload {
   return {
     schemaVersion: SCHEMA_VERSION,
     taskId: "task-rt-1",
-    agent: "reviewer-security",
+    agent: "omre-reviewer-security",
     dimension: "security",
     status: "completed",
     target: { kind: "working-tree", value: "src/auth.ts" },
@@ -94,7 +94,7 @@ describe("handoff roundtrip", () => {
   it("validate emits classification advisory for non-standard performance value", () => {
     withTempCwd((cwd) => {
       const payload = basePayload({
-        agent: "reviewer-performance",
+        agent: "omre-reviewer-performance",
         dimension: "performance",
         findings: [
           {

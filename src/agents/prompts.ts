@@ -29,9 +29,9 @@ Every finding must be evidence-backed and anchored to file:line when possible.
 
 /**
  * Coordinator-facing contract: bare JSON in chat, no markdown fences, no prose.
- * Used by slice-planner / slice-plan-validator / result-validator / slice-arbiter
- * / global-arbiter — agents that emit transient intermediate computations the
- * orchestrator consumes once in the same turn.
+* Used by omre-slice-planner / omre-slice-plan-validator / omre-result-validator / omre-slice-arbiter
+* / omre-global-arbiter — agents that emit transient intermediate computations the
+* orchestrator consumes once in the same turn.
  */
 export const CHAT_JSON_CONTRACT = `${BASE_JSON_RULES.trim()}
 Do not wrap JSON in markdown fences.
@@ -125,7 +125,7 @@ ${REVIEWER_HANDOFF_JSON}
 
 Rules for the JSON header:
 - "schema_version" MUST be "${SCHEMA_VERSION}".
-- "agent" MUST be your agent name (e.g., reviewer-security).
+- "agent" MUST be your agent name (e.g., omre-reviewer-security).
 - "dimension" MUST be your review dimension (e.g., security).
 - "status" MUST be "completed" or "blocked".
 - "findings" MUST be an array. If there are no findings, use an empty array [].
@@ -369,6 +369,6 @@ export function buildSubagentCatalog(): string {
 
 You may delegate to the following registered subagents (each runs with its own context, model, and tool whitelist):
 
-reviewer-spec, reviewer-quality, reviewer-security, reviewer-performance, reviewer-concurrency, slice-planner, slice-plan-validator, result-validator, slice-arbiter, global-arbiter, report-writer
+omre-reviewer-spec, omre-reviewer-quality, omre-reviewer-security, omre-reviewer-performance, omre-reviewer-concurrency, omre-slice-planner, omre-slice-plan-validator, omre-result-validator, omre-slice-arbiter, omre-global-arbiter, omre-report-writer
 `;
 }

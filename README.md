@@ -333,8 +333,8 @@ Written with `writeFileAtomicOverwrite` (temp + rename) for `latest.*`, and `O_E
 
 ```
 .omre/handoffs/20260507-183012-123/
-├── 20260507-183045-001-reviewer-security-auth.md
-├── 20260507-183047-002-reviewer-performance-queue.md
+├── 20260507-183045-001-omre-reviewer-security-auth.md
+├── 20260507-183047-002-omre-reviewer-performance-queue.md
 └── …
 ```
 

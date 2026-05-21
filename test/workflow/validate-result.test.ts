@@ -24,7 +24,7 @@ function createValidHandoff(): ReviewerHandoff {
   return {
     schema_version: SCHEMA_VERSION,
     task_id: "task-123",
-    agent: "reviewer-security",
+    agent: "omre-reviewer-security",
     dimension: "security",
     status: "completed",
     target: { kind: "working-tree", value: "src/auth.ts" },
@@ -200,7 +200,7 @@ describe("validateReviewerHandoff", () => {
 
   it("accepts valid performance classifications", () => {
     const handoff = createValidHandoff();
-    handoff.agent = "reviewer-performance";
+    handoff.agent = "omre-reviewer-performance";
     handoff.dimension = "performance";
     handoff.findings[0].classification = "provable-regression";
     const filePath = createMockHandoffFile(formatHandoff(handoff));
@@ -212,7 +212,7 @@ describe("validateReviewerHandoff", () => {
 
   it("accepts unknown performance classification with advisory warning", () => {
     const handoff = createValidHandoff();
-    handoff.agent = "reviewer-performance";
+    handoff.agent = "omre-reviewer-performance";
     handoff.dimension = "performance";
     handoff.findings[0].classification = "provable regression";
     const filePath = createMockHandoffFile(formatHandoff(handoff));
@@ -229,7 +229,7 @@ describe("validateReviewerHandoff", () => {
 
   it("accepts valid concurrency classifications", () => {
     const handoff = createValidHandoff();
-    handoff.agent = "reviewer-concurrency";
+    handoff.agent = "omre-reviewer-concurrency";
     handoff.dimension = "concurrency";
     handoff.findings[0].classification = "race-condition";
     const filePath = createMockHandoffFile(formatHandoff(handoff));
@@ -241,7 +241,7 @@ describe("validateReviewerHandoff", () => {
 
   it("accepts unknown concurrency classification with advisory warning", () => {
     const handoff = createValidHandoff();
-    handoff.agent = "reviewer-concurrency";
+    handoff.agent = "omre-reviewer-concurrency";
     handoff.dimension = "concurrency";
     handoff.findings[0].classification = "lost-update";
     const filePath = createMockHandoffFile(formatHandoff(handoff));
@@ -505,8 +505,8 @@ describe("NormalizedUnifiedHandoffSchema validation", () => {
     const raw: Record<string, unknown> = {
       schema_version: SCHEMA_VERSION,
       task_id: "task-123",
-      agent: "reviewer-security",
-      dimension: "security",
+    agent: "omre-reviewer-security",
+    dimension: "security",
       status: "completed",
       target: { kind: "working-tree", value: "src/auth.ts" },
       slice_id: "slice-1",
@@ -577,7 +577,7 @@ describe("UnifiedHandoffSchema direct validation", () => {
   const validHandoff = {
     schema_version: SCHEMA_VERSION,
     task_id: "task-123",
-    agent: "reviewer-security",
+    agent: "omre-reviewer-security",
     dimension: "security",
     status: "completed" as const,
     target: { kind: "working-tree", value: "src/auth.ts" },
@@ -603,7 +603,7 @@ describe("NormalizedUnifiedHandoffSchema direct validation", () => {
   const validHandoff = {
     schema_version: SCHEMA_VERSION,
     task_id: "task-123",
-    agent: "reviewer-security",
+    agent: "omre-reviewer-security",
     dimension: "security",
     status: "completed" as const,
     target: { kind: "working-tree", value: "src/auth.ts" },

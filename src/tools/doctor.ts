@@ -133,13 +133,13 @@ const REQUIRED_AGENT_PERMISSION_DENIES = ["bash", "edit", "webfetch", "websearch
 
 const WRITER_RULES = {
   omre_write_handoff: [
-    "reviewer-spec",
-    "reviewer-quality",
-    "reviewer-security",
-    "reviewer-performance",
-    "reviewer-concurrency",
+    "omre-reviewer-spec",
+    "omre-reviewer-quality",
+    "omre-reviewer-security",
+    "omre-reviewer-performance",
+    "omre-reviewer-concurrency",
   ],
-  omre_write_report: ["report-writer"],
+  omre_write_report: ["omre-report-writer"],
 } as const satisfies Record<string, readonly string[]>;
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {

@@ -11,7 +11,7 @@ import { parseHandoffJsonHeader } from "../tools/handoff.js";
  * Reads every reviewer handoff under `.omre/handoffs/{runId}/`, merges them
  * deterministically into a single review report, and persists the result via
  * `writeReport`. This is the destination of the `omre_finalize_review` plugin
- * tool: the report-writer subagent calls the tool with a runId, and this
+ * tool: the omre-report-writer subagent calls the tool with a runId, and this
  * module assembles canonical Markdown and JSON from the handoff files —
  * keeping report assembly out of LLM hands while still reusing the existing
  * `writeReport` validation, atomic-write, and history pipeline.

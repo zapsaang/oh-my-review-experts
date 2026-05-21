@@ -1,7 +1,7 @@
 {
   "schema_version": "2",
   "task_id": "task-123",
-  "agent": "reviewer-security",
+  "agent": "omre-reviewer-security",
   "dimension": "security",
   "status": "completed",
   "target": { "kind": "working-tree", "value": "src/example.ts" },

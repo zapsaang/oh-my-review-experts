@@ -45,13 +45,13 @@ describe("[step 17] config hook registers all 11 review subagents", () => {
     const userOverride = { prompt: "USER_OVERRIDE_MARKER" };
     const config = {
       agent: {
-        "reviewer-security": userOverride,
+        "omre-reviewer-security": userOverride,
       },
     } as Config;
     await hooks.config!(config);
 
-    expect(config.agent!["reviewer-security"]).toBe(userOverride);
-    expect(config.agent!["reviewer-security"]!.prompt).toBe("USER_OVERRIDE_MARKER");
+    expect(config.agent!["omre-reviewer-security"]).toBe(userOverride);
+    expect(config.agent!["omre-reviewer-security"]!.prompt).toBe("USER_OVERRIDE_MARKER");
     expect(Object.keys(config.agent!).length).toBe(AGENT_NAMES.length);
   });
 
@@ -83,10 +83,10 @@ describe("config hook auto provider inference", () => {
       } as Config;
       await hooks.config!(config);
 
-      expect(config.agent!["reviewer-spec"]!.model).toBe("anthropic/claude-opus-4-7");
-      expect(config.agent!["report-writer"]!.model).toBe("anthropic/claude-haiku-4-5");
-      expect(config.agent!["slice-plan-validator"]!.model).toBe("anthropic/claude-haiku-4-5");
-      expect(config.agent!["result-validator"]!.model).toBe("anthropic/claude-haiku-4-5");
+      expect(config.agent!["omre-reviewer-spec"]!.model).toBe("anthropic/claude-opus-4-7");
+      expect(config.agent!["omre-report-writer"]!.model).toBe("anthropic/claude-haiku-4-5");
+      expect(config.agent!["omre-slice-plan-validator"]!.model).toBe("anthropic/claude-haiku-4-5");
+      expect(config.agent!["omre-result-validator"]!.model).toBe("anthropic/claude-haiku-4-5");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -102,8 +102,8 @@ describe("config hook auto provider inference", () => {
       } as Config;
       await hooks.config!(config);
 
-      expect(config.agent!["report-writer"]!.model).toBe("openai/gpt-5.4-mini");
-      expect(config.agent!["reviewer-spec"]!.model).toBe("openai/gpt-5.5");
+      expect(config.agent!["omre-report-writer"]!.model).toBe("openai/gpt-5.4-mini");
+      expect(config.agent!["omre-reviewer-spec"]!.model).toBe("openai/gpt-5.5");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -124,9 +124,9 @@ describe("config hook auto provider inference", () => {
       } as Config;
       await hooks.config!(config);
 
-      expect(config.agent!["reviewer-spec"]!.model).toBe("google/gemini-2.5-pro");
-      expect(config.agent!["slice-plan-validator"]!.model).toBe("google/gemini-2.5-flash-lite");
-      expect(config.agent!["result-validator"]!.model).toBe("google/gemini-2.5-flash-lite");
+      expect(config.agent!["omre-reviewer-spec"]!.model).toBe("google/gemini-2.5-pro");
+      expect(config.agent!["omre-slice-plan-validator"]!.model).toBe("google/gemini-2.5-flash-lite");
+      expect(config.agent!["omre-result-validator"]!.model).toBe("google/gemini-2.5-flash-lite");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -147,8 +147,8 @@ describe("config hook auto provider inference", () => {
       } as Config;
       await hooks.config!(config);
 
-      expect(config.agent!["reviewer-spec"]!.model).toBe("custom/x");
-      expect(config.agent!["report-writer"]!.model).toBe("anthropic/claude-haiku-4-5");
+      expect(config.agent!["omre-reviewer-spec"]!.model).toBe("custom/x");
+      expect(config.agent!["omre-report-writer"]!.model).toBe("anthropic/claude-haiku-4-5");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

@@ -75,7 +75,7 @@ function buildHandoffJsonHeader(
   const base = {
     schema_version: "1",
     task_id: "task-123",
-    agent: "reviewer-security",
+    agent: "omre-reviewer-security",
     dimension: "security",
     status: "completed",
     target: { kind: "working-tree", value: "src/auth.ts" },
@@ -124,11 +124,11 @@ describe("finalizeReview [Fix 2-B RED]", () => {
     try {
       const runId = "run-20260519-test";
       writeHandoffFile(cwd, runId, "handoff-1.md", {
-        agent: "reviewer-security",
+        agent: "omre-reviewer-security",
         dimension: "security",
       });
       writeHandoffFile(cwd, runId, "handoff-2.md", {
-        agent: "reviewer-quality",
+        agent: "omre-reviewer-quality",
         dimension: "quality",
       });
 
@@ -184,7 +184,7 @@ describe("finalizeReview [Fix 2-B RED]", () => {
     try {
       const runId = "run-deterministic";
       const overrides = {
-        agent: "reviewer-spec",
+        agent: "omre-reviewer-spec",
         dimension: "spec",
       };
       writeHandoffFile(cwd1, runId, "handoff-1.md", overrides);
@@ -224,7 +224,7 @@ describe("finalizeReview [Fix 2-B RED]", () => {
     try {
       const runId = "run-degraded";
       writeHandoffFile(cwd, runId, "handoff-1.md", {
-        agent: "reviewer-performance",
+        agent: "omre-reviewer-performance",
         dimension: "performance",
         meta: {
           total_findings: 0,
