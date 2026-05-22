@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { OmreConfigSchema, DEFAULT_CONFIG, ReviewDimension, SliceType, sanitizeDefaultModel } from "../../src/config/schema.js";
+import { OmreConfigSchema, AgentConfigSchema, DEFAULT_CONFIG, ReviewDimension, SliceType, sanitizeDefaultModel } from "../../src/config/schema.js";
 
 describe("OmreConfigSchema", () => {
   it("parses empty object with defaults", () => {
@@ -250,5 +250,69 @@ describe("OmreConfigSchema provider field", () => {
   it("accepts disable_provider_inference true", () => {
     const result = OmreConfigSchema.parse({ disable_provider_inference: true });
     expect(result.disable_provider_inference).toBe(true);
+  });
+});
+
+describe("AgentConfigSchema", () => {
+  it("accepts a minimal agent config with model only", () => {
+    const result = OmreConfigSchema.parse({ agents: { "omre-reviewer-spec": { model: "anthropic/claude-opus-4-7" } } });
+    expect(result.agents?.["omre-reviewer-spec"].model).toBe("anthropic/claude-opus-4-7");
+  });
+
+  it("accepts all valid parameters", () => {
+    const result = OmreConfigSchema.parse({
+      agents: {
+        "omre-reviewer-spec": {
+          model: "anthropic/claude-opus-4-7",
+          variant: "max",
+          temperature: 0.7,
+          top_p: 0.9,
+        },
+      },
+    });
+    expect(result.agents?.["omre-reviewer-spec"].variant).toBe("max");
+    expect(result.agents?.["omre-reviewer-spec"].temperature).toBe(0.7);
+    expect(result.agents?.["omre-reviewer-spec"].top_p).toBe(0.9);
+  });
+
+  it("rejects unknown agent names", () => {
+    const result = OmreConfigSchema.safeParse({ agents: { "omre-reviewer-typo": { model: "x" } } });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid variant values", () => {
+    const result = AgentConfigSchema.safeParse({ model: "x", variant: "ultra" });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts temperature: 0", () => {
+    const result = AgentConfigSchema.safeParse({ model: "x", temperature: 0 });
+    expect(result.success).toBe(true);
+    expect(result.data?.temperature).toBe(0);
+  });
+
+  it("accepts top_p: 0", () => {
+    const result = AgentConfigSchema.safeParse({ model: "x", top_p: 0 });
+    expect(result.success).toBe(true);
+    expect(result.data?.top_p).toBe(0);
+  });
+});
+
+describe("OmreConfigSchema agents field", () => {
+  it("default is empty object when not provided", () => {
+    const result = OmreConfigSchema.parse({});
+    expect(result.agents).toEqual({});
+  });
+
+  it("parses empty agents object", () => {
+    const result = OmreConfigSchema.parse({ agents: {} });
+    expect(result.agents).toEqual({});
+  });
+
+  it("strips unknown top-level keys (old models, provider, disable_provider_inference)", () => {
+    const result = OmreConfigSchema.parse({ models: { spec: "x" }, provider: "anthropic", disable_provider_inference: true });
+    expect((result as any).models).toBeUndefined();
+    expect((result as any).provider).toBeUndefined();
+    expect((result as any).disable_provider_inference).toBeUndefined();
   });
 });

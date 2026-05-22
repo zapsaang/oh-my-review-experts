@@ -75,115 +75,105 @@ describe("doctor CLI", () => {
     );
   });
 
-  it("prints inferred provider from opencode.json model field", () => {
-    const captured = captureOutput();
-    const tmpDir = fs.mkdtempSync(".omre-doctor-test-");
-    try {
-      fs.writeFileSync(path.join(tmpDir, "opencode.json"), JSON.stringify({ model: "anthropic/claude-opus-4-7" }));
-      runDoctor({ cwd: tmpDir, output: captured.output, contractChecks: cleanContractChecks });
-      const text = stripAnsi(captured.lines.join("\n"));
-      expect(text).toContain("Inferred provider: anthropic");
-      expect(text).toContain("(source: opencode-config)");
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
-  });
+describe("doctor agent runtime models table", () => {
+    it("shows all agents with default source when no config", () => {
+      const captured = captureOutput();
+      const tmpDir = fs.mkdtempSync(".omre-doctor-test-");
+      try {
+        runDoctor({ cwd: tmpDir, output: captured.output, contractChecks: cleanContractChecks });
+        const text = stripAnsi(captured.lines.join("\n"));
+        expect(text).toContain("Agent runtime models:");
+        expect(text).toContain("Agent");
+        expect(text).toContain("Model");
+        expect(text).toContain("Tier");
+        expect(text).toContain("Parameters");
+        expect(text).toContain("Source");
+        expect(text).toContain("default");
+        expect(text).toContain("omre-reviewer-spec");
+        expect(text).toContain("omre-reviewer-quality");
+        expect(text).toContain("omre-reviewer-security");
+        expect(text).toContain("omre-reviewer-performance");
+        expect(text).toContain("omre-reviewer-concurrency");
+        expect(text).toContain("omre-slice-planner");
+        expect(text).toContain("omre-slice-plan-validator");
+        expect(text).toContain("omre-result-validator");
+        expect(text).toContain("omre-slice-arbiter");
+        expect(text).toContain("omre-global-arbiter");
+        expect(text).toContain("omre-report-writer");
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
 
-  it("prints inferred provider when opencode.json has a model with provider prefix", () => {
-    const captured = captureOutput();
-    const tmpDir = fs.mkdtempSync(".omre-doctor-test-");
-    const opencodePath = path.join(tmpDir, "opencode.json");
-    fs.writeFileSync(opencodePath, JSON.stringify({ model: "anthropic/claude-opus-4-7" }), "utf8");
+    it("shows config source for explicitly configured agents", () => {
+      const captured = captureOutput();
+      const tmpDir = fs.mkdtempSync(".omre-doctor-test-");
+      const omreConfigPath = path.join(tmpDir, ".opencode");
+      fs.mkdirSync(omreConfigPath, { recursive: true });
+      fs.writeFileSync(
+        path.join(omreConfigPath, "oh-my-review-experts.jsonc"),
+        JSON.stringify({ agents: { "omre-reviewer-spec": { model: "a/b" } } }),
+        "utf8"
+      );
 
-    try {
-      runDoctor({ cwd: tmpDir, output: captured.output, contractChecks: cleanContractChecks });
-      const text = stripAnsi(captured.lines.join("\n"));
-      expect(text).toContain("Inferred provider: anthropic");
-      expect(text).toContain("spec           → anthropic/claude-opus-4-7");
-      expect(text).toContain("reportWriter   → anthropic/claude-haiku-4-5");
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
-  });
+      try {
+        runDoctor({ cwd: tmpDir, output: captured.output, contractChecks: cleanContractChecks });
+        const text = stripAnsi(captured.lines.join("\n"));
+        expect(text).toContain("Agent runtime models:");
+        // "config" must appear in the table as a Source value, not just in "Config files:"
+        const tableSection = text.split("Agent runtime models:")[1]?.split("Provider inference:")[0] ?? "";
+        expect(tableSection).toContain("config");
+        expect(text).toContain("default");
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
 
-  it("prints Agent runtime models table with all agents", () => {
-    const captured = captureOutput();
-    const tmpDir = fs.mkdtempSync(".omre-doctor-test-");
-    const opencodePath = path.join(tmpDir, "opencode.json");
-    fs.writeFileSync(opencodePath, JSON.stringify({ model: "anthropic/claude-opus-4-7" }), "utf8");
+    it("does not show provider inference section", () => {
+      const captured = captureOutput();
+      const tmpDir = fs.mkdtempSync(".omre-doctor-test-");
+      const opencodePath = path.join(tmpDir, "opencode.json");
+      fs.writeFileSync(opencodePath, JSON.stringify({ model: "anthropic/claude-opus-4-7" }), "utf8");
 
-    try {
-      runDoctor({ cwd: tmpDir, output: captured.output, contractChecks: cleanContractChecks });
-      const text = stripAnsi(captured.lines.join("\n"));
-      expect(text).toContain("Agent runtime models:");
-      expect(text).toContain("Agent");
-      expect(text).toContain("Model");
-      expect(text).toContain("Tier");
-      expect(text).toContain("Source");
-      expect(text).toContain("omre-reviewer-spec");
-      expect(text).toContain("omre-reviewer-quality");
-      expect(text).toContain("omre-reviewer-security");
-      expect(text).toContain("omre-reviewer-performance");
-      expect(text).toContain("omre-reviewer-concurrency");
-      expect(text).toContain("omre-slice-planner");
-      expect(text).toContain("omre-slice-plan-validator");
-      expect(text).toContain("omre-result-validator");
-      expect(text).toContain("omre-slice-arbiter");
-      expect(text).toContain("omre-global-arbiter");
-      expect(text).toContain("omre-report-writer");
-      expect(text).toContain("anthropic/claude-opus-4-7");
-      expect(text).toContain("anthropic/claude-haiku-4-5");
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
-  });
+      try {
+        runDoctor({ cwd: tmpDir, output: captured.output, contractChecks: cleanContractChecks });
+        const text = stripAnsi(captured.lines.join("\n"));
+        expect(text).not.toContain("Inferred provider");
+        expect(text).not.toContain("Provider inference");
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
 
-  it("shows explicit source for user-configured models", () => {
-    const captured = captureOutput();
-    const tmpDir = fs.mkdtempSync(".omre-doctor-test-");
-    const opencodePath = path.join(tmpDir, "opencode.json");
-    fs.writeFileSync(opencodePath, JSON.stringify({ model: "anthropic/claude-opus-4-7" }), "utf8");
-    
-    const omreConfigPath = path.join(tmpDir, ".opencode");
-    fs.mkdirSync(omreConfigPath, { recursive: true });
-    fs.writeFileSync(
-      path.join(omreConfigPath, "oh-my-review-experts.jsonc"),
-      JSON.stringify({ models: { spec: "openai/gpt-5.5" } }),
-      "utf8"
-    );
+    it("warns when agent is configured in both opencode.json and OMRE config", () => {
+      const captured = captureOutput();
+      const tmpDir = fs.mkdtempSync(".omre-doctor-test-");
+      const opencodePath = path.join(tmpDir, "opencode.json");
+      fs.writeFileSync(
+        opencodePath,
+        JSON.stringify({
+          model: "anthropic/claude-opus-4-7",
+          agents: { "omre-reviewer-spec": { model: "openai/gpt-5.5" } },
+        }),
+        "utf8"
+      );
+      const omreConfigPath = path.join(tmpDir, ".opencode");
+      fs.mkdirSync(omreConfigPath, { recursive: true });
+      fs.writeFileSync(
+        path.join(omreConfigPath, "oh-my-review-experts.jsonc"),
+        JSON.stringify({ agents: { "omre-reviewer-spec": { model: "a/b" } } }),
+        "utf8"
+      );
 
-    try {
-      runDoctor({ cwd: tmpDir, output: captured.output, contractChecks: cleanContractChecks });
-      const text = stripAnsi(captured.lines.join("\n"));
-      expect(text).toContain("openai/gpt-5.5");
-      expect(text).toContain("explicit");
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  it("shows default source when provider inference is disabled", () => {
-    const captured = captureOutput();
-    const tmpDir = fs.mkdtempSync(".omre-doctor-test-");
-    const opencodePath = path.join(tmpDir, "opencode.json");
-    fs.writeFileSync(opencodePath, JSON.stringify({ model: "anthropic/claude-opus-4-7" }), "utf8");
-    
-    // Create OMRE config with disabled provider inference
-    const omreConfigPath = path.join(tmpDir, ".opencode");
-    fs.mkdirSync(omreConfigPath, { recursive: true });
-    fs.writeFileSync(
-      path.join(omreConfigPath, "oh-my-review-experts.jsonc"),
-      JSON.stringify({ disable_provider_inference: true }),
-      "utf8"
-    );
-
-    try {
-      runDoctor({ cwd: tmpDir, output: captured.output, contractChecks: cleanContractChecks });
-      const text = stripAnsi(captured.lines.join("\n"));
-      expect(text).toContain("Agent runtime models:");
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
+      try {
+        runDoctor({ cwd: tmpDir, output: captured.output, contractChecks: cleanContractChecks });
+        const text = stripAnsi(captured.lines.join("\n"));
+        expect(text).toMatch(/warn/i);
+        expect(text).toMatch(/configured in both|opencode\.json/i);
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
   });
 });
 

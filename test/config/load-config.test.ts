@@ -206,6 +206,70 @@ describe("defaultConfigJsonc", () => {
   });
 });
 
+describe("agents field deep-merge", () => {
+  beforeEach(() => {
+    clearLoadConfigCache();
+  });
+
+  it("merges agents across config files", () => {
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), ".omre-test-"));
+    const file1 = path.join(tmpDir, ".opencode", "oh-my-review-experts.jsonc");
+    const file2 = path.join(tmpDir, ".omre", "config.json");
+
+    fs.mkdirSync(path.dirname(file1), { recursive: true });
+    fs.writeFileSync(file1, JSON.stringify({ agents: { "omre-reviewer-spec": { model: "a/b" } } }), "utf8");
+
+    fs.mkdirSync(path.dirname(file2), { recursive: true });
+    fs.writeFileSync(file2, JSON.stringify({ agents: { "omre-reviewer-quality": { model: "c/d" } } }), "utf8");
+
+    try {
+      const config = loadConfig(tmpDir, true);
+      expect(config.agents).toBeDefined();
+      expect(config.agents["omre-reviewer-spec"]).toEqual({ model: "a/b" });
+      expect(config.agents["omre-reviewer-quality"]).toEqual({ model: "c/d" });
+    } finally {
+      try { fs.unlinkSync(file1); } catch { /* ignore */ }
+      try { fs.rmdirSync(path.dirname(file1)); } catch { /* ignore */ }
+      try { fs.unlinkSync(file2); } catch { /* ignore */ }
+      try { fs.rmdirSync(path.dirname(file2)); } catch { /* ignore */ }
+      try { fs.rmdirSync(tmpDir); } catch { /* ignore */ }
+    }
+  });
+
+  it("later config file overrides agent model but preserves other parameters", () => {
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), ".omre-test-"));
+    const file1 = path.join(tmpDir, ".opencode", "oh-my-review-experts.jsonc");
+    const file2 = path.join(tmpDir, ".omre", "config.json");
+
+    fs.mkdirSync(path.dirname(file1), { recursive: true });
+    fs.writeFileSync(file1, JSON.stringify({ agents: { "omre-reviewer-spec": { model: "a/b", variant: "max" } } }), "utf8");
+
+    fs.mkdirSync(path.dirname(file2), { recursive: true });
+    fs.writeFileSync(file2, JSON.stringify({ agents: { "omre-reviewer-spec": { model: "c/d" } } }), "utf8");
+
+    try {
+      const config = loadConfig(tmpDir, true);
+      expect(config.agents).toBeDefined();
+      expect(config.agents["omre-reviewer-spec"]).toEqual({ model: "c/d", variant: "max" });
+    } finally {
+      try { fs.unlinkSync(file1); } catch { /* ignore */ }
+      try { fs.rmdirSync(path.dirname(file1)); } catch { /* ignore */ }
+      try { fs.unlinkSync(file2); } catch { /* ignore */ }
+      try { fs.rmdirSync(path.dirname(file2)); } catch { /* ignore */ }
+      try { fs.rmdirSync(tmpDir); } catch { /* ignore */ }
+    }
+  });
+
+  it("defaultConfigJsonc() emits agents: {}", () => {
+    const jsonc = defaultConfigJsonc();
+    const parsed = JSON.parse(jsonc);
+    expect(parsed).toHaveProperty("agents", {});
+    expect(parsed).not.toHaveProperty("models");
+    expect(parsed).not.toHaveProperty("provider");
+    expect(parsed).not.toHaveProperty("disable_provider_inference");
+  });
+});
+
 describe("loadConfigWithOverrides", () => {
   beforeEach(() => {
     clearLoadConfigCache();
