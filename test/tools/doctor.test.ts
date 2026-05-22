@@ -240,10 +240,9 @@ describe("checkPromptExampleSchemaIdentity", () => {
 });
 
 describe("checkAgentToolWhitelist", () => {
-  function fakeAgent(name: string, toolsAllow: readonly string[]): AgentRegistration {
+  function fakeAgent(name: AgentRegistration["name"], toolsAllow: readonly string[]): AgentRegistration {
     return {
       name,
-      modelKey: "spec",
       staticPrompt: "test prompt",
       description: "test agent",
       toolsAllow,
@@ -263,7 +262,7 @@ describe("checkAgentToolWhitelist", () => {
 
   it("warns when an agent allows tools from the forbidden baseline", () => {
     const warnings = checkAgentToolWhitelistForAgents(
-      [fakeAgent("bad-reviewer", ["read", "bash", "edit"])],
+      [fakeAgent("bad-reviewer" as AgentRegistration["name"], ["read", "bash", "edit"])],
       { "bad-reviewer": requiredDenies },
     );
 

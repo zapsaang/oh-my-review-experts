@@ -81,25 +81,13 @@ describe.each(AGENT_NAMES)("registry: agent %s shape", (name) => {
     expect(slot.disable).toBe(false);
   });
 
-  it("[step 5] model === omreConfig.models[modelKey]", () => {
+  it("[step 5] model resolves from agents[name] or DEFAULT_MODEL", () => {
     const omre = freshOmreConfig();
-    omre.models.spec = "test-model-spec";
-    omre.models.quality = "test-model-quality";
-    omre.models.security = "test-model-security";
-    omre.models.performance = "test-model-performance";
-    omre.models.concurrency = "test-model-concurrency";
-    omre.models.slicePlanner = "test-model-slicePlanner";
-    omre.models.validator = "test-model-validator";
-    omre.models.sliceArbiter = "test-model-sliceArbiter";
-    omre.models.globalArbiter = "test-model-globalArbiter";
-    omre.models.reportWriter = "test-model-reportWriter";
-
+    omre.agents["omre-reviewer-spec"] = { model: "test-model-spec" };
     const config = freshConfig();
     registerAgents(config, omre);
-    const entry = ALL_AGENTS.find((a) => a.name === name);
-    expect(entry).toBeDefined();
-    const slot = (config.agent as Record<string, unknown>)[name] as Record<string, unknown>;
-    expect(slot.model).toBe(omre.models[entry!.modelKey]);
+    const slot = (config.agent as Record<string, unknown>)["omre-reviewer-spec"] as Record<string, unknown>;
+    expect(slot.model).toBe("test-model-spec");
   });
 
   it("[step 7] prompt does not contain a runId timestamp", () => {
@@ -190,7 +178,7 @@ describe("registry: tool-flag uniqueness", () => {
     const writers = slots.filter((s) => s.tools.omre_write_handoff === true).map((s) => s.name).sort();
     expect(writers).toEqual([...REVIEWER_NAMES].sort());
     for (const s of slots) {
-      if (!REVIEWER_NAMES.includes(s.name)) {
+      if (!REVIEWER_NAMES.includes(s.name as typeof REVIEWER_NAMES[number])) {
         expect(s.tools.omre_write_handoff ?? false).toBe(false);
       }
     }

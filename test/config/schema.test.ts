@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { OmreConfigSchema, AgentConfigSchema, DEFAULT_CONFIG, ReviewDimension, SliceType, sanitizeDefaultModel } from "../../src/config/schema.js";
+import { OmreConfigSchema, AgentConfigSchema, DEFAULT_CONFIG, ReviewDimension, SliceType } from "../../src/config/schema.js";
 
 describe("OmreConfigSchema", () => {
   it("parses empty object with defaults", () => {
@@ -15,7 +15,6 @@ describe("OmreConfigSchema", () => {
     const cfg = {
       enabled: false,
       command: { enabled: false, name: "review", aliases: ["r"], injection: "disabled" },
-      models: { orchestrator: "gpt-4", spec: "gpt-4" },
       slicing: { enabled: false, maxSlices: 1, skipDocsOnly: false, skipTestOnlyHeavyReview: false, forceWholeTargetAboveSlices: 8 },
       partialRerun: { enabled: false, maxRetriesPerTask: 0 },
       costGuardrail: { enabled: false, maxEstimatedTasks: 10, compactModeThreshold: 5, hardStopThreshold: 20 },
@@ -25,7 +24,6 @@ describe("OmreConfigSchema", () => {
     const result = OmreConfigSchema.parse(cfg);
     expect(result.enabled).toBe(false);
     expect(result.command.name).toBe("review");
-    expect(result.models.orchestrator).toBe("gpt-4");
     expect(result.reviewers.default).toEqual(["spec", "security"]);
   });
 
@@ -66,12 +64,6 @@ describe("OmreConfigSchema", () => {
 
   it("rejects command alias with invalid characters", () => {
     expect(() => OmreConfigSchema.parse({ command: { aliases: ["rc", "review code"] } })).toThrow();
-  });
-
-  it("fills missing model fields with default", () => {
-    const result = OmreConfigSchema.parse({ models: { orchestrator: "custom-model" } });
-    expect(result.models.orchestrator).toBe("custom-model");
-    expect(result.models.spec).toBeDefined();
   });
 
   it("parses arbitration config with default hierarchicalThreshold", () => {
@@ -145,35 +137,6 @@ describe("SliceType enum", () => {
   });
 });
 
-describe("sanitizeDefaultModel", () => {
-  it("returns fallback for undefined", () => {
-    expect(sanitizeDefaultModel(undefined)).toBe("minimax-cn/MiniMax-M2.7");
-  });
-
-  it("returns fallback for empty string", () => {
-    expect(sanitizeDefaultModel("")).toBe("minimax-cn/MiniMax-M2.7");
-  });
-
-  it("strips control characters", () => {
-    expect(sanitizeDefaultModel("model\x01name")).toBe("modelname");
-    expect(sanitizeDefaultModel("model\x7fname")).toBe("modelname");
-  });
-
-  it("strips quotes and backslashes", () => {
-    expect(sanitizeDefaultModel('model"quoted"')).toBe("modelquoted");
-    expect(sanitizeDefaultModel("model'quoted'")).toBe("modelquoted");
-    expect(sanitizeDefaultModel("model\\backslash")).toBe("modelbackslash");
-  });
-
-  it("returns fallback when all characters are stripped", () => {
-    expect(sanitizeDefaultModel('\x00"\x01\\')).toBe("minimax-cn/MiniMax-M2.7");
-  });
-
-  it("returns clean string unchanged", () => {
-    expect(sanitizeDefaultModel("custom-model-v2")).toBe("custom-model-v2");
-  });
-});
-
 describe("Forbidden command names", () => {
   it("rejects command name constructor with custom code", () => {
     const result = OmreConfigSchema.safeParse({ command: { name: "constructor" } });
@@ -231,32 +194,10 @@ describe("Forbidden command names", () => {
   });
 });
 
-describe("OmreConfigSchema provider field", () => {
-  it("parses empty object with provider and disable_provider_inference undefined", () => {
-    const result = OmreConfigSchema.parse({});
-    expect(result.provider).toBeUndefined();
-    expect(result.disable_provider_inference).toBeUndefined();
-  });
-
-  it("accepts valid provider value", () => {
-    const result = OmreConfigSchema.parse({ provider: "openai" });
-    expect(result.provider).toBe("openai");
-  });
-
-  it("rejects empty provider string", () => {
-    expect(() => OmreConfigSchema.parse({ provider: "" })).toThrow();
-  });
-
-  it("accepts disable_provider_inference true", () => {
-    const result = OmreConfigSchema.parse({ disable_provider_inference: true });
-    expect(result.disable_provider_inference).toBe(true);
-  });
-});
-
 describe("AgentConfigSchema", () => {
   it("accepts a minimal agent config with model only", () => {
     const result = OmreConfigSchema.parse({ agents: { "omre-reviewer-spec": { model: "anthropic/claude-opus-4-7" } } });
-    expect(result.agents?.["omre-reviewer-spec"].model).toBe("anthropic/claude-opus-4-7");
+    expect(result.agents["omre-reviewer-spec"]!.model).toBe("anthropic/claude-opus-4-7");
   });
 
   it("accepts all valid parameters", () => {
@@ -270,9 +211,10 @@ describe("AgentConfigSchema", () => {
         },
       },
     });
-    expect(result.agents?.["omre-reviewer-spec"].variant).toBe("max");
-    expect(result.agents?.["omre-reviewer-spec"].temperature).toBe(0.7);
-    expect(result.agents?.["omre-reviewer-spec"].top_p).toBe(0.9);
+    const agent = result.agents["omre-reviewer-spec"]!;
+    expect(agent.variant).toBe("max");
+    expect(agent.temperature).toBe(0.7);
+    expect(agent.top_p).toBe(0.9);
   });
 
   it("rejects unknown agent names", () => {

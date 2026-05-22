@@ -5,10 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0]
 
-### Added
-- Auto provider inference: when an OpenCode-level provider is configured, OMRE picks tier-appropriate per-agent models automatically. New optional config fields: `provider` and `disable_provider_inference`.
+### Breaking Changes
+- **Removed tier-based `models.*` configuration.** OMRE no longer uses abstract model keys (`spec`, `quality`, `security`, etc.). Configure agents directly by name in the new `agents` field.
+- **Removed provider inference.** The `provider` and `disable_provider_inference` fields are deleted. OMRE no longer attempts to guess your provider from `opencode.json`.
+- **Removed `models.orchestrator`.** This deprecated field had no consumer and is now fully removed.
+- **Removed `ModelKey` type and `modelKey` field.** Agent registrations no longer carry a `modelKey`; they are configured directly by `name`.
+
+### Migration
+- Rename `models.spec` → `agents["omre-reviewer-spec"].model`
+- Rename `models.quality` → `agents["omre-reviewer-quality"].model`
+- Rename `models.security` → `agents["omre-reviewer-security"].model`
+- Rename `models.performance` → `agents["omre-reviewer-performance"].model`
+- Rename `models.concurrency` → `agents["omre-reviewer-concurrency"].model`
+- Rename `models.slicePlanner` → `agents["omre-slice-planner"].model`
+- Rename `models.validator` → `agents["omre-slice-plan-validator"].model` AND `agents["omre-result-validator"].model`
+- Rename `models.sliceArbiter` → `agents["omre-slice-arbiter"].model`
+- Rename `models.globalArbiter` → `agents["omre-global-arbiter"].model`
+- Rename `models.reportWriter` → `agents["omre-report-writer"].model`
+- Delete `provider` and `disable_provider_inference` fields
 
 ## [0.1.8] — 2026-05-19
 

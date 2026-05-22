@@ -159,7 +159,25 @@ Load order (later wins):
 5. `.omre/config.jsonc`
 6. `.omre/config.json`
 
-Full schema:
+### Agent reference
+
+All 11 agents must be referenced by exact name when configuring them in the `agents` field:
+
+| Agent name | Role |
+|---|---|
+| `omre-reviewer-spec` | Contract drift, breaking changes, missing requirements |
+| `omre-reviewer-quality` | Readability, maintainability, duplication, dead paths |
+| `omre-reviewer-security` | Injection, authz gaps, unsafe crypto, leaked secrets |
+| `omre-reviewer-performance` | Hot-path allocations, N+1, bad complexity |
+| `omre-reviewer-concurrency` | Races, deadlocks, ordering hazards, cancellation bugs |
+| `omre-slice-planner` | Classifies changed files into slices |
+| `omre-slice-plan-validator` | Validates slice plan output |
+| `omre-result-validator` | Validates reviewer handoff output |
+| `omre-slice-arbiter` | Merges findings within a slice |
+| `omre-global-arbiter` | Merges findings across slices |
+| `omre-report-writer` | Persists final report |
+
+### Full schema
 
 ```jsonc
 {
@@ -172,17 +190,18 @@ Full schema:
     "injection": "both",
     "scopeResolution": "auto"
   },
-  "models": {
-    "spec":           "minimax-cn/MiniMax-M2.7",
-    "quality":        "minimax-cn/MiniMax-M2.7",
-    "security":       "minimax-cn/MiniMax-M2.7",
-    "performance":    "minimax-cn/MiniMax-M2.7",
-    "concurrency":    "minimax-cn/MiniMax-M2.7",
-    "slicePlanner":   "minimax-cn/MiniMax-M2.7",
-    "validator":      "minimax-cn/MiniMax-M2.7",
-    "sliceArbiter":   "minimax-cn/MiniMax-M2.7",
-    "globalArbiter":  "minimax-cn/MiniMax-M2.7",
-    "reportWriter":   "minimax-cn/MiniMax-M2.7"
+  "agents": {
+    "omre-reviewer-spec":         { "model": "minimax-cn/MiniMax-M2.7" },
+    "omre-reviewer-quality":      { "model": "minimax-cn/MiniMax-M2.7" },
+    "omre-reviewer-security":     { "model": "minimax-cn/MiniMax-M2.7" },
+    "omre-reviewer-performance":   { "model": "minimax-cn/MiniMax-M2.7" },
+    "omre-reviewer-concurrency":   { "model": "minimax-cn/MiniMax-M2.7" },
+    "omre-slice-planner":          { "model": "minimax-cn/MiniMax-M2.7" },
+    "omre-slice-plan-validator":   { "model": "minimax-cn/MiniMax-M2.7" },
+    "omre-result-validator":       { "model": "minimax-cn/MiniMax-M2.7" },
+    "omre-slice-arbiter":          { "model": "minimax-cn/MiniMax-M2.7" },
+    "omre-global-arbiter":        { "model": "minimax-cn/MiniMax-M2.7" },
+    "omre-report-writer":         { "model": "minimax-cn/MiniMax-M2.7" }
   },
   "slicing": {
     "enabled": true,
@@ -215,8 +234,6 @@ Full schema:
     "enabled": true,
     "directory": ".omre/handoffs"
   },
-  // "provider": "anthropic",           // optional: force a specific provider for auto model selection
-  // "disable_provider_inference": true, // optional: kill switch for provider inference
   "reviewers": {
     "default": ["spec", "quality", "security", "performance", "concurrency"],
     "bySliceType": {
@@ -233,60 +250,15 @@ Full schema:
 }
 ```
 
-### Auto provider inference
+### Model parameters
 
-When no `models` are explicitly configured, `omre` falls back to a provider-inference chain that picks a model for each agent from the OpenCode config. The chain is strict: higher steps short-circuit lower ones.
-
-Priority pyramid (first match wins):
-
-1. `omreConfig.models[k]` — per-agent override in the OMRE config
-2. `omreConfig.disable_provider_inference: true` — short-circuits the entire chain; all agents fall through to their default
-3. `omreConfig.provider` — forces every agent to use this provider's default model
-4. `Config.model` — parsed as "provider/model"; the provider slot is extracted and used
-5. Sole enabled `Config.provider` key — single provider in `opencode.json`; all agents use that provider
-6. `Config.small_model` for coordination/utility tiers — used when the same provider is detected across the config
-7. `PROVIDER_MODEL_PRESETS[providerID][tier]` — the current preset for that provider and tier
-8. `DEFAULT_MODEL` fallback — final catch-all
-
-Agent tiers:
-
-| Tier | Agents |
-|------|--------|
-| critical | spec, quality, security, performance, concurrency |
-| standard | (same as critical; used when no tier annotation applies) |
-| coordination | slicePlanner, sliceArbiter, globalArbiter, validator |
-| utility | reportWriter |
-
-Worked example — given `opencode.json`:
-
-```json
-{
-  "model": "anthropic/claude-opus-4-7",
-  "small_model": "anthropic/claude-haiku-4-5"
-}
-```
-
-and an empty OMRE config (no `models`, no `provider`, no `disable_provider_inference`):
-
-| Agent | Assigned model |
-|-------|----------------|
-| spec, quality, security, performance, concurrency | anthropic/claude-opus-4-7 (from `Config.model`) |
-| slicePlanner, sliceArbiter, globalArbiter, validator | anthropic/claude-opus-4-7 (from `Config.small_model` tier, same provider) |
-| reportWriter | anthropic/claude-opus-4-7 (from `Config.small_model` tier, same provider) |
-
-Opt-out examples — force a specific provider for all agents:
+Each agent entry supports optional `top_p` (snake_case, not camelCase):
 
 ```jsonc
 {
-  "provider": "google"
-}
-```
-
-Kill switch — disable provider inference entirely and let every agent fall through to its built-in default:
-
-```jsonc
-{
-  "disable_provider_inference": true
+  "agents": {
+    "omre-reviewer-spec": { "model": "minimax-cn/MiniMax-M2.7", "top_p": 0.9 }
+  }
 }
 ```
 

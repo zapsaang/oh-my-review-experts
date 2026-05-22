@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { deepMerge, findConfigFiles, loadConfig, clearLoadConfigCache, defaultConfigJsonc, loadConfigWithOverrides } from "../../src/config/load-config.js";
+import { deepMerge, findConfigFiles, loadConfig, clearLoadConfigCache, defaultConfigJsonc } from "../../src/config/load-config.js";
 import { OmreConfigSchema, DEFAULT_CONFIG } from "../../src/config/schema.js";
 import fs from "node:fs";
 import os from "node:os";
@@ -52,11 +52,6 @@ describe("deepMerge", () => {
     expect(result).toEqual({ a: { x: 1 }, b: 3 });
   });
 
-  it("loadConfig return value does not share nested references with DEFAULT_CONFIG", () => {
-    const config = loadConfig("nonexistent-path-12345-for-test");
-    config.models.orchestrator = "mutated-model";
-    expect(DEFAULT_CONFIG.models.orchestrator).not.toBe("mutated-model");
-  });
 });
 
 describe("findConfigFiles", () => {
@@ -131,14 +126,6 @@ describe("loadConfig cache", () => {
     }
   });
 
-  it("returns deep clone from cache so mutations do not affect subsequent reads", () => {
-    clearLoadConfigCache();
-    const config1 = loadConfig("nonexistent-path-12345-for-test");
-    config1.models.orchestrator = "mutated";
-
-    const config2 = loadConfig("nonexistent-path-12345-for-test");
-    expect(config2.models.orchestrator).not.toBe("mutated");
-  });
 });
 
 describe("assertSafeCwd security", () => {
@@ -187,16 +174,11 @@ describe("defaultConfigJsonc", () => {
     expect(jsonc).toContain('"$schema"');
   });
 
-  it("matches DEFAULT_CONFIG values, except for the deprecated models.orchestrator which is intentionally omitted from the scaffold", () => {
+  it("matches DEFAULT_CONFIG values", () => {
     const jsonc = defaultConfigJsonc();
     const parsed = JSON.parse(jsonc);
     const { $schema: _, ...configForComparison } = parsed;
-    const { models: scaffoldModels, ...scaffoldRest } = configForComparison;
-    const { models: defaultModels, ...defaultRest } = DEFAULT_CONFIG;
-    const { orchestrator: _orchestrator, ...activeDefaultModels } = defaultModels;
-    expect(scaffoldModels).toEqual(activeDefaultModels);
-    expect(scaffoldRest).toEqual(defaultRest);
-    expect(scaffoldModels).not.toHaveProperty("orchestrator");
+    expect(configForComparison).toEqual(DEFAULT_CONFIG);
   });
 
   it("is idempotent", () => {
@@ -270,103 +252,4 @@ describe("agents field deep-merge", () => {
   });
 });
 
-describe("loadConfigWithOverrides", () => {
-  beforeEach(() => {
-    clearLoadConfigCache();
-  });
 
-  it("returns empty explicitModelOverrides when no user config files exist", () => {
-    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), ".omre-test-"));
-    try {
-      const result = loadConfigWithOverrides(tmpDir, true);
-      expect(result).toHaveProperty("config");
-      expect(result).toHaveProperty("explicitModelOverrides");
-      expect(result.explicitModelOverrides).toBeInstanceOf(Set);
-      expect(result.explicitModelOverrides.size).toBe(0);
-    } finally {
-      try {
-        fs.rmdirSync(tmpDir);
-      } catch { /* directory may not exist */ }
-    }
-  });
-
-  it("returns explicitModelOverrides with ['spec'] when .omre/config.json overrides models.spec", () => {
-    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), ".omre-test-"));
-    const configPath = path.join(tmpDir, ".omre", "config.json");
-    fs.mkdirSync(path.dirname(configPath), { recursive: true });
-    fs.writeFileSync(configPath, JSON.stringify({ models: { spec: "x" } }), "utf8");
-
-    try {
-      const result = loadConfigWithOverrides(tmpDir, true);
-      expect(result.explicitModelOverrides).toBeInstanceOf(Set);
-      expect(Array.from(result.explicitModelOverrides)).toEqual(["spec"]);
-    } finally {
-      try {
-        fs.unlinkSync(configPath);
-      } catch { /* file may not exist */ }
-      try {
-        fs.rmdirSync(path.dirname(configPath));
-      } catch { /* directory may not exist */ }
-      try {
-        fs.rmdirSync(tmpDir);
-      } catch { /* directory may not exist */ }
-    }
-  });
-
-  it("returns explicitModelOverrides with both 'spec' and 'quality' from different config files", () => {
-    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), ".omre-test-"));
-    const opencodePath = path.join(tmpDir, ".opencode", "oh-my-review-experts.jsonc");
-    const omrePath = path.join(tmpDir, ".omre", "config.json");
-
-    fs.mkdirSync(path.dirname(opencodePath), { recursive: true });
-    fs.writeFileSync(opencodePath, JSON.stringify({ models: { spec: "y" } }), "utf8");
-
-    fs.mkdirSync(path.dirname(omrePath), { recursive: true });
-    fs.writeFileSync(omrePath, JSON.stringify({ models: { quality: "z" } }), "utf8");
-
-    try {
-      const result = loadConfigWithOverrides(tmpDir, true);
-      const overrides = Array.from(result.explicitModelOverrides).sort();
-      expect(overrides).toEqual(["quality", "spec"]);
-    } finally {
-      try {
-        fs.unlinkSync(opencodePath);
-      } catch { /* file may not exist */ }
-      try {
-        fs.rmdirSync(path.dirname(opencodePath));
-      } catch { /* directory may not exist */ }
-      try {
-        fs.unlinkSync(omrePath);
-      } catch { /* file may not exist */ }
-      try {
-        fs.rmdirSync(path.dirname(omrePath));
-      } catch { /* directory may not exist */ }
-      try {
-        fs.rmdirSync(tmpDir);
-      } catch { /* directory may not exist */ }
-    }
-  });
-
-  it("still includes 'spec' in explicitModelOverrides even when value matches DEFAULT_MODEL", () => {
-    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), ".omre-test-"));
-    const configPath = path.join(tmpDir, ".omre", "config.json");
-    fs.mkdirSync(path.dirname(configPath), { recursive: true });
-    fs.writeFileSync(configPath, JSON.stringify({ models: { spec: "minimax-cn/MiniMax-M2.7" } }), "utf8");
-
-    try {
-      const result = loadConfigWithOverrides(tmpDir, true);
-      expect(result.explicitModelOverrides).toBeInstanceOf(Set);
-      expect(Array.from(result.explicitModelOverrides)).toEqual(["spec"]);
-    } finally {
-      try {
-        fs.unlinkSync(configPath);
-      } catch { /* file may not exist */ }
-      try {
-        fs.rmdirSync(path.dirname(configPath));
-      } catch { /* directory may not exist */ }
-      try {
-        fs.rmdirSync(tmpDir);
-      } catch { /* directory may not exist */ }
-    }
-  });
-});
