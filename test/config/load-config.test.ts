@@ -251,5 +251,3 @@ describe("agents field deep-merge", () => {
     expect(parsed).not.toHaveProperty("disable_provider_inference");
   });
 });
-
-

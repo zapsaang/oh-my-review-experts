@@ -191,17 +191,10 @@ All 11 agents must be referenced by exact name when configuring them in the `age
     "scopeResolution": "auto"
   },
   "agents": {
-    "omre-reviewer-spec":         { "model": "minimax-cn/MiniMax-M2.7" },
-    "omre-reviewer-quality":      { "model": "minimax-cn/MiniMax-M2.7" },
-    "omre-reviewer-security":     { "model": "minimax-cn/MiniMax-M2.7" },
-    "omre-reviewer-performance":   { "model": "minimax-cn/MiniMax-M2.7" },
-    "omre-reviewer-concurrency":   { "model": "minimax-cn/MiniMax-M2.7" },
-    "omre-slice-planner":          { "model": "minimax-cn/MiniMax-M2.7" },
-    "omre-slice-plan-validator":   { "model": "minimax-cn/MiniMax-M2.7" },
-    "omre-result-validator":       { "model": "minimax-cn/MiniMax-M2.7" },
-    "omre-slice-arbiter":          { "model": "minimax-cn/MiniMax-M2.7" },
-    "omre-global-arbiter":        { "model": "minimax-cn/MiniMax-M2.7" },
-    "omre-report-writer":         { "model": "minimax-cn/MiniMax-M2.7" }
+    // Add per-agent overrides here. Only specify agents you want to customize.
+    // All agents fall back to the default model if not listed.
+    // Example:
+    // "omre-reviewer-spec": { "model": "anthropic/claude-opus-4-7", "variant": "max", "temperature": 0.7 }
   },
   "slicing": {
     "enabled": true,

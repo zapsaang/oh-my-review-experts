@@ -253,8 +253,9 @@ describe("OmreConfigSchema agents field", () => {
 
   it("strips unknown top-level keys (old models, provider, disable_provider_inference)", () => {
     const result = OmreConfigSchema.parse({ models: { spec: "x" }, provider: "anthropic", disable_provider_inference: true });
-    expect((result as any).models).toBeUndefined();
-    expect((result as any).provider).toBeUndefined();
-    expect((result as any).disable_provider_inference).toBeUndefined();
+    const keys = Object.keys(result);
+    expect(keys).not.toContain("models");
+    expect(keys).not.toContain("provider");
+    expect(keys).not.toContain("disable_provider_inference");
   });
 });
