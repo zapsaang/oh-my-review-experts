@@ -82,77 +82,351 @@
       },
       "additionalProperties": false
     },
-    "models": {
-      "description": "Model assignments for each agent role in the review pipeline.",
-      "default": {
-        "orchestrator": "minimax-cn/MiniMax-M2.7",
-        "spec": "minimax-cn/MiniMax-M2.7",
-        "quality": "minimax-cn/MiniMax-M2.7",
-        "security": "minimax-cn/MiniMax-M2.7",
-        "performance": "minimax-cn/MiniMax-M2.7",
-        "concurrency": "minimax-cn/MiniMax-M2.7",
-        "slicePlanner": "minimax-cn/MiniMax-M2.7",
-        "validator": "minimax-cn/MiniMax-M2.7",
-        "sliceArbiter": "minimax-cn/MiniMax-M2.7",
-        "globalArbiter": "minimax-cn/MiniMax-M2.7",
-        "reportWriter": "minimax-cn/MiniMax-M2.7"
-      },
+    "agents": {
+      "description": "Agent-specific model and inference settings.",
+      "default": {},
       "type": "object",
       "properties": {
-        "orchestrator": {
-          "description": "[DEPRECATED — no consumer, kept for config compatibility] Model for the orchestrator agent that coordinates the review pipeline.",
-          "default": "minimax-cn/MiniMax-M2.7",
-          "type": "string"
+        "omre-reviewer-spec": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "type": "string",
+              "enum": [
+                "max",
+                "high",
+                "medium",
+                "low"
+              ]
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
         },
-        "spec": {
-          "description": "Model for the spec compliance reviewer.",
-          "default": "minimax-cn/MiniMax-M2.7",
-          "type": "string"
+        "omre-reviewer-quality": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "type": "string",
+              "enum": [
+                "max",
+                "high",
+                "medium",
+                "low"
+              ]
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
         },
-        "quality": {
-          "description": "Model for the code quality reviewer.",
-          "default": "minimax-cn/MiniMax-M2.7",
-          "type": "string"
+        "omre-reviewer-security": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "type": "string",
+              "enum": [
+                "max",
+                "high",
+                "medium",
+                "low"
+              ]
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
         },
-        "security": {
-          "description": "Model for the security reviewer.",
-          "default": "minimax-cn/MiniMax-M2.7",
-          "type": "string"
+        "omre-reviewer-performance": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "type": "string",
+              "enum": [
+                "max",
+                "high",
+                "medium",
+                "low"
+              ]
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
         },
-        "performance": {
-          "description": "Model for the performance reviewer.",
-          "default": "minimax-cn/MiniMax-M2.7",
-          "type": "string"
+        "omre-reviewer-concurrency": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "type": "string",
+              "enum": [
+                "max",
+                "high",
+                "medium",
+                "low"
+              ]
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
         },
-        "concurrency": {
-          "description": "Model for the concurrency reviewer.",
-          "default": "minimax-cn/MiniMax-M2.7",
-          "type": "string"
+        "omre-slice-planner": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "type": "string",
+              "enum": [
+                "max",
+                "high",
+                "medium",
+                "low"
+              ]
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
         },
-        "slicePlanner": {
-          "description": "Model for the slice planner agent that groups changed files into coherent slices.",
-          "default": "minimax-cn/MiniMax-M2.7",
-          "type": "string"
+        "omre-slice-plan-validator": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "type": "string",
+              "enum": [
+                "max",
+                "high",
+                "medium",
+                "low"
+              ]
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
         },
-        "validator": {
-          "description": "Model for the validator agent that checks reviewer output structure.",
-          "default": "minimax-cn/MiniMax-M2.7",
-          "type": "string"
+        "omre-result-validator": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "type": "string",
+              "enum": [
+                "max",
+                "high",
+                "medium",
+                "low"
+              ]
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
         },
-        "sliceArbiter": {
-          "description": "Model for the slice arbiter that merges per-slice findings.",
-          "default": "minimax-cn/MiniMax-M2.7",
-          "type": "string"
+        "omre-slice-arbiter": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "type": "string",
+              "enum": [
+                "max",
+                "high",
+                "medium",
+                "low"
+              ]
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
         },
-        "globalArbiter": {
-          "description": "Model for the global arbiter that deduplicates across slices.",
-          "default": "minimax-cn/MiniMax-M2.7",
-          "type": "string"
+        "omre-global-arbiter": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "type": "string",
+              "enum": [
+                "max",
+                "high",
+                "medium",
+                "low"
+              ]
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
         },
-        "reportWriter": {
-          "description": "Model for the report writer agent that produces the final markdown report.",
-          "default": "minimax-cn/MiniMax-M2.7",
-          "type": "string"
+        "omre-report-writer": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "type": "string",
+              "enum": [
+                "max",
+                "high",
+                "medium",
+                "low"
+              ]
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -599,15 +873,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "provider": {
-      "description": "Preferred provider ID for automatic per-agent model selection. When set and a model field is not explicitly overridden, OMRE uses the matching entry from PROVIDER_MODEL_PRESETS for each agent's tier. If omitted, OMRE attempts to auto-detect from OpenCode's config.model or config.provider.",
-      "type": "string",
-      "minLength": 1
-    },
-    "disable_provider_inference": {
-      "description": "When true, OMRE skips automatic provider/model inference entirely; only models.* fields the user explicitly sets are used (others fall back to DEFAULT_MODEL). Use this as a kill switch when explicit configuration is required.",
-      "type": "boolean"
     }
   },
   "additionalProperties": false

@@ -56,7 +56,7 @@ describe("generated JSON schema", () => {
     // Verify top-level sections exist as properties (so partial configs are structurally valid)
     expect(schema.properties).toBeDefined();
     expect(Object.keys(schema.properties)).toContain("command");
-    expect(Object.keys(schema.properties)).toContain("models");
+    expect(Object.keys(schema.properties)).toContain("agents");
   });
 
   it("contains report directory path constraints", () => {
