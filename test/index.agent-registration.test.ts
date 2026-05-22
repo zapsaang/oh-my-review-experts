@@ -154,25 +154,6 @@ describe("config hook auto provider inference", () => {
     }
   });
 
-  it("skips inference when provider is disabled in OpenCode config", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-inference-disabled-"));
-    try {
-      const hooks = await OhMyReviewExperts(stubPluginInput(tmpDir));
-      const config = {
-        provider: { openai: {} },
-        enabled_providers: ["openai"],
-        disabled_providers: ["openai"],
-      } as Config;
-      await hooks.config!(config);
-
-      for (const name of AGENT_NAMES) {
-        expect(config.agent![name]!.model).toBe(DEFAULT_MODEL);
-      }
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
-  });
-
   it("skips inference when disable_provider_inference is true in OMRE config", async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-inference-kill-switch-"));
     try {

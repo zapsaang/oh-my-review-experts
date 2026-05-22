@@ -59,15 +59,8 @@ export function resolveProviderFromOpenCodeConfig(c: Config | undefined | null):
   }
 
   if (c.provider && typeof c.provider === "object" && !Array.isArray(c.provider)) {
-    const providerKeys = Object.keys(c.provider);
-    const disabled = new Set(Array.isArray(c.disabled_providers) ? c.disabled_providers : []);
-    const enabled = new Set(
-      Array.isArray(c.enabled_providers)
-        ? c.enabled_providers
-        : providerKeys,
-    );
-    const filtered = [...enabled].filter((k) => !disabled.has(k));
-    if (filtered.length === 1) return filtered[0];
+    const keys = Object.keys(c.provider);
+    if (keys.length === 1) return keys[0];
   }
 
   return undefined;

@@ -22,34 +22,16 @@ describe("resolveProviderFromOpenCodeConfig", () => {
     expect(resolveProviderFromOpenCodeConfig(config)).toBeUndefined();
   });
 
-  it("returns single provider key when model is undefined and no enabled/disabled lists", () => {
+  it("returns single provider key when provider object has exactly one key", () => {
     const config = { model: undefined, provider: { openai: {} } } as Config;
     expect(resolveProviderFromOpenCodeConfig(config)).toBe("openai");
   });
 
-  it("returns enabled provider when enabled_providers filters multiple providers", () => {
+  it("returns undefined when provider object has multiple keys", () => {
     const config = {
       provider: { openai: {}, anthropic: {} },
-      enabled_providers: ["openai"],
-    } as Config;
-    expect(resolveProviderFromOpenCodeConfig(config)).toBe("openai");
-  });
-
-  it("returns undefined when the only provider is disabled", () => {
-    const config = {
-      provider: { openai: {} },
-      disabled_providers: ["openai"],
     } as Config;
     expect(resolveProviderFromOpenCodeConfig(config)).toBeUndefined();
-  });
-
-  it("disabled_providers wins over enabled_providers", () => {
-    const config = {
-      provider: { openai: {}, anthropic: {} },
-      enabled_providers: ["openai", "anthropic"],
-      disabled_providers: ["anthropic"],
-    } as Config;
-    expect(resolveProviderFromOpenCodeConfig(config)).toBe("openai");
   });
 
   it("returns undefined for empty config and does not throw on null or non-object values", () => {
