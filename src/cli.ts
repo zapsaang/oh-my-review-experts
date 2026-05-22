@@ -8,13 +8,8 @@ import pc from "picocolors"
 import Table from "cli-table3"
 import { modify, parse as parseJsonc, applyEdits } from "jsonc-parser"
 import type { Config } from "@opencode-ai/plugin"
-import { defaultConfigJsonc, findConfigFiles, loadConfigWithOverrides } from "./config/load-config.js"
-import {
-  resolveProviderFromOpenCodeConfig,
-  resolveModelsWithInference,
-  AGENT_TIER_MAP,
-} from "./config/provider-presets.js"
-import type { ModelKey } from "./agents/registry.js"
+import { defaultConfigJsonc, findConfigFiles, loadConfig } from "./config/load-config.js"
+import { AGENT_TIER_MAP } from "./config/provider-presets.js"
 import { ALL_AGENTS, registerAgents } from "./agents/registry.js"
 import { renderLocalDryRun } from "./workflow/run-review-code.js"
 
@@ -157,10 +152,10 @@ export function runDoctor(options: RunDoctorOptions = {}): void {
   output.log("Config files:")
   for (const f of files) output.log(`- ${f}`)
   if (!files.length) output.log(pc.yellow("- none found; defaults will be used"))
-  const { config, explicitModelOverrides } = loadConfigWithOverrides(cwd)
-  output.log("Command:", `/${config.command.name}`, "aliases:", config.command.aliases.join(", "))
-  output.log("Report dir:", config.report.directory)
-  output.log("Max estimated tasks:", config.costGuardrail.maxEstimatedTasks)
+  const omreConfig = loadConfig(cwd)
+  output.log("Command:", `/${omreConfig.command.name}`, "aliases:", omreConfig.command.aliases.join(", "))
+  output.log("Report dir:", omreConfig.report.directory)
+  output.log("Max estimated tasks:", omreConfig.costGuardrail.maxEstimatedTasks)
 
   const projectConfig = getOpencodeConfigPath(false, cwd)
   const globalConfig = getOpencodeConfigPath(true)
@@ -177,13 +172,13 @@ export function runDoctor(options: RunDoctorOptions = {}): void {
   }
 
   output.log("\nConfig hook:")
-  if (!config.enabled) {
+  if (!omreConfig.enabled) {
     output.log(pc.yellow("  plugin disabled"))
-  } else if (!config.command.enabled) {
+  } else if (!omreConfig.command.enabled) {
     output.log(pc.yellow("  commands disabled"))
-  } else if (config.command.injection === "disabled") {
+  } else if (omreConfig.command.injection === "disabled") {
     output.log(pc.yellow("  injection disabled"))
-  } else if (config.command.injection === "tool") {
+  } else if (omreConfig.command.injection === "tool") {
     output.log(pc.yellow("  tool mode (commands not registered via config hook)"))
   } else {
     output.log(pc.green("  commands registered at runtime via config hook"))
@@ -214,33 +209,24 @@ export function runDoctor(options: RunDoctorOptions = {}): void {
 
   output.log("\nSubagent registration:")
 
-  const opencodeConfigPath = getOpencodeConfigPath(false, cwd)
-  const opencodeConfigText = readFileSafe(opencodeConfigPath)
-  let opencodeConfig: Record<string, unknown> = {}
-  if (opencodeConfigText) {
-    try {
-      const parsed = parseJsonc(opencodeConfigText)
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        opencodeConfig = parsed as Record<string, unknown>
+  // Load raw opencode.json to initialize probe config with user-defined agent slots
+  let probeConfig: Config = {};
+  try {
+    const opencodeRaw = fs.readFileSync(path.join(cwd, "opencode.json"), "utf-8");
+    const parsed = JSON.parse(opencodeRaw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const obj = parsed as Record<string, unknown>;
+      if (obj.agents && !obj.agent) {
+        obj.agent = obj.agents;
       }
-    } catch { /* ignore parse errors */ }
-  }
-  const providerID = config.provider ?? resolveProviderFromOpenCodeConfig(opencodeConfig as Config)
-
-  let finalConfig = config
-  let finalModels = config.models
-  if (config.disable_provider_inference !== true && providerID) {
-    finalModels = resolveModelsWithInference(
-      config.models,
-      providerID,
-      opencodeConfig as Config,
-      explicitModelOverrides,
-    )
-    finalConfig = { ...config, models: finalModels }
+      probeConfig = obj as Config;
+    }
+  } catch {
+    // opencode.json does not exist — probeConfig stays empty
   }
 
-  const probeConfig: Config = {}
-  registerAgents(probeConfig, finalConfig)
+  // Register OMRE agents; skip-on-conflict preserves existing opencode.json slots
+  const { registered, skipped } = registerAgents(probeConfig, omreConfig);
   const agentStatus = checkAgentRegistration(probeConfig)
   const agentLine = `agents: ${agentStatus.registered}/${agentStatus.expected} registered`
   if (agentStatus.registered === agentStatus.expected) {
@@ -254,25 +240,27 @@ export function runDoctor(options: RunDoctorOptions = {}): void {
 
   output.log("\nAgent runtime models:")
   const table = new Table({
-    head: ["Agent", "Model", "Tier", "Source"],
+    head: ["Agent", "Model", "Tier", "Parameters", "Source"],
     style: { head: [], border: [] },
-    colAligns: ["left", "left", "left", "left"],
+    colAligns: ["left", "left", "left", "left", "left"],
   })
 
   for (const agent of ALL_AGENTS) {
     const agentConfig = probeConfig.agent?.[agent.name] as Record<string, unknown> | undefined
     const model = typeof agentConfig?.model === "string" ? agentConfig.model : "(not set)"
-    const tier = AGENT_TIER_MAP[agent.modelKey] ?? "unknown"
-    const isExplicit = explicitModelOverrides.has(agent.modelKey)
-    const source = isExplicit ? "explicit" : providerID ? "inferred" : "default"
+    const tier = AGENT_TIER_MAP[agent.name] ?? "unknown"
+    const hasExplicitConfig = omreConfig.agents[agent.name]?.model !== undefined
+    const source = hasExplicitConfig ? "config" : "default"
+    const sourceColored = source === "config" ? pc.cyan(source) : pc.gray(source)
 
-    const sourceColored = source === "explicit"
-      ? pc.cyan(source)
-      : source === "inferred"
-        ? pc.yellow(source)
-        : pc.gray(source)
+    const params: string[] = []
+    const override = omreConfig.agents[agent.name]
+    if (override?.variant !== undefined) params.push(`variant: ${override.variant}`)
+    if (override?.temperature !== undefined) params.push(`temperature: ${override.temperature}`)
+    if (override?.top_p !== undefined) params.push(`top_p: ${override.top_p}`)
+    const paramsStr = params.join(", ") || "—"
 
-    table.push([agent.name, model, tier, sourceColored])
+    table.push([agent.name, model, tier, paramsStr, sourceColored])
   }
 
   const tableLines = table.toString().split("\n")
@@ -280,18 +268,12 @@ export function runDoctor(options: RunDoctorOptions = {}): void {
     output.log(`  ${line}`)
   }
 
-  output.log("\nProvider inference:")
-  if (config.disable_provider_inference === true) {
-    output.log("  Auto provider inference: disabled (via omreConfig.disable_provider_inference).")
-  } else if (providerID) {
-    const source = config.provider ? "omre.provider" : "opencode-config"
-    output.log(`  Inferred provider: ${providerID}  (source: ${source})`)
-    output.log("  Final model assignment per agent:")
-    for (const key of Object.keys(finalModels) as ModelKey[]) {
-      output.log(`    ${key.padEnd(14)} → ${finalModels[key]}`)
+  for (const agent of ALL_AGENTS) {
+    const ocAgent = probeConfig.agent?.[agent.name]
+    const omreAgent = omreConfig.agents[agent.name]
+    if (ocAgent && omreAgent && skipped.includes(agent.name)) {
+      output.log(pc.yellow(`  Warning: ${agent.name} is configured in both opencode.json and OMRE config; OpenCode wins`))
     }
-  } else {
-    output.log("  Auto provider inference: no provider detected; using DEFAULT_MODEL for all unset agents.")
   }
 
   const promptWarnings = contractChecks.checkPromptExampleSchemaIdentity()
@@ -304,7 +286,7 @@ export function runDoctor(options: RunDoctorOptions = {}): void {
   for (const warning of contractWarnings) output.log(pc.yellow(`  ${warning}`))
 
   output.log("\nReport layout:")
-  const layoutWarnings = checkReportLayout(cwd, { apply: !!options.cleanReports, reportDirectory: config.report.directory })
+  const layoutWarnings = checkReportLayout(cwd, { apply: !!options.cleanReports, reportDirectory: omreConfig.report.directory })
   if (layoutWarnings.length === 0) {
     output.log(pc.green("  clean (no stray *-report.{md,json}; latest.md valid or absent)"))
   } else {

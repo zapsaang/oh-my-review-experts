@@ -1,5 +1,6 @@
 import type { Config } from "@opencode-ai/plugin";
 import type { OmreConfig } from "../config/schema.js";
+import { DEFAULT_MODEL } from "../config/schema.js";
 import {
   COMPLETE_REVIEWER_PROMPTS,
   SLICE_PLANNER_PROMPT,
@@ -10,11 +11,8 @@ import {
   REPORT_WRITER_PROMPT,
 } from "./prompts.js";
 
-export type ModelKey = keyof OmreConfig["models"];
-
 export interface AgentRegistration {
-  readonly name: string;
-  readonly modelKey: ModelKey;
+  readonly name: keyof OmreConfig["agents"];
   readonly staticPrompt: string;
   readonly description: string;
   readonly toolsAllow: readonly string[];
@@ -59,35 +57,30 @@ const REVIEWER_TOOLS_ALLOW = ["read", "grep", "glob", "omre_write_handoff"] as c
 export const REVIEWER_AGENTS: readonly AgentRegistration[] = [
   {
     name: "omre-reviewer-spec",
-    modelKey: "spec",
     staticPrompt: COMPLETE_REVIEWER_PROMPTS.spec,
     description: "Validates specification compliance, API contracts, schema compatibility, and silent behavior drift.",
     toolsAllow: REVIEWER_TOOLS_ALLOW,
   },
   {
     name: "omre-reviewer-quality",
-    modelKey: "quality",
     staticPrompt: COMPLETE_REVIEWER_PROMPTS.quality,
     description: "Validates maintainability and design quality: cohesion, coupling, duplication, error handling, and testability.",
     toolsAllow: REVIEWER_TOOLS_ALLOW,
   },
   {
     name: "omre-reviewer-security",
-    modelKey: "security",
     staticPrompt: COMPLETE_REVIEWER_PROMPTS.security,
     description: "Validates cybersecurity risk: authn/authz, injection, traversal, secret leakage, and unsafe defaults.",
     toolsAllow: REVIEWER_TOOLS_ALLOW,
   },
   {
     name: "omre-reviewer-performance",
-    modelKey: "performance",
     staticPrompt: COMPLETE_REVIEWER_PROMPTS.performance,
     description: "Validates performance risk: algorithmic regressions, blocking IO, N+1 queries, and tail latency.",
     toolsAllow: REVIEWER_TOOLS_ALLOW,
   },
   {
     name: "omre-reviewer-concurrency",
-    modelKey: "concurrency",
     staticPrompt: COMPLETE_REVIEWER_PROMPTS.concurrency,
     description: "Validates race conditions, atomicity violations, ordering issues, and distributed inconsistency.",
     toolsAllow: REVIEWER_TOOLS_ALLOW,
@@ -97,42 +90,36 @@ export const REVIEWER_AGENTS: readonly AgentRegistration[] = [
 export const COORDINATOR_AGENTS: readonly AgentRegistration[] = [
   {
     name: "omre-slice-planner",
-    modelKey: "slicePlanner",
     staticPrompt: SLICE_PLANNER_PROMPT,
     description: "Partitions code changes into coherent review slices by module boundary and risk profile.",
     toolsAllow: ["read", "grep", "glob"],
   },
   {
     name: "omre-slice-plan-validator",
-    modelKey: "validator",
     staticPrompt: SLICE_PLAN_VALIDATOR_PROMPT,
     description: "Validates slice planner JSON output for structural correctness.",
     toolsAllow: ["read"],
   },
   {
     name: "omre-result-validator",
-    modelKey: "validator",
     staticPrompt: RESULT_VALIDATOR_PROMPT,
     description: "Validates reviewer JSON outputs for dimension matching and completeness.",
     toolsAllow: ["read", "omre_validate_handoff"],
   },
   {
     name: "omre-slice-arbiter",
-    modelKey: "sliceArbiter",
     staticPrompt: SLICE_ARBITER_PROMPT,
     description: "Merges and deduplicates reviewer outputs for one slice.",
     toolsAllow: ["read", "omre_validate_handoff"],
   },
   {
     name: "omre-global-arbiter",
-    modelKey: "globalArbiter",
     staticPrompt: GLOBAL_ARBITER_PROMPT,
     description: "Consumes all slice arbiter outputs and produces a globally merged result.",
     toolsAllow: ["read", "omre_validate_handoff"],
   },
   {
     name: "omre-report-writer",
-    modelKey: "reportWriter",
     staticPrompt: REPORT_WRITER_PROMPT,
     description: "Persists the final merged results to configured report paths.",
     toolsAllow: ["read", "omre_write_report", "omre_finalize_review"],
@@ -158,11 +145,16 @@ function buildAgentConfig(agent: AgentRegistration, omreConfig: OmreConfig): Rec
   // Allowlist must iterate last: explicit allow overrides the deny baseline.
   for (const t of agent.toolsAllow) tools[t] = true;
 
+  const agentOverride = omreConfig.agents?.[agent.name];
+
   return {
     mode: "subagent",
     hidden: false,
     disable: false,
-    model: omreConfig.models[agent.modelKey],
+    model: agentOverride?.model ?? DEFAULT_MODEL,
+    ...(agentOverride?.variant !== undefined && { variant: agentOverride.variant }),
+    ...(agentOverride?.temperature !== undefined && { temperature: agentOverride.temperature }),
+    ...(agentOverride?.top_p !== undefined && { top_p: agentOverride.top_p }),
     prompt: agent.staticPrompt,
     description: agent.description,
     tools,

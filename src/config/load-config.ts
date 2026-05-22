@@ -3,8 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import { parse as parseJsonc } from "jsonc-parser";
 import { DEFAULT_CONFIG, OmreConfig, OmreConfigSchema } from "./schema.js";
-import type { ModelKey } from "../agents/registry.js";
-import { ZodError } from "zod";
 
 const CONFIG_NAMES = [
   ".opencode/oh-my-review-experts.jsonc",
@@ -90,7 +88,6 @@ export function findConfigFiles(cwd = process.cwd()): string[] {
 
 interface CacheEntry {
   config: OmreConfig;
-  explicitModelOverrides: Set<ModelKey>;
   mtimes: Map<string, number>;
 }
 
@@ -114,55 +111,26 @@ function isCacheValid(entry: CacheEntry, files: string[]): boolean {
   return true;
 }
 
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === "object" && !Array.isArray(v);
-}
-
-function isModelKey(key: string): key is ModelKey {
-  return key in DEFAULT_CONFIG.models;
-}
-
-function collectExplicitModelOverrides(raw: unknown, explicitModelOverrides: Set<ModelKey>): void {
-  if (!isPlainObject(raw) || !isPlainObject(raw.models)) return;
-  for (const key of Object.keys(raw.models)) {
-    if (isModelKey(key)) {
-      explicitModelOverrides.add(key);
-    }
-  }
-}
-
 export function clearLoadConfigCache(): void {
   configCache.clear();
 }
 
 export function loadConfig(cwd = process.cwd(), trusted = false): OmreConfig {
-  return loadConfigWithOverrides(cwd, trusted).config;
-}
-
-export function loadConfigWithOverrides(
-  cwd = process.cwd(),
-  trusted = false,
-): { config: OmreConfig; explicitModelOverrides: Set<ModelKey> } {
   if (!trusted) assertSafeCwd(cwd);
   const files = findConfigFiles(cwd);
   const cacheKey = getCacheKey(cwd, files);
   const cached = configCache.get(cacheKey);
 
   if (cached && isCacheValid(cached, files)) {
-    return {
-      config: structuredClone(cached.config),
-      explicitModelOverrides: new Set(cached.explicitModelOverrides),
-    };
+    return structuredClone(cached.config);
   }
 
   let merged: Record<string, unknown> = structuredClone(DEFAULT_CONFIG);
-  const explicitModelOverrides = new Set<ModelKey>();
   const mtimes = new Map<string, number>();
 
   for (const file of files) {
     const raw = readJsonc(file);
     if (raw !== undefined) {
-      collectExplicitModelOverrides(raw, explicitModelOverrides);
       merged = deepMerge(merged, raw);
     }
     try {
@@ -172,43 +140,24 @@ export function loadConfigWithOverrides(
     }
   }
 
-  let config: OmreConfig;
-  try {
-    config = OmreConfigSchema.parse(merged);
-  } catch (err) {
-    if (err instanceof ZodError) {
-      const issues = err.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-      throw new Error(`Config validation failed: ${issues}`);
-    }
-    throw err;
-  }
+  const config = OmreConfigSchema.parse(merged);
 
   if (configCache.size >= MAX_CACHE_SIZE) {
     const firstKey = configCache.keys().next().value;
-    if (firstKey !== undefined) {
-      configCache.delete(firstKey);
-    }
+    if (firstKey !== undefined) configCache.delete(firstKey);
   }
 
-  configCache.set(cacheKey, {
-    config: structuredClone(config),
-    explicitModelOverrides: new Set(explicitModelOverrides),
-    mtimes,
-  });
-  return { config, explicitModelOverrides };
+  configCache.set(cacheKey, { config: structuredClone(config), mtimes });
+  return config;
 }
 
 export function defaultConfigJsonc(): string {
   const defaults = OmreConfigSchema.parse({});
-  // models.orchestrator is deprecated (no consumer; orchestrator runs as the
-  // user's primary agent). Omit it from the scaffold so fresh configs do not
-  // advertise an inactive field. Existing configs with the field still parse.
-  const { orchestrator: _orchestrator, ...activeModels } = defaults.models;
   const config = {
     $schema: "https://raw.githubusercontent.com/zapsaang/oh-my-review-experts/main/schemas/oh-my-review-experts.schema.json",
     enabled: defaults.enabled,
     command: defaults.command,
-    models: activeModels,
+    agents: defaults.agents,
     slicing: defaults.slicing,
     partialRerun: defaults.partialRerun,
     costGuardrail: defaults.costGuardrail,

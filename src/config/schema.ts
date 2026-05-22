@@ -33,27 +33,22 @@ export const SliceType = z.enum([
   "docs-only",
 ]);
 
-export function sanitizeDefaultModel(raw: string | undefined): string {
-  if (!raw) return "minimax-cn/MiniMax-M2.7";
-  const cleaned = raw.replace(/[\x00-\x1f\x7f"'\\]/g, "");
-  return cleaned || "minimax-cn/MiniMax-M2.7";
-}
 
-const DEFAULT_MODEL = sanitizeDefaultModel(process.env.OMRE_DEFAULT_MODEL);
-
-export const ModelConfig = z.object({
-  orchestrator: z.string().default(DEFAULT_MODEL).describe("[DEPRECATED — no consumer, kept for config compatibility] Model for the orchestrator agent that coordinates the review pipeline."),
-  spec: z.string().default(DEFAULT_MODEL).describe("Model for the spec compliance reviewer."),
-  quality: z.string().default(DEFAULT_MODEL).describe("Model for the code quality reviewer."),
-  security: z.string().default(DEFAULT_MODEL).describe("Model for the security reviewer."),
-  performance: z.string().default(DEFAULT_MODEL).describe("Model for the performance reviewer."),
-  concurrency: z.string().default(DEFAULT_MODEL).describe("Model for the concurrency reviewer."),
-  slicePlanner: z.string().default(DEFAULT_MODEL).describe("Model for the slice planner agent that groups changed files into coherent slices."),
-  validator: z.string().default(DEFAULT_MODEL).describe("Model for the validator agent that checks reviewer output structure."),
-  sliceArbiter: z.string().default(DEFAULT_MODEL).describe("Model for the slice arbiter that merges per-slice findings."),
-  globalArbiter: z.string().default(DEFAULT_MODEL).describe("Model for the global arbiter that deduplicates across slices."),
-  reportWriter: z.string().default(DEFAULT_MODEL).describe("Model for the report writer agent that produces the final markdown report."),
+export const AgentConfigSchema = z.object({
+  model: z.string().min(1),
+  variant: z.enum(["max", "high", "medium", "low"]).optional()
+    .describe("Model variant. Passed through to the runtime."),
+  temperature: z.number().min(0).max(2).optional(),
+  top_p: z.number().min(0).max(1).optional()
+    .describe("Nucleus sampling cutoff. Passed through to the runtime."),
 });
+
+const AGENT_NAMES = [
+  "omre-reviewer-spec", "omre-reviewer-quality", "omre-reviewer-security",
+  "omre-reviewer-performance", "omre-reviewer-concurrency",
+  "omre-slice-planner", "omre-slice-plan-validator", "omre-result-validator",
+  "omre-slice-arbiter", "omre-global-arbiter", "omre-report-writer",
+] as const;
 
 const DEFAULT_COMMAND = {
   enabled: true,
@@ -63,19 +58,6 @@ const DEFAULT_COMMAND = {
   scopeResolution: "auto" as const,
 };
 
-const DEFAULT_MODELS = {
-  orchestrator: DEFAULT_MODEL,
-  spec: DEFAULT_MODEL,
-  quality: DEFAULT_MODEL,
-  security: DEFAULT_MODEL,
-  performance: DEFAULT_MODEL,
-  concurrency: DEFAULT_MODEL,
-  slicePlanner: DEFAULT_MODEL,
-  validator: DEFAULT_MODEL,
-  sliceArbiter: DEFAULT_MODEL,
-  globalArbiter: DEFAULT_MODEL,
-  reportWriter: DEFAULT_MODEL,
-};
 
 const DEFAULT_SLICING = {
   enabled: true,
@@ -159,7 +141,19 @@ export const OmreConfigSchema = z.object({
       "How user-provided args drive review scope. 'auto' (default) parses commit/branch/path/staged forms deterministically. 'guidance-only' treats args as opaque guidance text and uses the default git diff HEAD scope (preserves pre-0.x behavior)."
     ),
   }).default(() => structuredClone(DEFAULT_COMMAND)).describe("Slash command registration settings."),
-  models: ModelConfig.default(() => structuredClone(DEFAULT_MODELS)).describe("Model assignments for each agent role in the review pipeline."),
+  agents: z.object({
+    "omre-reviewer-spec": AgentConfigSchema.optional(),
+    "omre-reviewer-quality": AgentConfigSchema.optional(),
+    "omre-reviewer-security": AgentConfigSchema.optional(),
+    "omre-reviewer-performance": AgentConfigSchema.optional(),
+    "omre-reviewer-concurrency": AgentConfigSchema.optional(),
+    "omre-slice-planner": AgentConfigSchema.optional(),
+    "omre-slice-plan-validator": AgentConfigSchema.optional(),
+    "omre-result-validator": AgentConfigSchema.optional(),
+    "omre-slice-arbiter": AgentConfigSchema.optional(),
+    "omre-global-arbiter": AgentConfigSchema.optional(),
+    "omre-report-writer": AgentConfigSchema.optional(),
+  }).strict().default(() => ({})).describe("Agent-specific model and inference settings."),
   slicing: z.object({
     enabled: z.boolean().default(true).describe("Enable the file slicing engine that groups changed files into coherent review slices."),
     maxSlices: z.number().int().min(1).max(32).default(4).describe("Maximum number of slices to generate. Range: 1-32."),
@@ -222,12 +216,6 @@ export const OmreConfigSchema = z.object({
       "Reviewer dimensions per slice type. Unknown slice types are rejected by design."
     ),
   }).default(() => structuredClone(DEFAULT_REVIEWERS)).describe("Reviewer dimension assignment settings."),
-  provider: z.string().min(1).optional().describe(
-    "Preferred provider ID for automatic per-agent model selection. When set and a model field is not explicitly overridden, OMRE uses the matching entry from PROVIDER_MODEL_PRESETS for each agent's tier. If omitted, OMRE attempts to auto-detect from OpenCode's config.model or config.provider."
-  ),
-  disable_provider_inference: z.boolean().optional().describe(
-    "When true, OMRE skips automatic provider/model inference entirely; only models.* fields the user explicitly sets are used (others fall back to DEFAULT_MODEL). Use this as a kill switch when explicit configuration is required."
-  ),
 }).meta({
   $id: "https://raw.githubusercontent.com/zapsaang/oh-my-review-experts/main/schemas/oh-my-review-experts.schema.json",
   title: "Oh My Review Experts Config",
@@ -239,3 +227,5 @@ export type ReviewDimensionType = z.infer<typeof ReviewDimension>;
 export type SliceTypeValue = z.infer<typeof SliceType>;
 
 export const DEFAULT_CONFIG: OmreConfig = OmreConfigSchema.parse({});
+
+export const DEFAULT_MODEL = "minimax-cn/MiniMax-M2.7";

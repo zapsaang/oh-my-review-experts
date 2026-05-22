@@ -102,8 +102,7 @@
         "orchestrator": {
           "description": "[DEPRECATED — no consumer, kept for config compatibility] Model for the orchestrator agent that coordinates the review pipeline.",
           "default": "minimax-cn/MiniMax-M2.7",
-          "type": "string",
-          "deprecated": true
+          "type": "string"
         },
         "spec": {
           "description": "Model for the spec compliance reviewer.",
