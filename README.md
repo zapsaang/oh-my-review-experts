@@ -40,7 +40,9 @@ Reviewing a large diff well is *five different jobs*: spec compliance, code qual
 
 **Reports that stick around.** Final output lands in `.omre/reports/latest.md` and `latest.json`, with timestamped history under `.omre/reports/history/`. Written atomically via temp-file + rename, so a crash never leaves you with a half-written report.
 
-**Security built in, not bolted on.** Path traversal guards on every file write. Prompt-injection regex filters on user arguments. Secret redaction on diffs before they reach any model. Command-name validation that rejects `__proto__` and friends.
+**Agent tiers that reflect real cost tradeoffs.** Each of the 11 subagents is classified by importance — `critical` (spec, security), `standard` (quality, performance, concurrency), `coordination` (slice planner, arbiters), or `utility` (validators, report writer). The `omre doctor` command surfaces every agent's tier alongside its runtime model and source (config override vs. default), so you know exactly which reviewers are running on which model.
+
+**Security built in, not bolted on.** Path traversal guards on every file write. Prompt-injection regex filters on user arguments. Secret redaction on diffs before they reach any model. Command-name validation that rejects `__proto__` and friends. The plugin also registers a `permission.ask` hook that auto-denies write/edit access to `.omre/reports/` and `.omre/handoffs/` from external agents, preventing accidental corruption of review artifacts.
 
 ---
 
@@ -275,9 +277,14 @@ omre init [--force]        # scaffold .opencode/oh-my-review-experts.jsonc
 omre install --global      # enable plugin in ~/.config/opencode/opencode.json
 omre install --project     # enable plugin in ./opencode.json
 omre doctor [--clean-reports] [--strict]
-                           # validate config + plugin wiring (used in CI)
+                           # validate config + plugin wiring + contracts (used in CI)
+                           # prints: config files, command/aliases, plugin registration,
+                           #         subagent permissions, agent runtime models (tier/source),
+                           #         contract self-check (prompt schemas + tool whitelists),
+                           #         report layout (stray artifact detection)
                            # --clean-reports removes stray *-report.{md,json} artifacts
                            # --strict exits non-zero on any warning
+                           # exit codes: 0 clean, 1 warning (with --strict), 2 contract failure
 omre dry-run               # build the prompt locally, no model calls
 ```
 
@@ -333,6 +340,7 @@ The plugin exposes seven tools for programmatic use:
 - **Command injection** — Command names are validated against `SAFE_COMMAND_PATTERN` and a forbidden list (`__proto__`, `constructor`, `prototype`).
 - **Diff bounds** — Unified diff is capped at 180KB with a visible truncation marker.
 - **Atomic writes** — No partial files, no mid-crash corruption.
+- **Permission hook** — The `permission.ask` hook auto-denies write/edit access to `.omre/reports/` and `.omre/handoffs/` from external agents, preventing accidental corruption of review artifacts.
 
 None of these are optional or togglable — they're always on.
 
