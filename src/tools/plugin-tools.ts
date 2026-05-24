@@ -65,8 +65,8 @@ export const tools = {
         args = args.slice(0, MAX_ARGS_LENGTH) + "\n[WARNING: User guidance truncated due to excessive length]";
       }
       args = validateAndSanitizeArgs(args);
-      const { cwd, trusted } = resolveCwd(input.cwd, context.directory);
-      const bundle = buildReviewCodePrompt({ ...input, args, cwd }, trusted);
+      const { cwd } = resolveCwd(input.cwd, context.directory);
+      const bundle = buildReviewCodePrompt({ ...input, args, cwd });
       return JSON.stringify({
         prompt: bundle.prompt,
         estimatedTasks: bundle.estimatedTasks,
@@ -89,14 +89,13 @@ export const tools = {
       missingDimensionsGlobal: z.array(z.string()).optional(),
     },
     async execute(input, context) {
-      const { cwd, trusted } = resolveCwd(input.cwd, context.directory);
+      const { cwd } = resolveCwd(input.cwd, context.directory);
       const written = persistReport(
         input.markdown,
         input.json ?? {},
         cwd,
         input.degradedSlices,
         input.missingDimensionsGlobal,
-        trusted,
         input.runId
       );
       return JSON.stringify({ written });
@@ -130,7 +129,7 @@ export const tools = {
     },
     async execute(input, context) {
       try {
-        const { cwd, trusted } = resolveCwd(input.cwd, context.directory);
+        const { cwd } = resolveCwd(input.cwd, context.directory);
         const errors: string[] = [];
         if (input.payload.task_id !== undefined && input.payload.task_id.length === 0) {
           errors.push("task_id, when provided, must be non-empty");
@@ -150,7 +149,7 @@ export const tools = {
         if (errors.length > 0) {
           return JSON.stringify({ ok: false, errors });
         }
-        const config = loadConfig(cwd, trusted);
+        const config = loadConfig(cwd);
         const p = input.payload;
         const payload: HandoffPayload = {
           schemaVersion: p.schema_version,
@@ -183,8 +182,8 @@ export const tools = {
       cwd: z.string().optional(),
     },
     async execute(input, context) {
-      const { cwd, trusted } = resolveCwd(input.cwd, context.directory);
-      const markdown = renderLocalDryRun({ ...input, cwd }, trusted);
+      const { cwd } = resolveCwd(input.cwd, context.directory);
+      const markdown = renderLocalDryRun({ ...input, cwd });
       return markdown;
     },
   }),
@@ -204,7 +203,7 @@ export const tools = {
         assertSafePath(resolvedCwd, trustedBase, "omre_finalize_review cwd");
       }
       try {
-        const result = finalizeReview({ runId: input.runId, cwd, trusted: true });
+        const result = finalizeReview({ runId: input.runId, cwd });
         return JSON.stringify({
           ok: true,
           written: result.written,
@@ -225,8 +224,8 @@ export const tools = {
       cwd: z.string().optional(),
     },
     async execute(input, context) {
-      const { cwd, trusted } = resolveCwd(input.cwd, context.directory);
-      const config = loadConfig(cwd, trusted);
+      const { cwd } = resolveCwd(input.cwd, context.directory);
+      const config = loadConfig(cwd);
       return JSON.stringify(config);
     },
   }),

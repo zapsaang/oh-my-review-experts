@@ -50,7 +50,7 @@ async function executeWriteHandoffRaw(raw: unknown, directory: string): Promise<
 
 describe("omre_write_handoff result shape [L4 fix]", () => {
   it("returns { ok: true, filePath } on success", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-ok-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-handoff-ok-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -84,7 +84,7 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
   });
 
   it("returns { ok: false, errors } when handoff is disabled (no throw)", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-disabled-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-handoff-disabled-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -115,7 +115,7 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
   });
 
   it("rejects explicitly-empty task_id with { ok: false, errors }", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-empty-task-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-handoff-empty-task-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -150,7 +150,7 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
   });
 
   it("rejects empty agent at the write boundary", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-empty-agent-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-handoff-empty-agent-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -178,7 +178,7 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
   });
 
   it("rejects empty dimension at the write boundary", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-empty-dimension-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-handoff-empty-dimension-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -206,7 +206,7 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
   });
 
   it("rejects empty target kind at the write boundary", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-empty-kind-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-handoff-empty-kind-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -235,7 +235,7 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
   });
 
   it("rejects empty agent directly in execute() bypassing args schema", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-direct-agent-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-handoff-direct-agent-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -266,7 +266,7 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
   });
 
   it("rejects empty dimension directly in execute() bypassing args schema", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-direct-dimension-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-handoff-direct-dimension-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -297,7 +297,7 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
   });
 
   it("rejects empty target.kind directly in execute() bypassing args schema", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-direct-kind-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-handoff-direct-kind-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -329,7 +329,7 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
   });
 
   it("rejects empty slice_id directly in execute() bypassing args schema", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-direct-slice-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-handoff-direct-slice-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -361,7 +361,7 @@ describe("omre_write_handoff result shape [L4 fix]", () => {
   });
 
   it("returns { ok: false, errors } on rejected handoff directory (no throw)", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-traversal-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-handoff-traversal-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -432,7 +432,7 @@ describe("plugin tools", () => {
   });
 
   it("omre_write_report accepts structured JSON payload", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-report-test-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-report-test-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -455,7 +455,7 @@ describe("plugin tools", () => {
   });
 
   it("omre_write_report propagates runId to history markdown filename", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-report-runid-md-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-report-runid-md-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -483,7 +483,7 @@ describe("plugin tools", () => {
   });
 
   it("omre_write_report propagates runId to history json filename", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-report-runid-json-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-report-runid-json-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -511,7 +511,7 @@ describe("plugin tools", () => {
   });
 
   it("omre_write_report falls back to timestamp when runId is absent", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-report-no-runid-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-report-no-runid-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -549,7 +549,7 @@ describe("plugin tools", () => {
   });
 
   it("omre_write_handoff uses context.directory when cwd is omitted", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-test-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-handoff-test-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -618,7 +618,7 @@ describe("plugin tools", () => {
   });
 
   it("omre_write_handoff writes findings with extra fields and missing optionals", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-findings-test-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-handoff-findings-test-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -661,7 +661,7 @@ describe("plugin tools", () => {
   });
 
   it("omre_write_handoff followed by validate_handoff round-trip", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-roundtrip-test-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-roundtrip-test-"));
     try {
       fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
       fs.writeFileSync(
@@ -785,7 +785,7 @@ function buildHandoffJson(overrides: Record<string, unknown> = {}): string {
 }
 
 function withTempCwd<T>(fn: (cwd: string) => Promise<T>): Promise<T> {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "omre-handoff-"));
+  const tmp = fs.mkdtempSync(path.join(process.cwd(), "omre-handoff-"));
   return fn(tmp).finally(() => {
     try {
       fs.rmSync(tmp, { recursive: true, force: true });
@@ -965,7 +965,7 @@ function parseFinalizeArgs(raw: unknown): z.infer<z.ZodObject<typeof omreFinaliz
 }
 
 function createTempProjectForFinalize(): string {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-finalize-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-finalize-"));
   fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, ".omre", "config.json"),
