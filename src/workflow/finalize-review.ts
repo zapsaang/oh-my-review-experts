@@ -20,7 +20,6 @@ import { parseHandoffJsonHeader } from "../tools/handoff.js";
 export interface FinalizeReviewInput {
   runId: string;
   cwd: string;
-  trusted?: boolean;
 }
 
 export interface FinalizeReviewResult {
@@ -391,8 +390,7 @@ function buildReportJson(merged: MergedResult, runId: string): Record<string, un
 }
 
 export function finalizeReview(input: FinalizeReviewInput): FinalizeReviewResult {
-  const trusted = input.trusted ?? true;
-  const config = loadConfig(input.cwd, trusted);
+  const config = loadConfig(input.cwd);
 
   const resolvedCwd = path.resolve(input.cwd);
   const handoffBase = path.resolve(resolvedCwd, config.handoff.directory);

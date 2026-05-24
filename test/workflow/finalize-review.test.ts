@@ -47,10 +47,11 @@ async function loadFinalizeReview(): Promise<{
 // ---------------------------------------------------------------------------
 
 function createTempProject(): string {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-finalize-"));
-  fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+  const absoluteTmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-finalize-"));
+  const relativeTmpDir = path.relative(process.cwd(), absoluteTmpDir);
+  fs.mkdirSync(path.join(absoluteTmpDir, ".omre"), { recursive: true });
   fs.writeFileSync(
-    path.join(tmpDir, ".omre", "config.json"),
+    path.join(absoluteTmpDir, ".omre", "config.json"),
     JSON.stringify({
       report: {
         enabled: true,
@@ -66,7 +67,7 @@ function createTempProject(): string {
     }),
     "utf8"
   );
-  return tmpDir;
+  return relativeTmpDir;
 }
 
 function buildHandoffJsonHeader(
