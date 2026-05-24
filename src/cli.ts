@@ -100,16 +100,34 @@ function ensurePluginInOpencodeConfig(configFile: string, maxRetries = 3): boole
   return false
 }
 
-function getOpencodeConfigPath(global: boolean, cwd = process.cwd()): string {
+export function getOpencodeConfigPath(global: boolean, cwd = process.cwd(), homeDir = os.homedir()): string {
   return global
-    ? path.join(os.homedir(), ".config", "opencode", "opencode.json")
+    ? path.join(homeDir, ".config", "opencode", "opencode.json")
     : path.resolve(cwd, "opencode.json")
 }
 
-function getPluginConfigPath(global: boolean): string {
+export function getPluginConfigPath(global: boolean, cwd = process.cwd(), homeDir = os.homedir()): string {
   return global
-    ? path.join(os.homedir(), ".config", "opencode", "oh-my-review-experts.jsonc")
-    : path.resolve(process.cwd(), ".opencode", "oh-my-review-experts.jsonc")
+    ? path.join(homeDir, ".config", "opencode", "oh-my-review-experts.jsonc")
+    : path.resolve(cwd, ".opencode", "oh-my-review-experts.jsonc")
+}
+
+export interface InstallResult {
+  opencodeConfigPath: string;
+  pluginChanged: boolean;
+  pluginConfigPath: string;
+  configCreated: boolean;
+}
+
+export function runInstall(opts: { global?: boolean; project?: boolean; cwd?: string; homeDir?: string }): InstallResult {
+  const cwd = opts.cwd ?? process.cwd()
+  const homeDir = opts.homeDir ?? os.homedir()
+  const global = !!opts.global
+  const opencodeConfigPath = getOpencodeConfigPath(global, cwd, homeDir)
+  const pluginChanged = ensurePluginInOpencodeConfig(opencodeConfigPath)
+  const pluginConfigPath = getPluginConfigPath(global, cwd, homeDir)
+  const configCreated = writeIfMissing(pluginConfigPath, defaultConfigJsonc())
+  return { opencodeConfigPath, pluginChanged, pluginConfigPath, configCreated }
 }
 
 export interface DoctorContractChecks {
@@ -335,16 +353,9 @@ export function createCliProgram(): Command {
     .option("--project", "write ./opencode.json", false)
     .action((opts: { global?: boolean; project?: boolean }) => {
       try {
-        const target = getOpencodeConfigPath(!!opts.global)
-        const pluginChanged = ensurePluginInOpencodeConfig(target)
-        console.log(pluginChanged ? pc.green(`enabled plugin in ${target}`) : pc.gray(`already enabled in ${target}`))
-        const cfg = getPluginConfigPath(!!opts.global)
-        const created = writeIfMissing(cfg, defaultConfigJsonc())
-        if (created) {
-          console.log(pc.green(`config ready: ${cfg}`))
-        } else {
-          console.log(pc.gray(`config exists: ${cfg}`))
-        }
+        const result = runInstall(opts)
+        console.log(result.pluginChanged ? pc.green(`enabled plugin in ${result.opencodeConfigPath}`) : pc.gray(`already enabled in ${result.opencodeConfigPath}`))
+        console.log(result.configCreated ? pc.green(`config ready: ${result.pluginConfigPath}`) : pc.gray(`config exists: ${result.pluginConfigPath}`))
       } catch (err) {
         console.error(pc.red(`install failed: ${err instanceof Error ? err.message : String(err)}`))
         process.exit(1)

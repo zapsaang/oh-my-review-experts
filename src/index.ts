@@ -2,7 +2,7 @@ import type { Plugin, Hooks, Config, PluginModule } from "@opencode-ai/plugin"
 import type { Part, Permission } from "@opencode-ai/sdk"
 import { injectReviewCodePrompt } from "./hooks/command-injection.js"
 import { tools } from "./tools/plugin-tools.js"
-import { loadConfig } from "./config/load-config.js"
+import { loadConfig, loadConfigUnsafe } from "./config/load-config.js"
 import { registerAgents } from "./agents/registry.js"
 import { VERSION } from "./version.js"
 
@@ -27,7 +27,7 @@ function makeTextPart(sessionID: string, text: string) {
 const INJECTION_MODES_WITH_HOOK = new Set(["hook", "both"])
 
 function registerCommands(config: Config, cwd: string): string[] {
-  const omreConfig = loadConfig(cwd, true)
+  const omreConfig = loadConfigUnsafe(cwd)
   if (!omreConfig.enabled || !omreConfig.command.enabled) {
     return []
   }
@@ -95,7 +95,7 @@ const OhMyReviewExperts: Plugin = async (input) => {
           })
         }
 
-        const omreConfig = loadConfig(input.directory, true)
+        const omreConfig = loadConfigUnsafe(input.directory)
 
         const { registered: agentNames, skipped: agentSkipped } = registerAgents(config, omreConfig)
         if (agentNames.length > 0) {
