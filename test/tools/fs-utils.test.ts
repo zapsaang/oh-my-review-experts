@@ -32,6 +32,7 @@ describe("writeFileAtomic", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -49,6 +50,46 @@ describe("writeFileAtomic", () => {
     expect(result).toBe(path.join(tmpDir, "test-1.txt"));
     expect(fs.readFileSync(filePath, "utf8")).toBe("first");
     expect(fs.readFileSync(result, "utf8")).toBe("second");
+  });
+
+  it("writeFileAtomic throws after 10 EEXIST collisions", () => {
+    const filePath = path.join(tmpDir, "test.txt");
+    const writeFileSpy = vi.spyOn(fs, "writeFileSync").mockImplementation(() => {
+      throw Object.assign(new Error("exists"), { code: "EEXIST" });
+    });
+
+    expect(() => writeFileAtomic(filePath, "hello")).toThrow(/retr|exhaust|attempt/i);
+    expect(writeFileSpy).toHaveBeenCalledTimes(10);
+  });
+
+  it("writeFileAtomic propagates ENOSPC errors immediately", () => {
+    const filePath = path.join(tmpDir, "test.txt");
+    const writeFileSpy = vi.spyOn(fs, "writeFileSync").mockImplementation(() => {
+      throw Object.assign(new Error("disk full"), { code: "ENOSPC" });
+    });
+
+    expect(() => writeFileAtomic(filePath, "hello")).toThrow(/disk full/);
+    expect(writeFileSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("writeFileAtomic propagates EACCES errors immediately", () => {
+    const filePath = path.join(tmpDir, "test.txt");
+    const writeFileSpy = vi.spyOn(fs, "writeFileSync").mockImplementation(() => {
+      throw Object.assign(new Error("permission denied"), { code: "EACCES" });
+    });
+
+    expect(() => writeFileAtomic(filePath, "hello")).toThrow(/permission denied/);
+    expect(writeFileSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("writeFileAtomic propagates EIO errors immediately", () => {
+    const filePath = path.join(tmpDir, "test.txt");
+    const writeFileSpy = vi.spyOn(fs, "writeFileSync").mockImplementation(() => {
+      throw Object.assign(new Error("i/o error"), { code: "EIO" });
+    });
+
+    expect(() => writeFileAtomic(filePath, "hello")).toThrow(/i\/o error/);
+    expect(writeFileSpy).toHaveBeenCalledTimes(1);
   });
 });
 

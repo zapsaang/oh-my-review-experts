@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { writeReport } from "../../src/tools/report.js";
+import { writeReport, validateReportMarkdown, renderCoverageWarning } from "../../src/tools/report.js";
 import { OmreConfig } from "../../src/config/schema.js";
 
 function createTestConfig(overrides: Partial<OmreConfig["report"]> = {}): OmreConfig {
@@ -347,5 +347,93 @@ describe("writeReport", () => {
       const historyJson = JSON.parse(fs.readFileSync(path.join(historyDir, jsonFile!), "utf8"));
       expect(historyJson).toEqual(latestJson);
     });
+  });
+});
+
+describe("validateReportMarkdown direct tests", () => {
+  it("returns ok: true for well-formed markdown >= 200 chars and >= 5 non-blank lines starting with #", () => {
+    const md = [
+      "# Review Report",
+      "This is line one with enough content to contribute to the overall length requirement of two hundred characters.",
+      "Line two also has sufficient text to ensure we meet the minimum length threshold for validation.",
+      "Line three continues with more words to pad out the document properly.",
+      "Line four is here as well with additional content for completeness.",
+      "Line five brings us to the end with enough text to satisfy all constraints.",
+    ].join("\n");
+    const result = validateReportMarkdown(md);
+    expect(result.ok).toBe(true);
+    expect(result.reason).toBeUndefined();
+  });
+
+  it("returns ok: false reason: empty for empty/whitespace input", () => {
+    const result = validateReportMarkdown("   \n\n  ");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("empty");
+  });
+
+  it("returns ok: false reason: too-short when trimmed length < 200", () => {
+    const result = validateReportMarkdown("# Title\nshort body");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("too-short");
+  });
+
+  it("returns ok: false reason: too-few-lines when non-blank lines < 5", () => {
+    const md = "# Title\n" + "x".repeat(200) + "\n\nend";
+    const result = validateReportMarkdown(md);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("too-few-lines");
+  });
+
+  it("returns ok: false reason: no-heading when first non-whitespace char is not #", () => {
+    const md = "Title without hash\n" + "a".repeat(50) + "\n" + "b".repeat(50) + "\n" + "c".repeat(50) + "\n" + "d".repeat(50) + "\n" + "e".repeat(50);
+    const result = validateReportMarkdown(md);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("no-heading");
+  });
+
+  it("returns ok: false reason: reference-only for short reference messages", () => {
+    const result = validateReportMarkdown("Report persisted to /tmp/foo.md");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("reference-only");
+  });
+});
+
+describe("renderCoverageWarning direct tests", () => {
+  it("returns the warning header when both inputs are empty", () => {
+    const result = renderCoverageWarning([], []);
+    expect(result).toContain("## Coverage warning");
+    expect(result).toContain("Coverage is degraded");
+    expect(result).not.toContain("### Degraded slices");
+    expect(result).not.toContain("### Missing dimensions globally");
+  });
+
+  it("includes Degraded slices section when degradedSlices is non-empty", () => {
+    const result = renderCoverageWarning([{ slice_id: "s1", missing_dimensions: ["security"] }], []);
+    expect(result).toContain("### Degraded slices");
+    expect(result).toContain("s1");
+    expect(result).toContain("security");
+  });
+
+  it("includes Missing dimensions globally section when missingDimensionsGlobal is non-empty", () => {
+    const result = renderCoverageWarning([], ["spec", "concurrency"]);
+    expect(result).toContain("### Missing dimensions globally");
+    expect(result).toContain("spec");
+    expect(result).toContain("concurrency");
+  });
+
+  it("includes both sections when both inputs are non-empty", () => {
+    const result = renderCoverageWarning(
+      [{ slice_id: "s1", missing_dimensions: ["security"] }],
+      ["spec", "concurrency"]
+    );
+    expect(result).toContain("### Degraded slices");
+    expect(result).toContain("### Missing dimensions globally");
+    const degradedIndex = result.indexOf("### Degraded slices");
+    const missingIndex = result.indexOf("### Missing dimensions globally");
+    expect(degradedIndex).toBeLessThan(missingIndex);
+    expect(result).toContain("s1");
+    expect(result).toContain("security");
+    expect(result).toContain("spec");
+    expect(result).toContain("concurrency");
   });
 });
