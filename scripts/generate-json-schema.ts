@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { toJSONSchema } from "zod";
 import { OmreConfigSchema } from "../src/config/schema.js";
+import { deterministicStringify } from "../src/utils/deterministic-json.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -49,6 +50,6 @@ stripRequired(jsonSchema);
 
 const outputPath = path.join(__dirname, "..", "schemas", "oh-my-review-experts.schema.json");
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-fs.writeFileSync(outputPath, JSON.stringify(jsonSchema, null, 2), "utf8");
+fs.writeFileSync(outputPath, deterministicStringify(jsonSchema), "utf8");
 
 console.log(`JSON Schema written to ${outputPath}`);

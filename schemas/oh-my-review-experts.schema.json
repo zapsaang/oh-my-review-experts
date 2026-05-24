@@ -1,646 +1,549 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/zapsaang/oh-my-review-experts/main/schemas/oh-my-review-experts.schema.json",
-  "title": "Oh My Review Experts Config",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Configuration schema for the oh-my-review-experts OpenCode plugin.",
-  "type": "object",
   "properties": {
-    "enabled": {
-      "description": "Globally enable or disable the review plugin.",
-      "default": true,
-      "type": "boolean"
+    "agents": {
+      "additionalProperties": false,
+      "default": {},
+      "description": "Agent-specific model and inference settings.",
+      "properties": {
+        "omre-global-arbiter": {
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "temperature": {
+              "maximum": 2,
+              "minimum": 0,
+              "type": "number"
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "omre-report-writer": {
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "temperature": {
+              "maximum": 2,
+              "minimum": 0,
+              "type": "number"
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "omre-result-validator": {
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "temperature": {
+              "maximum": 2,
+              "minimum": 0,
+              "type": "number"
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "omre-reviewer-concurrency": {
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "temperature": {
+              "maximum": 2,
+              "minimum": 0,
+              "type": "number"
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "omre-reviewer-performance": {
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "temperature": {
+              "maximum": 2,
+              "minimum": 0,
+              "type": "number"
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "omre-reviewer-quality": {
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "temperature": {
+              "maximum": 2,
+              "minimum": 0,
+              "type": "number"
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "omre-reviewer-security": {
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "temperature": {
+              "maximum": 2,
+              "minimum": 0,
+              "type": "number"
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "omre-reviewer-spec": {
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "temperature": {
+              "maximum": 2,
+              "minimum": 0,
+              "type": "number"
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "omre-slice-arbiter": {
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "temperature": {
+              "maximum": 2,
+              "minimum": 0,
+              "type": "number"
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "omre-slice-plan-validator": {
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "temperature": {
+              "maximum": 2,
+              "minimum": 0,
+              "type": "number"
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "omre-slice-planner": {
+          "additionalProperties": false,
+          "properties": {
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "temperature": {
+              "maximum": 2,
+              "minimum": 0,
+              "type": "number"
+            },
+            "top_p": {
+              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "variant": {
+              "description": "Model variant. Passed through to the runtime.",
+              "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "arbitration": {
+      "additionalProperties": false,
+      "default": {
+        "hierarchicalThreshold": 3
+      },
+      "description": "Arbitration strategy settings for merging reviewer findings.",
+      "properties": {
+        "hierarchicalThreshold": {
+          "default": 3,
+          "description": "Number of slices above which hierarchical arbitration is used instead of flat merging. Range: 1-32.",
+          "maximum": 32,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
     },
     "command": {
-      "description": "Slash command registration settings.",
+      "additionalProperties": false,
       "default": {
-        "enabled": true,
-        "name": "review-code",
         "aliases": [
           "rc"
         ],
+        "enabled": true,
         "injection": "both",
+        "name": "review-code",
         "scopeResolution": "auto"
       },
-      "type": "object",
+      "description": "Slash command registration settings.",
       "properties": {
-        "enabled": {
-          "description": "Enable the /review-code slash command.",
-          "default": true,
-          "type": "boolean"
-        },
-        "name": {
-          "description": "Slash command name. Alphanumeric, underscore, or hyphen only. Forbidden names: __proto__, constructor, prototype.",
-          "default": "review-code",
-          "type": "string",
-          "pattern": "^[a-zA-Z0-9_-]+$",
-          "not": {
-            "enum": [
-              "__proto__",
-              "constructor",
-              "prototype"
-            ]
-          }
-        },
         "aliases": {
-          "description": "Alternative names for the slash command.",
           "default": [
             "rc"
           ],
-          "type": "array",
+          "description": "Alternative names for the slash command.",
           "items": {
-            "type": "string",
-            "pattern": "^[a-zA-Z0-9_-]+$",
             "not": {
               "enum": [
                 "__proto__",
                 "constructor",
                 "prototype"
               ]
-            }
-          }
+            },
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "enabled": {
+          "default": true,
+          "description": "Enable the /review-code slash command.",
+          "type": "boolean"
         },
         "injection": {
-          "description": "How the command is wired: 'both' registers via config hook and intercepts execution; 'hook' same as both; 'disabled' mutes the plugin; 'tool' disables slash commands but keeps plugin tools available.",
           "default": "both",
-          "type": "string",
+          "description": "How the command is wired: 'both' registers via config hook and intercepts execution; 'hook' same as both; 'disabled' mutes the plugin; 'tool' disables slash commands but keeps plugin tools available.",
           "enum": [
             "hook",
             "tool",
             "both",
             "disabled"
-          ]
+          ],
+          "type": "string"
+        },
+        "name": {
+          "default": "review-code",
+          "description": "Slash command name. Alphanumeric, underscore, or hyphen only. Forbidden names: __proto__, constructor, prototype.",
+          "not": {
+            "enum": [
+              "__proto__",
+              "constructor",
+              "prototype"
+            ]
+          },
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "type": "string"
         },
         "scopeResolution": {
-          "description": "How user-provided args drive review scope. 'auto' (default) parses commit/branch/path/staged forms deterministically. 'guidance-only' treats args as opaque guidance text and uses the default git diff HEAD scope (preserves pre-0.x behavior).",
           "default": "auto",
-          "type": "string",
+          "description": "How user-provided args drive review scope. 'auto' (default) parses commit/branch/path/staged forms deterministically. 'guidance-only' treats args as opaque guidance text and uses the default git diff HEAD scope (preserves pre-0.x behavior).",
           "enum": [
             "auto",
             "guidance-only"
-          ]
+          ],
+          "type": "string"
         }
       },
-      "additionalProperties": false
+      "type": "object"
     },
-    "agents": {
-      "description": "Agent-specific model and inference settings.",
-      "default": {},
-      "type": "object",
-      "properties": {
-        "omre-reviewer-spec": {
-          "type": "object",
-          "properties": {
-            "model": {
-              "type": "string",
-              "minLength": 1
-            },
-            "variant": {
-              "description": "Model variant. Passed through to the runtime.",
-              "type": "string",
-              "enum": [
-                "max",
-                "high",
-                "medium",
-                "low"
-              ]
-            },
-            "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
-            },
-            "top_p": {
-              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "additionalProperties": false
-        },
-        "omre-reviewer-quality": {
-          "type": "object",
-          "properties": {
-            "model": {
-              "type": "string",
-              "minLength": 1
-            },
-            "variant": {
-              "description": "Model variant. Passed through to the runtime.",
-              "type": "string",
-              "enum": [
-                "max",
-                "high",
-                "medium",
-                "low"
-              ]
-            },
-            "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
-            },
-            "top_p": {
-              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "additionalProperties": false
-        },
-        "omre-reviewer-security": {
-          "type": "object",
-          "properties": {
-            "model": {
-              "type": "string",
-              "minLength": 1
-            },
-            "variant": {
-              "description": "Model variant. Passed through to the runtime.",
-              "type": "string",
-              "enum": [
-                "max",
-                "high",
-                "medium",
-                "low"
-              ]
-            },
-            "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
-            },
-            "top_p": {
-              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "additionalProperties": false
-        },
-        "omre-reviewer-performance": {
-          "type": "object",
-          "properties": {
-            "model": {
-              "type": "string",
-              "minLength": 1
-            },
-            "variant": {
-              "description": "Model variant. Passed through to the runtime.",
-              "type": "string",
-              "enum": [
-                "max",
-                "high",
-                "medium",
-                "low"
-              ]
-            },
-            "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
-            },
-            "top_p": {
-              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "additionalProperties": false
-        },
-        "omre-reviewer-concurrency": {
-          "type": "object",
-          "properties": {
-            "model": {
-              "type": "string",
-              "minLength": 1
-            },
-            "variant": {
-              "description": "Model variant. Passed through to the runtime.",
-              "type": "string",
-              "enum": [
-                "max",
-                "high",
-                "medium",
-                "low"
-              ]
-            },
-            "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
-            },
-            "top_p": {
-              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "additionalProperties": false
-        },
-        "omre-slice-planner": {
-          "type": "object",
-          "properties": {
-            "model": {
-              "type": "string",
-              "minLength": 1
-            },
-            "variant": {
-              "description": "Model variant. Passed through to the runtime.",
-              "type": "string",
-              "enum": [
-                "max",
-                "high",
-                "medium",
-                "low"
-              ]
-            },
-            "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
-            },
-            "top_p": {
-              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "additionalProperties": false
-        },
-        "omre-slice-plan-validator": {
-          "type": "object",
-          "properties": {
-            "model": {
-              "type": "string",
-              "minLength": 1
-            },
-            "variant": {
-              "description": "Model variant. Passed through to the runtime.",
-              "type": "string",
-              "enum": [
-                "max",
-                "high",
-                "medium",
-                "low"
-              ]
-            },
-            "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
-            },
-            "top_p": {
-              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "additionalProperties": false
-        },
-        "omre-result-validator": {
-          "type": "object",
-          "properties": {
-            "model": {
-              "type": "string",
-              "minLength": 1
-            },
-            "variant": {
-              "description": "Model variant. Passed through to the runtime.",
-              "type": "string",
-              "enum": [
-                "max",
-                "high",
-                "medium",
-                "low"
-              ]
-            },
-            "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
-            },
-            "top_p": {
-              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "additionalProperties": false
-        },
-        "omre-slice-arbiter": {
-          "type": "object",
-          "properties": {
-            "model": {
-              "type": "string",
-              "minLength": 1
-            },
-            "variant": {
-              "description": "Model variant. Passed through to the runtime.",
-              "type": "string",
-              "enum": [
-                "max",
-                "high",
-                "medium",
-                "low"
-              ]
-            },
-            "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
-            },
-            "top_p": {
-              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "additionalProperties": false
-        },
-        "omre-global-arbiter": {
-          "type": "object",
-          "properties": {
-            "model": {
-              "type": "string",
-              "minLength": 1
-            },
-            "variant": {
-              "description": "Model variant. Passed through to the runtime.",
-              "type": "string",
-              "enum": [
-                "max",
-                "high",
-                "medium",
-                "low"
-              ]
-            },
-            "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
-            },
-            "top_p": {
-              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "additionalProperties": false
-        },
-        "omre-report-writer": {
-          "type": "object",
-          "properties": {
-            "model": {
-              "type": "string",
-              "minLength": 1
-            },
-            "variant": {
-              "description": "Model variant. Passed through to the runtime.",
-              "type": "string",
-              "enum": [
-                "max",
-                "high",
-                "medium",
-                "low"
-              ]
-            },
-            "temperature": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 2
-            },
-            "top_p": {
-              "description": "Nucleus sampling cutoff. Passed through to the runtime.",
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1
-            }
-          },
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
-    },
-    "slicing": {
-      "description": "File classification and grouping settings.",
+    "costGuardrail": {
+      "additionalProperties": false,
       "default": {
+        "compactModeThreshold": 20,
         "enabled": true,
-        "maxSlices": 4,
-        "skipDocsOnly": true,
-        "skipTestOnlyHeavyReview": true,
-        "forceWholeTargetAboveSlices": 12
+        "hardStopThreshold": 60,
+        "maxEstimatedTasks": 24
       },
-      "type": "object",
+      "description": "Cost guardrail settings to prevent accidental high-cost reviews.",
       "properties": {
+        "compactModeThreshold": {
+          "default": 20,
+          "description": "Estimated task threshold for compact mode (reduced reviewer matrix). Range: 1-1000.",
+          "maximum": 1000,
+          "minimum": 1,
+          "type": "integer"
+        },
         "enabled": {
-          "description": "Enable the file slicing engine that groups changed files into coherent review slices.",
           "default": true,
+          "description": "Enable cost estimation and guardrails before launching the review pipeline.",
           "type": "boolean"
         },
-        "maxSlices": {
-          "description": "Maximum number of slices to generate. Range: 1-32.",
-          "default": 4,
-          "type": "integer",
+        "hardStopThreshold": {
+          "default": 60,
+          "description": "Absolute maximum estimated tasks; pipeline halts if exceeded. Range: 1-1000.",
+          "maximum": 1000,
           "minimum": 1,
-          "maximum": 32
+          "type": "integer"
         },
-        "skipDocsOnly": {
-          "description": "Skip heavy review for docs-only slices.",
-          "default": true,
-          "type": "boolean"
-        },
-        "skipTestOnlyHeavyReview": {
-          "description": "Skip heavy review for test-only slices.",
-          "default": true,
-          "type": "boolean"
-        },
-        "forceWholeTargetAboveSlices": {
-          "description": "When the estimated number of slices exceeds this threshold, review the entire target as one unit instead of slicing. Range: 1-100.",
-          "default": 12,
-          "type": "integer",
+        "maxEstimatedTasks": {
+          "default": 24,
+          "description": "Maximum estimated tasks before switching to compact mode. Range: 1-1000.",
+          "maximum": 1000,
           "minimum": 1,
-          "maximum": 100
+          "type": "integer"
         }
       },
-      "additionalProperties": false
+      "type": "object"
+    },
+    "enabled": {
+      "default": true,
+      "description": "Globally enable or disable the review plugin.",
+      "type": "boolean"
+    },
+    "handoff": {
+      "additionalProperties": false,
+      "default": {
+        "directory": ".omre/handoffs",
+        "enabled": true
+      },
+      "description": "Handoff protocol settings for structured subagent output.",
+      "properties": {
+        "directory": {
+          "default": ".omre/handoffs",
+          "description": "Directory for handoff files. Must be a safe relative path (no .., no absolute paths).",
+          "pattern": "^(?!\\/)((?!\\.\\.)[a-zA-Z0-9_\\-\\.\\/])+$",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "description": "Enable the handoff protocol for structured subagent communication.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
     },
     "partialRerun": {
-      "description": "Partial rerun settings for failed reviewer tasks.",
+      "additionalProperties": false,
       "default": {
         "enabled": true,
         "maxRetriesPerTask": 1
       },
-      "type": "object",
+      "description": "Partial rerun settings for failed reviewer tasks.",
       "properties": {
         "enabled": {
-          "description": "Enable partial rerun: when a reviewer fails, re-run only that task instead of the whole pipeline.",
           "default": true,
+          "description": "Enable partial rerun: when a reviewer fails, re-run only that task instead of the whole pipeline.",
           "type": "boolean"
         },
         "maxRetriesPerTask": {
-          "description": "Maximum retry attempts per failed task. Range: 0-1.",
           "default": 1,
-          "type": "integer",
+          "description": "Maximum retry attempts per failed task. Range: 0-1.",
+          "maximum": 1,
           "minimum": 0,
-          "maximum": 1
+          "type": "integer"
         }
       },
-      "additionalProperties": false
-    },
-    "costGuardrail": {
-      "description": "Cost guardrail settings to prevent accidental high-cost reviews.",
-      "default": {
-        "enabled": true,
-        "maxEstimatedTasks": 24,
-        "compactModeThreshold": 20,
-        "hardStopThreshold": 60
-      },
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "description": "Enable cost estimation and guardrails before launching the review pipeline.",
-          "default": true,
-          "type": "boolean"
-        },
-        "maxEstimatedTasks": {
-          "description": "Maximum estimated tasks before switching to compact mode. Range: 1-1000.",
-          "default": 24,
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 1000
-        },
-        "compactModeThreshold": {
-          "description": "Estimated task threshold for compact mode (reduced reviewer matrix). Range: 1-1000.",
-          "default": 20,
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 1000
-        },
-        "hardStopThreshold": {
-          "description": "Absolute maximum estimated tasks; pipeline halts if exceeded. Range: 1-1000.",
-          "default": 60,
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 1000
-        }
-      },
-      "additionalProperties": false
-    },
-    "arbitration": {
-      "description": "Arbitration strategy settings for merging reviewer findings.",
-      "default": {
-        "hierarchicalThreshold": 3
-      },
-      "type": "object",
-      "properties": {
-        "hierarchicalThreshold": {
-          "description": "Number of slices above which hierarchical arbitration is used instead of flat merging. Range: 1-32.",
-          "default": 3,
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 32
-        }
-      },
-      "additionalProperties": false
+      "type": "object"
     },
     "report": {
-      "description": "Report output settings.",
+      "additionalProperties": false,
       "default": {
-        "enabled": true,
         "directory": ".omre/reports",
-        "latestMarkdown": "latest.md",
+        "enabled": true,
         "latestJson": "latest.json",
+        "latestMarkdown": "latest.md",
         "timestamped": true
       },
-      "type": "object",
+      "description": "Report output settings.",
       "properties": {
-        "enabled": {
-          "description": "Enable report generation and persistence.",
-          "default": true,
-          "type": "boolean"
-        },
         "directory": {
-          "description": "Directory for report output. Must be a safe relative path (no .., no absolute paths).",
           "default": ".omre/reports",
-          "type": "string",
-          "pattern": "^(?!\\/)((?!\\.\\.)[a-zA-Z0-9_\\-\\.\\/])+$"
+          "description": "Directory for report output. Must be a safe relative path (no .., no absolute paths).",
+          "pattern": "^(?!\\/)((?!\\.\\.)[a-zA-Z0-9_\\-\\.\\/])+$",
+          "type": "string"
         },
-        "latestMarkdown": {
-          "description": "Filename for the latest markdown report.",
-          "default": "latest.md",
-          "type": "string",
-          "pattern": "^(?!.*\\.\\.)[a-zA-Z0-9_\\-\\.]+$"
+        "enabled": {
+          "default": true,
+          "description": "Enable report generation and persistence.",
+          "type": "boolean"
         },
         "latestJson": {
-          "description": "Filename for the latest JSON report.",
           "default": "latest.json",
-          "type": "string",
-          "pattern": "^(?!.*\\.\\.)[a-zA-Z0-9_\\-\\.]+$"
+          "description": "Filename for the latest JSON report.",
+          "pattern": "^(?!.*\\.\\.)[a-zA-Z0-9_\\-\\.]+$",
+          "type": "string"
+        },
+        "latestMarkdown": {
+          "default": "latest.md",
+          "description": "Filename for the latest markdown report.",
+          "pattern": "^(?!.*\\.\\.)[a-zA-Z0-9_\\-\\.]+$",
+          "type": "string"
         },
         "timestamped": {
+          "default": true,
           "description": "Generate timestamped history copies alongside latest.md/latest.json.",
-          "default": true,
           "type": "boolean"
         }
       },
-      "additionalProperties": false
-    },
-    "handoff": {
-      "description": "Handoff protocol settings for structured subagent output.",
-      "default": {
-        "enabled": true,
-        "directory": ".omre/handoffs"
-      },
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "description": "Enable the handoff protocol for structured subagent communication.",
-          "default": true,
-          "type": "boolean"
-        },
-        "directory": {
-          "description": "Directory for handoff files. Must be a safe relative path (no .., no absolute paths).",
-          "default": ".omre/handoffs",
-          "type": "string",
-          "pattern": "^(?!\\/)((?!\\.\\.)[a-zA-Z0-9_\\-\\.\\/])+$"
-        }
-      },
-      "additionalProperties": false
+      "type": "object"
     },
     "reviewers": {
-      "description": "Reviewer dimension assignment settings.",
+      "additionalProperties": false,
       "default": {
-        "default": [
-          "spec",
-          "quality",
-          "security",
-          "performance",
-          "concurrency"
-        ],
         "bySliceType": {
           "api-contract": [
             "spec",
             "security",
             "concurrency"
           ],
-          "migration": [
-            "spec",
-            "performance",
-            "concurrency"
-          ],
           "business-module": [
             "spec",
             "security",
+            "performance",
+            "concurrency"
+          ],
+          "dependency-change": [
+            "security",
+            "performance"
+          ],
+          "docs-only": [],
+          "infra-change": [
+            "security",
+            "performance"
+          ],
+          "migration": [
+            "spec",
             "performance",
             "concurrency"
           ],
@@ -650,60 +553,46 @@
             "security",
             "concurrency"
           ],
-          "dependency-change": [
-            "security",
-            "performance"
-          ],
-          "infra-change": [
-            "security",
-            "performance"
-          ],
           "test-only": [
             "spec",
             "quality"
-          ],
-          "docs-only": []
-        }
-      },
-      "type": "object",
-      "properties": {
-        "default": {
-          "description": "Default reviewer dimensions applied to all slices.",
-          "default": [
-            "spec",
-            "quality",
-            "security",
-            "performance",
-            "concurrency"
-          ],
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": [
-              "spec",
-              "quality",
-              "security",
-              "performance",
-              "concurrency"
-            ]
-          }
+          ]
         },
+        "default": [
+          "spec",
+          "quality",
+          "security",
+          "performance",
+          "concurrency"
+        ]
+      },
+      "description": "Reviewer dimension assignment settings.",
+      "properties": {
         "bySliceType": {
-          "description": "Reviewer dimensions per slice type. Unknown slice types are rejected by design.",
+          "additionalProperties": false,
           "default": {
             "api-contract": [
               "spec",
               "security",
               "concurrency"
             ],
-            "migration": [
-              "spec",
-              "performance",
-              "concurrency"
-            ],
             "business-module": [
               "spec",
               "security",
+              "performance",
+              "concurrency"
+            ],
+            "dependency-change": [
+              "security",
+              "performance"
+            ],
+            "docs-only": [],
+            "infra-change": [
+              "security",
+              "performance"
+            ],
+            "migration": [
+              "spec",
               "performance",
               "concurrency"
             ],
@@ -713,22 +602,31 @@
               "security",
               "concurrency"
             ],
-            "dependency-change": [
-              "security",
-              "performance"
-            ],
-            "infra-change": [
-              "security",
-              "performance"
-            ],
             "test-only": [
               "spec",
               "quality"
-            ],
-            "docs-only": []
+            ]
           },
-          "type": "object",
+          "description": "Reviewer dimensions per slice type. Unknown slice types are rejected by design.",
           "properties": {
+            "api-contract": {
+              "default": [
+                "spec",
+                "security",
+                "concurrency"
+              ],
+              "items": {
+                "enum": [
+                  "spec",
+                  "quality",
+                  "security",
+                  "performance",
+                  "concurrency"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
             "business-module": {
               "default": [
                 "spec",
@@ -736,17 +634,65 @@
                 "performance",
                 "concurrency"
               ],
-              "type": "array",
               "items": {
-                "type": "string",
                 "enum": [
                   "spec",
                   "quality",
                   "security",
                   "performance",
                   "concurrency"
-                ]
-              }
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "dependency-change": {
+              "default": [
+                "security",
+                "performance"
+              ],
+              "items": {
+                "enum": [
+                  "spec",
+                  "quality",
+                  "security",
+                  "performance",
+                  "concurrency"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "docs-only": {
+              "default": [],
+              "items": {
+                "enum": [
+                  "spec",
+                  "quality",
+                  "security",
+                  "performance",
+                  "concurrency"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "infra-change": {
+              "default": [
+                "security",
+                "performance"
+              ],
+              "items": {
+                "enum": [
+                  "spec",
+                  "quality",
+                  "security",
+                  "performance",
+                  "concurrency"
+                ],
+                "type": "string"
+              },
+              "type": "array"
             },
             "migration": {
               "default": [
@@ -754,69 +700,17 @@
                 "performance",
                 "concurrency"
               ],
-              "type": "array",
               "items": {
-                "type": "string",
                 "enum": [
                   "spec",
                   "quality",
                   "security",
                   "performance",
                   "concurrency"
-                ]
-              }
-            },
-            "api-contract": {
-              "default": [
-                "spec",
-                "security",
-                "concurrency"
-              ],
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "spec",
-                  "quality",
-                  "security",
-                  "performance",
-                  "concurrency"
-                ]
-              }
-            },
-            "dependency-change": {
-              "default": [
-                "security",
-                "performance"
-              ],
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "spec",
-                  "quality",
-                  "security",
-                  "performance",
-                  "concurrency"
-                ]
-              }
-            },
-            "infra-change": {
-              "default": [
-                "security",
-                "performance"
-              ],
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "spec",
-                  "quality",
-                  "security",
-                  "performance",
-                  "concurrency"
-                ]
-              }
+                ],
+                "type": "string"
+              },
+              "type": "array"
             },
             "shared-library": {
               "default": [
@@ -825,55 +719,106 @@
                 "security",
                 "concurrency"
               ],
-              "type": "array",
               "items": {
-                "type": "string",
                 "enum": [
                   "spec",
                   "quality",
                   "security",
                   "performance",
                   "concurrency"
-                ]
-              }
+                ],
+                "type": "string"
+              },
+              "type": "array"
             },
             "test-only": {
               "default": [
                 "spec",
                 "quality"
               ],
-              "type": "array",
               "items": {
-                "type": "string",
                 "enum": [
                   "spec",
                   "quality",
                   "security",
                   "performance",
                   "concurrency"
-                ]
-              }
-            },
-            "docs-only": {
-              "default": [],
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "spec",
-                  "quality",
-                  "security",
-                  "performance",
-                  "concurrency"
-                ]
-              }
+                ],
+                "type": "string"
+              },
+              "type": "array"
             }
           },
-          "additionalProperties": false
+          "type": "object"
+        },
+        "default": {
+          "default": [
+            "spec",
+            "quality",
+            "security",
+            "performance",
+            "concurrency"
+          ],
+          "description": "Default reviewer dimensions applied to all slices.",
+          "items": {
+            "enum": [
+              "spec",
+              "quality",
+              "security",
+              "performance",
+              "concurrency"
+            ],
+            "type": "string"
+          },
+          "type": "array"
         }
       },
-      "additionalProperties": false
+      "type": "object"
+    },
+    "slicing": {
+      "additionalProperties": false,
+      "default": {
+        "enabled": true,
+        "forceWholeTargetAboveSlices": 12,
+        "maxSlices": 4,
+        "skipDocsOnly": true,
+        "skipTestOnlyHeavyReview": true
+      },
+      "description": "File classification and grouping settings.",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "description": "Enable the file slicing engine that groups changed files into coherent review slices.",
+          "type": "boolean"
+        },
+        "forceWholeTargetAboveSlices": {
+          "default": 12,
+          "description": "When the estimated number of slices exceeds this threshold, review the entire target as one unit instead of slicing. Range: 1-100.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "maxSlices": {
+          "default": 4,
+          "description": "Maximum number of slices to generate. Range: 1-32.",
+          "maximum": 32,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "skipDocsOnly": {
+          "default": true,
+          "description": "Skip heavy review for docs-only slices.",
+          "type": "boolean"
+        },
+        "skipTestOnlyHeavyReview": {
+          "default": true,
+          "description": "Skip heavy review for test-only slices.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
     }
   },
-  "additionalProperties": false
+  "title": "Oh My Review Experts Config",
+  "type": "object"
 }
