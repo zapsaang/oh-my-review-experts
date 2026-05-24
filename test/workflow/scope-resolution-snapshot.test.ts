@@ -9,6 +9,7 @@ function normalizePrompt(prompt: string): string {
   return prompt
     .replace(/\d{8}-\d{6}-\d{3}/g, "RUN_ID")
     .replace(/^[a-f0-9]{7,40} init$/gm, "COMMIT_HASH init")
+    .replace(/commit [a-f0-9]{7,40}/g, "commit COMMIT_HASH")
     .replace(/index 0000000\.[.][a-f0-9]{7,40}/g, "index 0000000..COMMIT_HASH");
 }
 
@@ -21,7 +22,7 @@ function buildPromptWithGuidanceOnly(args: string): string {
       "utf8"
     );
     clearLoadConfigCache();
-    const bundle = buildReviewCodePrompt({ args, cwd }, true);
+    const bundle = buildReviewCodePrompt({ args, cwd });
     return normalizePrompt(bundle.prompt);
   });
 }

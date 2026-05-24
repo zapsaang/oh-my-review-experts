@@ -145,7 +145,7 @@ Unified diff follows. Use it as evidence and do not invent files:
 
 
 
-commit [REDACTED_SECRET]
+commit COMMIT_HASH
 Author: Test <test@example.com>
 
     init
@@ -316,7 +316,7 @@ Unified diff follows. Use it as evidence and do not invent files:
 
 
 
-commit [REDACTED_SECRET]
+commit COMMIT_HASH
 Author: Test <test@example.com>
 
     init
@@ -487,7 +487,7 @@ Unified diff follows. Use it as evidence and do not invent files:
 
 
 
-commit [REDACTED_SECRET]
+commit COMMIT_HASH
 Author: Test <test@example.com>
 
     init
@@ -658,7 +658,7 @@ Unified diff follows. Use it as evidence and do not invent files:
 
 
 
-commit [REDACTED_SECRET]
+commit COMMIT_HASH
 Author: Test <test@example.com>
 
     init
@@ -829,7 +829,7 @@ Unified diff follows. Use it as evidence and do not invent files:
 
 
 
-commit [REDACTED_SECRET]
+commit COMMIT_HASH
 Author: Test <test@example.com>
 
     init
