@@ -12,9 +12,6 @@ const CONFIG_NAMES = [
 ];
 
 function assertSafeCwd(cwd: string): void {
-  // SECURITY: Check the original path for ".." before normalization.
-  // path.normalize resolves ".." segments, e.g. "/a/../../b" normalizes to "/b",
-  // which would bypass a post-normalization regex check.
   if (/\.\./.test(cwd)) {
     throw new Error(`Invalid cwd: "${cwd}". Path traversal is not allowed.`);
   }
@@ -22,15 +19,11 @@ function assertSafeCwd(cwd: string): void {
   const currentCwd = path.resolve(process.cwd());
   const resolved = path.resolve(cwd);
 
-  // process.cwd() itself is always allowed (default behavior).
   if (resolved === currentCwd) {
     return;
   }
 
-  // SECURITY: Reject absolute paths that are not process.cwd().
-  // Allowing arbitrary absolute paths (e.g. "/etc") enables arbitrary file writes
-  // via downstream tools like omre_write_report.
-  if (path.isAbsolute(cwd)) {
+  if (path.isAbsolute(cwd) && !resolved.startsWith(currentCwd + path.sep)) {
     throw new Error(
       `Invalid cwd: "${cwd}". Absolute paths are not allowed. ` +
       `Only relative paths within the current working directory are permitted.`,
@@ -66,9 +59,9 @@ export function readJsonc(file: string): unknown | undefined {
   }
 }
 
-export function findConfigFiles(cwd = process.cwd()): string[] {
+export function findConfigFiles(cwd = process.cwd(), homeDir = os.homedir()): string[] {
   const files: string[] = [];
-  const globalDir = path.join(os.homedir(), ".config", "opencode");
+  const globalDir = path.join(homeDir, ".config", "opencode");
   for (const name of ["oh-my-review-experts.jsonc", "oh-my-review-experts.json"]) {
     const p = path.join(globalDir, name);
     try {
@@ -91,11 +84,8 @@ interface CacheEntry {
   mtimes: Map<string, number>;
 }
 
-const MAX_CACHE_SIZE = 50;
-const configCache = new Map<string, CacheEntry>();
-
-function getCacheKey(cwd: string, files: string[]): string {
-  return `${cwd}:${files.join(",")}`;
+function getCacheKey(cwd: string, homeDir: string, files: string[]): string {
+  return `${cwd}:${homeDir}:${files.join(",")}`;
 }
 
 function isCacheValid(entry: CacheEntry, files: string[]): boolean {
@@ -111,44 +101,89 @@ function isCacheValid(entry: CacheEntry, files: string[]): boolean {
   return true;
 }
 
-export function clearLoadConfigCache(): void {
-  configCache.clear();
+export interface ConfigLoaderOptions {
+  maxCacheSize?: number;
 }
 
-export function loadConfig(cwd = process.cwd(), trusted = false): OmreConfig {
-  if (!trusted) assertSafeCwd(cwd);
-  const files = findConfigFiles(cwd);
-  const cacheKey = getCacheKey(cwd, files);
-  const cached = configCache.get(cacheKey);
+export class ConfigLoader {
+  private cache = new Map<string, CacheEntry>();
+  private maxCacheSize: number;
 
-  if (cached && isCacheValid(cached, files)) {
-    return structuredClone(cached.config);
+  constructor(options: ConfigLoaderOptions = {}) {
+    this.maxCacheSize = options.maxCacheSize ?? 50;
   }
 
-  let merged: Record<string, unknown> = structuredClone(DEFAULT_CONFIG);
-  const mtimes = new Map<string, number>();
+  load(cwd: string, homeDir: string = os.homedir()): OmreConfig {
+    const files = findConfigFiles(cwd, homeDir);
+    const cacheKey = getCacheKey(cwd, homeDir, files);
+    const cached = this.cache.get(cacheKey);
 
-  for (const file of files) {
-    const raw = readJsonc(file);
-    if (raw !== undefined) {
-      merged = deepMerge(merged, raw);
+    if (cached && isCacheValid(cached, files)) {
+      return structuredClone(cached.config);
     }
-    try {
-      mtimes.set(file, fs.statSync(file).mtimeMs);
-    } catch (err) {
-      throw new Error(`Failed to stat config file ${file}: ${err instanceof Error ? err.message : String(err)}`);
+
+    let merged: Record<string, unknown> = structuredClone(DEFAULT_CONFIG);
+    const mtimes = new Map<string, number>();
+
+    for (const file of files) {
+      const raw = readJsonc(file);
+      if (raw !== undefined) {
+        merged = deepMerge(merged, raw);
+      }
+      try {
+        mtimes.set(file, fs.statSync(file).mtimeMs);
+      } catch (err) {
+        throw new Error(`Failed to stat config file ${file}: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
+
+    const config = OmreConfigSchema.parse(merged);
+
+    if (this.cache.size >= this.maxCacheSize) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey !== undefined) this.cache.delete(firstKey);
+    }
+
+    this.cache.set(cacheKey, { config: structuredClone(config), mtimes });
+    return config;
   }
 
-  const config = OmreConfigSchema.parse(merged);
-
-  if (configCache.size >= MAX_CACHE_SIZE) {
-    const firstKey = configCache.keys().next().value;
-    if (firstKey !== undefined) configCache.delete(firstKey);
+  clearCache(): void {
+    this.cache.clear();
   }
 
-  configCache.set(cacheKey, { config: structuredClone(config), mtimes });
-  return config;
+  get cacheSize(): number {
+    return this.cache.size;
+  }
+}
+
+// Default instance for backward compatibility
+const defaultLoader = new ConfigLoader();
+
+/**
+ * Load OMRE configuration with path traversal guards.
+ * This is the safe public API — always validates cwd before reading files.
+ */
+export function loadConfig(cwd = process.cwd(), homeDir = os.homedir()): OmreConfig {
+  assertSafeCwd(cwd);
+  return defaultLoader.load(cwd, homeDir);
+}
+
+/**
+ * Load OMRE configuration without path traversal guards.
+ * For internal use only (e.g. plugin boot where OpenCode has already validated the directory).
+ * @internal
+ */
+export function loadConfigUnsafe(cwd: string, homeDir?: string): OmreConfig {
+  return defaultLoader.load(cwd, homeDir ?? os.homedir());
+}
+
+/**
+ * Clear the default ConfigLoader cache.
+ * @deprecated Use `new ConfigLoader()` for test isolation instead.
+ */
+export function clearLoadConfigCache(): void {
+  defaultLoader.clearCache();
 }
 
 export function defaultConfigJsonc(): string {

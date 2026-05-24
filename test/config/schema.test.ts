@@ -223,8 +223,61 @@ describe("AgentConfigSchema", () => {
   });
 
   it("rejects invalid variant values", () => {
-    const result = AgentConfigSchema.safeParse({ model: "x", variant: "ultra" });
+    const result = AgentConfigSchema.safeParse({ model: "x", variant: "ultra!" });
     expect(result.success).toBe(false);
+  });
+
+  describe("variant accepts any valid passthrough string", () => {
+    it("accepts xhigh", () => {
+      const result = AgentConfigSchema.safeParse({ model: "x", variant: "xhigh" });
+      expect(result.success).toBe(true);
+      expect(result.data?.variant).toBe("xhigh");
+    });
+
+    it("accepts turbo", () => {
+      const result = AgentConfigSchema.safeParse({ model: "x", variant: "turbo" });
+      expect(result.success).toBe(true);
+      expect(result.data?.variant).toBe("turbo");
+    });
+
+    it("accepts high", () => {
+      const result = AgentConfigSchema.safeParse({ model: "x", variant: "high" });
+      expect(result.success).toBe(true);
+      expect(result.data?.variant).toBe("high");
+    });
+
+    it("accepts max", () => {
+      const result = AgentConfigSchema.safeParse({ model: "x", variant: "max" });
+      expect(result.success).toBe(true);
+      expect(result.data?.variant).toBe("max");
+    });
+  });
+
+  describe("variant rejects malformed strings", () => {
+    it("rejects empty string", () => {
+      const result = AgentConfigSchema.safeParse({ model: "x", variant: "" });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects whitespace", () => {
+      const result = AgentConfigSchema.safeParse({ model: "x", variant: "max " });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects zero-width space", () => {
+      const result = AgentConfigSchema.safeParse({ model: "x", variant: "xhigh\u200B" });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects >32 chars", () => {
+      const result = AgentConfigSchema.safeParse({ model: "x", variant: "a".repeat(33) });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects special chars", () => {
+      const result = AgentConfigSchema.safeParse({ model: "x", variant: "max!" });
+      expect(result.success).toBe(false);
+    });
   });
 
   it("accepts temperature: 0", () => {

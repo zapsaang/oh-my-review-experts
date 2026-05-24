@@ -36,7 +36,7 @@ export const SliceType = z.enum([
 
 export const AgentConfigSchema = z.object({
   model: z.string().min(1),
-  variant: z.enum(["max", "high", "medium", "low"]).optional()
+  variant: z.string().regex(/^[a-zA-Z0-9_-]{1,32}$/).optional()
     .describe("Model variant. Passed through to the runtime."),
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional()

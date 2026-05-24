@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { deepMerge, findConfigFiles, loadConfig, clearLoadConfigCache, defaultConfigJsonc } from "../../src/config/load-config.js";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { deepMerge, findConfigFiles, loadConfig, loadConfigUnsafe, clearLoadConfigCache, defaultConfigJsonc, ConfigLoader } from "../../src/config/load-config.js";
 import { OmreConfigSchema, DEFAULT_CONFIG } from "../../src/config/schema.js";
 import fs from "node:fs";
-import os from "node:os";
+import os, { tmpdir } from "node:os";
 import path from "node:path";
 
 describe("deepMerge", () => {
@@ -86,11 +86,33 @@ describe("findConfigFiles", () => {
       } catch { /* directory may not exist */ }
     }
   });
+
+  it("findConfigFiles uses passed homeDir over os.homedir() default", () => {
+    const fakeHomeDir = fs.mkdtempSync(path.join(process.cwd(), "omre-cfg-"));
+    const globalDir = path.join(fakeHomeDir, ".config", "opencode");
+    fs.mkdirSync(globalDir, { recursive: true });
+    const globalConfigPath = path.join(globalDir, "oh-my-review-experts.jsonc");
+    fs.writeFileSync(globalConfigPath, "{}", "utf8");
+
+    const spy = vi.spyOn(os, "homedir").mockReturnValue("/never/used");
+
+    try {
+      const files = findConfigFiles(process.cwd(), fakeHomeDir);
+      expect(files).toContain(globalConfigPath);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+      fs.rmSync(fakeHomeDir, { recursive: true, force: true, maxRetries: 3 });
+    }
+  });
 });
 
 describe("loadConfig cache", () => {
-  it("returns same config from cache on repeated calls", () => {
+  beforeEach(() => {
     clearLoadConfigCache();
+  });
+
+  it("returns same config from cache on repeated calls", () => {
     const config1 = loadConfig("nonexistent-path-12345-for-test");
     const config2 = loadConfig("nonexistent-path-12345-for-test");
     expect(config1).toEqual(config2);
@@ -105,7 +127,6 @@ describe("loadConfig cache", () => {
     fs.writeFileSync(configPath, JSON.stringify({ enabled: true }), "utf8");
 
     try {
-      clearLoadConfigCache();
       const config1 = loadConfig(relativeTmpDir);
       expect(config1.enabled).toBe(true);
 
@@ -123,6 +144,53 @@ describe("loadConfig cache", () => {
       try {
         fs.rmdirSync(tmpDir);
       } catch { /* directory may not exist */ }
+    }
+  });
+
+  it("loadConfig forwards homeDir to findConfigFiles", () => {
+    const absoluteTmpDir = fs.mkdtempSync(path.join(tmpdir(), "omre-cfg-"));
+    const fakeHomeDir = fs.mkdtempSync(path.join(tmpdir(), "omre-cfg-"));
+    const emptyHomeDir = fs.mkdtempSync(path.join(tmpdir(), "omre-cfg-"));
+    const globalDir = path.join(fakeHomeDir, ".config", "opencode");
+    fs.mkdirSync(globalDir, { recursive: true });
+    fs.writeFileSync(path.join(globalDir, "oh-my-review-experts.jsonc"), JSON.stringify({ enabled: false }), "utf8");
+
+    try {
+      const config = loadConfigUnsafe(absoluteTmpDir, fakeHomeDir);
+      expect(config.enabled).toBe(false);
+
+      const defaultConfig = loadConfigUnsafe(absoluteTmpDir, emptyHomeDir);
+      expect(defaultConfig.enabled).toBe(true);
+    } finally {
+      fs.rmSync(absoluteTmpDir, { recursive: true, force: true, maxRetries: 3 });
+      fs.rmSync(fakeHomeDir, { recursive: true, force: true, maxRetries: 3 });
+      fs.rmSync(emptyHomeDir, { recursive: true, force: true, maxRetries: 3 });
+    }
+  });
+
+  it("loadConfig cache differentiates by homeDir", () => {
+    const absoluteTmpDir = fs.mkdtempSync(path.join(tmpdir(), "omre-cfg-"));
+    const homeA = fs.mkdtempSync(path.join(tmpdir(), "omre-cfg-"));
+    const homeB = fs.mkdtempSync(path.join(tmpdir(), "omre-cfg-"));
+    const globalDirA = path.join(homeA, ".config", "opencode");
+    const globalDirB = path.join(homeB, ".config", "opencode");
+    fs.mkdirSync(globalDirA, { recursive: true });
+    fs.mkdirSync(globalDirB, { recursive: true });
+    fs.writeFileSync(path.join(globalDirA, "oh-my-review-experts.jsonc"), JSON.stringify({ enabled: false }), "utf8");
+    fs.writeFileSync(path.join(globalDirB, "oh-my-review-experts.jsonc"), JSON.stringify({ command: { name: "review-alt" } }), "utf8");
+
+    try {
+      const configA = loadConfigUnsafe(absoluteTmpDir, homeA);
+      const configB = loadConfigUnsafe(absoluteTmpDir, homeB);
+
+      expect(configA.enabled).toBe(false);
+      expect(configB.enabled).toBe(true);
+      expect(configB.command.name).toBe("review-alt");
+      expect(configA).not.toEqual(configB);
+    } finally {
+      fs.rmSync(absoluteTmpDir, { recursive: true, force: true, maxRetries: 3 });
+      fs.rmSync(homeA, { recursive: true, force: true, maxRetries: 3 });
+      fs.rmSync(homeB, { recursive: true, force: true, maxRetries: 3 });
     }
   });
 
@@ -205,7 +273,7 @@ describe("agents field deep-merge", () => {
     fs.writeFileSync(file2, JSON.stringify({ agents: { "omre-reviewer-quality": { model: "c/d" } } }), "utf8");
 
     try {
-      const config = loadConfig(tmpDir, true);
+      const config = loadConfigUnsafe(tmpDir);
       expect(config.agents).toBeDefined();
       expect(config.agents["omre-reviewer-spec"]).toEqual({ model: "a/b" });
       expect(config.agents["omre-reviewer-quality"]).toEqual({ model: "c/d" });
@@ -230,7 +298,7 @@ describe("agents field deep-merge", () => {
     fs.writeFileSync(file2, JSON.stringify({ agents: { "omre-reviewer-spec": { model: "c/d" } } }), "utf8");
 
     try {
-      const config = loadConfig(tmpDir, true);
+      const config = loadConfigUnsafe(tmpDir);
       expect(config.agents).toBeDefined();
       expect(config.agents["omre-reviewer-spec"]).toEqual({ model: "c/d", variant: "max" });
     } finally {
@@ -249,5 +317,130 @@ describe("agents field deep-merge", () => {
     expect(parsed).not.toHaveProperty("models");
     expect(parsed).not.toHaveProperty("provider");
     expect(parsed).not.toHaveProperty("disable_provider_inference");
+  });
+});
+
+describe("loadConfig hierarchy", () => {
+  let cwd: string;
+  let homeDir: string;
+
+  beforeEach(() => {
+    clearLoadConfigCache();
+    cwd = fs.mkdtempSync(path.join(tmpdir(), "omre-cfg-"));
+    homeDir = fs.mkdtempSync(path.join(tmpdir(), "omre-cfg-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(cwd, { recursive: true, force: true, maxRetries: 3 });
+    fs.rmSync(homeDir, { recursive: true, force: true, maxRetries: 3 });
+  });
+
+  function writeConfig(file: string, config: unknown): void {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(config), "utf8");
+  }
+
+  function writeRawConfig(file: string, contents: string): void {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, contents, "utf8");
+  }
+
+  it("project config wins over global config for same agent", () => {
+    writeConfig(path.join(homeDir, ".config", "opencode", "oh-my-review-experts.jsonc"), {
+      agents: { "omre-reviewer-spec": { model: "global-model" } },
+    });
+    writeConfig(path.join(cwd, ".opencode", "oh-my-review-experts.jsonc"), {
+      agents: { "omre-reviewer-spec": { model: "project-model" } },
+    });
+
+    const config = loadConfigUnsafe(cwd, homeDir);
+
+    expect(config.agents["omre-reviewer-spec"]?.model).toBe("project-model");
+  });
+
+  it("global and project agents deep-merge across files", () => {
+    writeConfig(path.join(homeDir, ".config", "opencode", "oh-my-review-experts.jsonc"), {
+      agents: { "omre-reviewer-spec": { model: "global-model" } },
+    });
+    writeConfig(path.join(cwd, ".opencode", "oh-my-review-experts.jsonc"), {
+      agents: { "omre-reviewer-quality": { model: "project-model" } },
+    });
+
+    const config = loadConfigUnsafe(cwd, homeDir);
+
+    expect(config.agents["omre-reviewer-spec"]).toEqual({ model: "global-model" });
+    expect(config.agents["omre-reviewer-quality"]).toEqual({ model: "project-model" });
+  });
+
+  it("all 6 documented file positions are loaded in correct order", () => {
+    const files = [
+      [path.join(homeDir, ".config", "opencode", "oh-my-review-experts.jsonc"), "global-jsonc"],
+      [path.join(homeDir, ".config", "opencode", "oh-my-review-experts.json"), "global-json"],
+      [path.join(cwd, ".opencode", "oh-my-review-experts.jsonc"), "project-jsonc"],
+      [path.join(cwd, ".opencode", "oh-my-review-experts.json"), "project-json"],
+      [path.join(cwd, ".omre", "config.jsonc"), "omre-jsonc"],
+      [path.join(cwd, ".omre", "config.json"), "omre-json"],
+    ] as const;
+
+    for (const [file, name] of files) {
+      writeConfig(file, { command: { name } });
+    }
+
+    const config = loadConfigUnsafe(cwd, homeDir);
+
+    expect(config.command.name).toBe("omre-json");
+  });
+
+  it("malformed global JSONC is ignored when parser recovers", () => {
+    writeRawConfig(path.join(homeDir, ".config", "opencode", "oh-my-review-experts.jsonc"), "{");
+    writeConfig(path.join(cwd, ".opencode", "oh-my-review-experts.jsonc"), {
+      command: { name: "project-valid" },
+    });
+
+    const config = loadConfigUnsafe(cwd, homeDir);
+
+    expect(config.command.name).toBe("project-valid");
+  });
+});
+
+describe("ConfigLoader", () => {
+  it("creates isolated cache instances", () => {
+    const loaderA = new ConfigLoader();
+    const loaderB = new ConfigLoader();
+
+    const configA = loaderA.load("nonexistent-path-12345-for-test");
+    expect(loaderA.cacheSize).toBe(1);
+    expect(loaderB.cacheSize).toBe(0);
+
+    const configB = loaderB.load("nonexistent-path-12345-for-test");
+    expect(configB).toEqual(configA);
+    expect(loaderB.cacheSize).toBe(1);
+  });
+
+  it("respects maxCacheSize option", () => {
+    const loader = new ConfigLoader({ maxCacheSize: 2 });
+    loader.load("nonexistent-path-1");
+    loader.load("nonexistent-path-2");
+    loader.load("nonexistent-path-3");
+    expect(loader.cacheSize).toBe(2);
+  });
+
+  it("clearCache removes all entries", () => {
+    const loader = new ConfigLoader();
+    loader.load("nonexistent-path-12345-for-test");
+    expect(loader.cacheSize).toBe(1);
+    loader.clearCache();
+    expect(loader.cacheSize).toBe(0);
+  });
+
+  it("does not share cache with defaultLoader", () => {
+    clearLoadConfigCache();
+    const loader = new ConfigLoader();
+
+    loadConfig("nonexistent-path-12345-for-test");
+    expect(loader.cacheSize).toBe(0);
+
+    loader.load("nonexistent-path-12345-for-test");
+    expect(loader.cacheSize).toBe(1);
   });
 });
