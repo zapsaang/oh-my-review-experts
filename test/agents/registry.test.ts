@@ -8,7 +8,7 @@ import {
   ALL_AGENTS,
   type RegistrationResult,
 } from "../../src/agents/registry.js";
-import { DEFAULT_CONFIG, type OmreConfig } from "../../src/config/schema.js";
+import { DEFAULT_CONFIG, DEFAULT_MODEL, OmreConfigSchema, type OmreConfig } from "../../src/config/schema.js";
 import { clearLoadConfigCache } from "../../src/config/load-config.js";
 
 const REVIEWER_NAMES = REVIEWER_AGENTS.map((a) => a.name);
@@ -59,6 +59,46 @@ describe("registry: registerAgents", () => {
     expect([...AGENT_NAMES].sort()).toEqual([...expected].sort());
     expect([...result.registered].sort()).toEqual([...expected].sort());
     expect(result.skipped).toEqual([]);
+  });
+});
+
+describe("registry: buildAgentConfig fallback/override [CHAR]", () => {
+  it("buildAgentConfig falls back to DEFAULT_MODEL when omreConfig.agents is empty", () => {
+    const omre = OmreConfigSchema.parse({ agents: {} });
+    const config = freshConfig();
+    registerAgents(config, omre);
+    const slot = (config.agent as Record<string, unknown>)["omre-reviewer-spec"] as Record<string, unknown>;
+    expect(slot.model).toBe(DEFAULT_MODEL);
+  });
+
+  it("buildAgentConfig uses agent override when present", () => {
+    const omre = OmreConfigSchema.parse({
+      agents: { "omre-reviewer-spec": { model: "test/x" } },
+    });
+    const config = freshConfig();
+    registerAgents(config, omre);
+    const slot = (config.agent as Record<string, unknown>)["omre-reviewer-spec"] as Record<string, unknown>;
+    expect(slot.model).toBe("test/x");
+  });
+
+  it("buildAgentConfig preserves variant + temperature + top_p when only model is overridden", () => {
+    const omre = OmreConfigSchema.parse({
+      agents: {
+        "omre-reviewer-spec": {
+          model: "x",
+          variant: "high",
+          temperature: 0.5,
+          top_p: 0.9,
+        },
+      },
+    });
+    const config = freshConfig();
+    registerAgents(config, omre);
+    const slot = (config.agent as Record<string, unknown>)["omre-reviewer-spec"] as Record<string, unknown>;
+    expect(slot.model).toBe("x");
+    expect(slot.variant).toBe("high");
+    expect(slot.temperature).toBe(0.5);
+    expect(slot.top_p).toBe(0.9);
   });
 });
 

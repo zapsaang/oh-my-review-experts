@@ -42,6 +42,7 @@
     "postbuild": "node scripts/verify-packaging.js",
     "dev": "tsx src/cli.ts",
     "typecheck": "tsc --noEmit",
+    "check-schema": "tsx scripts/check-schema.ts",
     "test": "vitest run",
     "preversion": "npm run typecheck && npm run test",
     "postversion": "git push && git push --tags",

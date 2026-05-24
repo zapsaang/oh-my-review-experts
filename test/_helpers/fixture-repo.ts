@@ -1,6 +1,5 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
 function gitCommit(cwd: string, message: string) {
@@ -12,14 +11,15 @@ function gitCommit(cwd: string, message: string) {
 }
 
 export function withCleanGitRepo<T>(fn: (cwd: string) => T): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-review-prompt-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-review-prompt-"));
+  const relativeCwd = path.relative(process.cwd(), tmpDir);
   try {
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, ".gitignore"), ".omre/\nnode_modules/\n", "utf8");
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
     execFileSync("git", ["add", "."], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "init");
-    return fn(tmpDir);
+    return fn(relativeCwd);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -30,7 +30,8 @@ export function withRepoOnBranch<T>(
   files: Record<string, string>,
   fn: (cwd: string) => T
 ): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-branch-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-branch-"));
+  const relativeCwd = path.relative(process.cwd(), tmpDir);
   try {
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
@@ -46,7 +47,7 @@ export function withRepoOnBranch<T>(
     gitCommit(tmpDir, "add files");
 
     execFileSync("git", ["checkout", "-b", branchName], { cwd: tmpDir, stdio: "ignore" });
-    return fn(tmpDir);
+    return fn(relativeCwd);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -56,7 +57,8 @@ export function withRepoWithBranches<T>(
   branches: Record<string, Record<string, string>>,
   fn: (cwd: string) => T
 ): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-branches-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-branches-"));
+  const relativeCwd = path.relative(process.cwd(), tmpDir);
   try {
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
@@ -74,7 +76,7 @@ export function withRepoWithBranches<T>(
       gitCommit(tmpDir, `add files on ${branchName}`);
     }
 
-    return fn(tmpDir);
+    return fn(relativeCwd);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -85,7 +87,8 @@ export function withRepoWithStagedFile<T>(
   content: string,
   fn: (cwd: string) => T
 ): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-staged-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-staged-"));
+  const relativeCwd = path.relative(process.cwd(), tmpDir);
   try {
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
@@ -97,14 +100,15 @@ export function withRepoWithStagedFile<T>(
     fs.writeFileSync(fullPath, content, "utf8");
     execFileSync("git", ["add", file], { cwd: tmpDir, stdio: "ignore" });
 
-    return fn(tmpDir);
+    return fn(relativeCwd);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
 export function withRepoWithSecret<T>(fn: (cwd: string) => T): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-secret-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-secret-"));
+  const relativeCwd = path.relative(process.cwd(), tmpDir);
   try {
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
@@ -116,14 +120,15 @@ export function withRepoWithSecret<T>(fn: (cwd: string) => T): T {
     execFileSync("git", ["add", "secret.txt"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "add secret");
 
-    return fn(tmpDir);
+    return fn(relativeCwd);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
 export function withHierarchicalRepo<T>(fn: (cwd: string) => T): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-hier-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-hier-"));
+  const relativeCwd = path.relative(process.cwd(), tmpDir);
   try {
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, ".gitignore"), ".omre/\nnode_modules/\n", "utf8");
@@ -142,14 +147,15 @@ export function withHierarchicalRepo<T>(fn: (cwd: string) => T): T {
     fs.writeFileSync(path.join(tmpDir, "src", "auth", "login.ts"), "// auth\n", "utf8");
     fs.writeFileSync(path.join(tmpDir, "src", "payment", "process.ts"), "// payment\n", "utf8");
     fs.writeFileSync(path.join(tmpDir, "src", "user", "profile.ts"), "// user\n", "utf8");
-    return fn(tmpDir);
+    return fn(relativeCwd);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
 export function withRepoWithOversizedDiff<T>(fn: (cwd: string) => T): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-oversized-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-oversized-"));
+  const relativeCwd = path.relative(process.cwd(), tmpDir);
   try {
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
@@ -166,7 +172,7 @@ export function withRepoWithOversizedDiff<T>(fn: (cwd: string) => T): T {
     execFileSync("git", ["add", "large.txt"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "add oversized file");
 
-    return fn(tmpDir);
+    return fn(relativeCwd);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
