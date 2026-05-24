@@ -107,7 +107,7 @@ function formatAmbiguousScopeError(args: string, candidates: ReviewScope[]): str
 
 export function injectReviewCodePrompt(input: InjectReviewCodeInput): string | undefined {
   const cwd = input.cwd ?? process.cwd();
-  const config = loadConfig(cwd, input.trusted ?? false);
+  const config = loadConfig(cwd);
   if (!config.enabled || !config.command.enabled) return undefined;
   if (config.command.injection === "disabled" || config.command.injection === "tool") return undefined;
   const names = [config.command.name, ...config.command.aliases].filter(Boolean);
@@ -118,7 +118,7 @@ export function injectReviewCodePrompt(input: InjectReviewCodeInput): string | u
   }
   args = validateAndSanitizeArgs(args);
   try {
-    return buildReviewCodePrompt({ args, cwd }, input.trusted ?? false).prompt;
+    return buildReviewCodePrompt({ args, cwd }).prompt;
   } catch (err) {
     if (err instanceof ScopeResolutionError) {
       return `Error: ${err.message}`;
