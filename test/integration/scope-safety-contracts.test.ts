@@ -37,7 +37,7 @@ function writeManyFiles(cwd: string, opts: { skipRoot?: boolean } = {}) {
 }
 
 function withManyFilesRepo<T>(fn: (cwd: string) => T): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-many-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-many-"));
   try {
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
@@ -48,14 +48,14 @@ function withManyFilesRepo<T>(fn: (cwd: string) => T): T {
     execFileSync("git", ["add", "."], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "add many files");
 
-    return fn(tmpDir);
+    return fn(path.relative(process.cwd(), tmpDir));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
 function withBranchWithSecret<T>(fn: (cwd: string) => T): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-branch-secret-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-branch-secret-"));
   try {
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
@@ -67,14 +67,14 @@ function withBranchWithSecret<T>(fn: (cwd: string) => T): T {
     execFileSync("git", ["add", "secret.txt"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "add secret");
 
-    return fn(tmpDir);
+    return fn(path.relative(process.cwd(), tmpDir));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
 function withBranchWithOversizedDiff<T>(fn: (cwd: string) => T): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-branch-oversized-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-branch-oversized-"));
   try {
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
@@ -87,14 +87,14 @@ function withBranchWithOversizedDiff<T>(fn: (cwd: string) => T): T {
     execFileSync("git", ["add", "large.txt"], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "add oversized file");
 
-    return fn(tmpDir);
+    return fn(path.relative(process.cwd(), tmpDir));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
 function withBranchWithManyFiles<T>(fn: (cwd: string) => T): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-branch-many-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-branch-many-"));
   try {
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
@@ -106,14 +106,14 @@ function withBranchWithManyFiles<T>(fn: (cwd: string) => T): T {
     execFileSync("git", ["add", "."], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "add many files");
 
-    return fn(tmpDir);
+    return fn(path.relative(process.cwd(), tmpDir));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
 function withPathsWithSecret<T>(fn: (cwd: string) => T): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-paths-secret-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-paths-secret-"));
   try {
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
@@ -127,14 +127,14 @@ function withPathsWithSecret<T>(fn: (cwd: string) => T): T {
 
     fs.writeFileSync(path.join(tmpDir, "src", "secret.txt"), "AKIAIOSFODNN7EXAMPLE is my aws key\nmodified\n", "utf8");
 
-    return fn(tmpDir);
+    return fn(path.relative(process.cwd(), tmpDir));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
 function withPathsWithOversizedDiff<T>(fn: (cwd: string) => T): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-paths-oversized-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-paths-oversized-"));
   try {
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
@@ -149,14 +149,14 @@ function withPathsWithOversizedDiff<T>(fn: (cwd: string) => T): T {
     const largeContent = makeLargeContent();
     fs.writeFileSync(path.join(tmpDir, "src", "large.txt"), largeContent, "utf8");
 
-    return fn(tmpDir);
+    return fn(path.relative(process.cwd(), tmpDir));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
 function withPathsWithManyFiles<T>(fn: (cwd: string) => T): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-paths-many-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-paths-many-"));
   try {
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
@@ -167,14 +167,14 @@ function withPathsWithManyFiles<T>(fn: (cwd: string) => T): T {
     execFileSync("git", ["add", "."], { cwd: tmpDir, stdio: "ignore" });
     gitCommit(tmpDir, "add many files");
 
-    return fn(tmpDir);
+    return fn(path.relative(process.cwd(), tmpDir));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
 function withStagedWithOversizedDiff<T>(fn: (cwd: string) => T): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-staged-oversized-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-staged-oversized-"));
   try {
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
@@ -185,14 +185,14 @@ function withStagedWithOversizedDiff<T>(fn: (cwd: string) => T): T {
     fs.writeFileSync(path.join(tmpDir, "large.txt"), content, "utf8");
     execFileSync("git", ["add", "large.txt"], { cwd: tmpDir, stdio: "ignore" });
 
-    return fn(tmpDir);
+    return fn(path.relative(process.cwd(), tmpDir));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
 function withStagedWithManyFiles<T>(fn: (cwd: string) => T): T {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-staged-many-"));
+  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-staged-many-"));
   try {
     execFileSync("git", ["init", "--initial-branch=main"], { cwd: tmpDir, stdio: "ignore" });
     fs.writeFileSync(path.join(tmpDir, "README.md"), "# fixture\n", "utf8");
@@ -202,7 +202,7 @@ function withStagedWithManyFiles<T>(fn: (cwd: string) => T): T {
     writeManyFiles(tmpDir);
     execFileSync("git", ["add", "."], { cwd: tmpDir, stdio: "ignore" });
 
-    return fn(tmpDir);
+    return fn(path.relative(process.cwd(), tmpDir));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -212,7 +212,7 @@ describe("scope safety contracts", () => {
   describe("default scope", () => {
     it("redacts secrets", () => {
       withRepoWithSecret((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "", cwd });
         expect(bundle.prompt).not.toContain("AKIAIOSFODNN7EXAMPLE");
         expect(bundle.prompt).toContain("[REDACTED_AWS_ACCESS_KEY_ID]");
       });
@@ -220,14 +220,14 @@ describe("scope safety contracts", () => {
 
     it("truncates diff above 180KB", () => {
       withRepoWithOversizedDiff((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "", cwd });
         expect(bundle.prompt).toContain("[WARNING: Diff truncated");
       });
     });
 
     it("enables compactMode for >20 files", () => {
       withManyFilesRepo((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "", cwd });
         expect(bundle.prompt).toContain("compactMode: true");
       });
     });
@@ -236,7 +236,7 @@ describe("scope safety contracts", () => {
   describe("staged scope", () => {
     it("redacts secrets", () => {
       withRepoWithStagedFile("secret.txt", "AKIAIOSFODNN7EXAMPLE is my aws key\n", (cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "staged", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "staged", cwd });
         expect(bundle.prompt).not.toContain("AKIAIOSFODNN7EXAMPLE");
         expect(bundle.prompt).toContain("[REDACTED_AWS_ACCESS_KEY_ID]");
       });
@@ -244,14 +244,14 @@ describe("scope safety contracts", () => {
 
     it("truncates diff above 180KB", () => {
       withStagedWithOversizedDiff((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "staged", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "staged", cwd });
         expect(bundle.prompt).toContain("[WARNING: Diff truncated");
       });
     });
 
     it("enables compactMode for >20 staged files", () => {
       withStagedWithManyFiles((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "staged", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "staged", cwd });
         expect(bundle.prompt).toContain("compactMode: true");
       });
     });
@@ -260,7 +260,7 @@ describe("scope safety contracts", () => {
   describe("commit scope", () => {
     it("redacts secrets", () => {
       withRepoWithSecret((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "commit:HEAD", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "commit:HEAD", cwd });
         expect(bundle.prompt).not.toContain("AKIAIOSFODNN7EXAMPLE");
         expect(bundle.prompt).toContain("[REDACTED_AWS_ACCESS_KEY_ID]");
       });
@@ -268,14 +268,14 @@ describe("scope safety contracts", () => {
 
     it("truncates diff above 180KB", () => {
       withRepoWithOversizedDiff((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "commit:HEAD", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "commit:HEAD", cwd });
         expect(bundle.prompt).toContain("[WARNING: Diff truncated");
       });
     });
 
     it("enables compactMode for >20 files", () => {
       withManyFilesRepo((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "commit:HEAD", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "commit:HEAD", cwd });
         expect(bundle.prompt).toContain("compactMode: true");
       });
     });
@@ -284,7 +284,7 @@ describe("scope safety contracts", () => {
   describe("branch scope", () => {
     it("redacts secrets", () => {
       withBranchWithSecret((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "branch:main", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "branch:main", cwd });
         expect(bundle.prompt).not.toContain("AKIAIOSFODNN7EXAMPLE");
         expect(bundle.prompt).toContain("[REDACTED_AWS_ACCESS_KEY_ID]");
       });
@@ -292,14 +292,14 @@ describe("scope safety contracts", () => {
 
     it("truncates diff above 180KB", () => {
       withBranchWithOversizedDiff((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "branch:main", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "branch:main", cwd });
         expect(bundle.prompt).toContain("[WARNING: Diff truncated");
       });
     });
 
     it("enables compactMode for >20 files", () => {
       withBranchWithManyFiles((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "branch:main", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "branch:main", cwd });
         expect(bundle.prompt).toContain("compactMode: true");
       });
     });
@@ -308,7 +308,7 @@ describe("scope safety contracts", () => {
   describe("range scope", () => {
     it("redacts secrets", () => {
       withRepoWithSecret((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "range:HEAD~1..HEAD", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "range:HEAD~1..HEAD", cwd });
         expect(bundle.prompt).not.toContain("AKIAIOSFODNN7EXAMPLE");
         expect(bundle.prompt).toContain("[REDACTED_AWS_ACCESS_KEY_ID]");
       });
@@ -316,14 +316,14 @@ describe("scope safety contracts", () => {
 
     it("truncates diff above 180KB", () => {
       withRepoWithOversizedDiff((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "range:HEAD~1..HEAD", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "range:HEAD~1..HEAD", cwd });
         expect(bundle.prompt).toContain("[WARNING: Diff truncated");
       });
     });
 
     it("enables compactMode for >20 files", () => {
       withManyFilesRepo((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "range:HEAD~1..HEAD", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "range:HEAD~1..HEAD", cwd });
         expect(bundle.prompt).toContain("compactMode: true");
       });
     });
@@ -332,7 +332,7 @@ describe("scope safety contracts", () => {
   describe("paths scope", () => {
     it("redacts secrets", () => {
       withPathsWithSecret((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "path:src", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "path:src", cwd });
         expect(bundle.prompt).not.toContain("AKIAIOSFODNN7EXAMPLE");
         expect(bundle.prompt).toContain("[REDACTED_AWS_ACCESS_KEY_ID]");
       });
@@ -340,14 +340,14 @@ describe("scope safety contracts", () => {
 
     it("truncates diff above 180KB", () => {
       withPathsWithOversizedDiff((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "path:src", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "path:src", cwd });
         expect(bundle.prompt).toContain("[WARNING: Diff truncated");
       });
     });
 
     it("enables compactMode for >20 files", () => {
       withPathsWithManyFiles((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "path:src", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "path:src", cwd });
         expect(bundle.prompt).toContain("compactMode: true");
       });
     });
@@ -356,7 +356,7 @@ describe("scope safety contracts", () => {
   describe("guidance scope", () => {
     it("redacts secrets", () => {
       withRepoWithSecret((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "focus on security", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "focus on security", cwd });
         expect(bundle.prompt).not.toContain("AKIAIOSFODNN7EXAMPLE");
         expect(bundle.prompt).toContain("[REDACTED_AWS_ACCESS_KEY_ID]");
       });
@@ -364,14 +364,14 @@ describe("scope safety contracts", () => {
 
     it("truncates diff above 180KB", () => {
       withRepoWithOversizedDiff((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "focus on security", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "focus on security", cwd });
         expect(bundle.prompt).toContain("[WARNING: Diff truncated");
       });
     });
 
     it("enables compactMode for >20 files", () => {
       withManyFilesRepo((cwd) => {
-        const bundle = buildReviewCodePrompt({ args: "focus on security", cwd }, true);
+        const bundle = buildReviewCodePrompt({ args: "focus on security", cwd });
         expect(bundle.prompt).toContain("compactMode: true");
       });
     });
@@ -380,7 +380,7 @@ describe("scope safety contracts", () => {
 
 describe("[P4] writeManyFiles helper", () => {
   it("creates 25 files with expected directory structure", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-write-many-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-write-many-"));
     try {
       writeManyFiles(tmpDir);
 
@@ -396,7 +396,7 @@ describe("[P4] writeManyFiles helper", () => {
   });
 
   it("skipRoot option omits root file and starts numbering in src/module01", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-write-many-"));
+    const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-write-many-"));
     try {
       writeManyFiles(tmpDir, { skipRoot: true });
 
