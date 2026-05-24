@@ -1,8 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { execFileSync } from "node:child_process";
-import { buildReviewCodePrompt, renderLocalDryRun } from "../../src/workflow/run-review-code.js";
+import { buildReviewCodePrompt, renderLocalDryRun, persistReport } from "../../src/workflow/run-review-code.js";
 import { clearLoadConfigCache } from "../../src/config/load-config.js";
 import {
   withCleanGitRepo,
@@ -47,7 +48,7 @@ describe("buildReviewCodePrompt", () => {
 
   it("[C1] orchestrator prompt uses camelCase isValid from omre_validate_handoff", () => {
     withCleanGitRepo((cwd) => {
-      const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      const bundle = buildReviewCodePrompt({ args: "", cwd });
       expect(bundle.prompt).not.toContain("is_valid");
       expect(bundle.prompt).toMatch(/isValid/);
     });
@@ -55,7 +56,7 @@ describe("buildReviewCodePrompt", () => {
 
   it("[L4 fix] orchestrator prompt describes the {ok, errors} contract for omre_write_handoff", () => {
     withCleanGitRepo((cwd) => {
-      const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      const bundle = buildReviewCodePrompt({ args: "", cwd });
       expect(bundle.prompt).toMatch(/omre_write_handoff/);
       expect(bundle.prompt).toMatch(/ok.*?(true|false)/);
       expect(bundle.prompt).toContain("taskId");
@@ -106,7 +107,7 @@ describe("buildReviewCodePrompt", () => {
   it("[Fix 2-A] orchestrator prompt does NOT instruct calling omre_write_report directly", () => {
     withCleanGitRepo((cwd) => {
       clearLoadConfigCache();
-      const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      const bundle = buildReviewCodePrompt({ args: "", cwd });
       const executionBlock = getExecutionRequirements(bundle.prompt);
       expect(executionBlock).not.toMatch(/Call\s+[`']?omre_write_report[`']?\s+tool/i);
     });
@@ -115,7 +116,7 @@ describe("buildReviewCodePrompt", () => {
   it("[Fix 2-A] orchestrator prompt instructs delegating to omre-report-writer with runId only", () => {
     withCleanGitRepo((cwd) => {
       clearLoadConfigCache();
-      const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      const bundle = buildReviewCodePrompt({ args: "", cwd });
       expect(bundle.prompt).toMatch(/(Delegate|Invoke|Hand off)[^\n]*omre-report-writer[^\n]*runId/i);
     });
   });
@@ -123,7 +124,7 @@ describe("buildReviewCodePrompt", () => {
   it("[Fix 2-A] orchestrator prompt forbids using write tool for .omre/reports/", () => {
     withCleanGitRepo((cwd) => {
       clearLoadConfigCache();
-      const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      const bundle = buildReviewCodePrompt({ args: "", cwd });
       expect(bundle.prompt).toMatch(/DO NOT use[^.]*write[^.]*\.omre\/reports/i);
     });
   });
@@ -131,7 +132,7 @@ describe("buildReviewCodePrompt", () => {
   it("[Fix 2-A] orchestrator prompt forbids passing a file-path reference as content", () => {
     withCleanGitRepo((cwd) => {
       clearLoadConfigCache();
-      const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      const bundle = buildReviewCodePrompt({ args: "", cwd });
       expect(bundle.prompt).toMatch(/(do not|never)[^.]*(reference|file.path)[^.]*report/i);
     });
   });
@@ -139,7 +140,7 @@ describe("buildReviewCodePrompt", () => {
   it("[Fix 2-A] orchestrator prompt requires surfacing omre-report-writer errors instead of falling back to write", () => {
     withCleanGitRepo((cwd) => {
       clearLoadConfigCache();
-      const bundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      const bundle = buildReviewCodePrompt({ args: "", cwd });
       const executionBlock = getExecutionRequirements(bundle.prompt);
       expect(executionBlock).toMatch(/surface.*error|omre-report-writer.*error|do not retry|do not write.*directly/i);
     });
@@ -148,7 +149,7 @@ describe("buildReviewCodePrompt", () => {
   it("[Fix 2-A] both arbitration branches end at report-writer delegation", () => {
     withCleanGitRepo((cwd) => {
       clearLoadConfigCache();
-      const flatBundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      const flatBundle = buildReviewCodePrompt({ args: "", cwd });
       expect(flatBundle.prompt).toContain("useHierarchicalArbitration: false");
       const flatExecution = getExecutionRequirements(flatBundle.prompt);
       expect(flatExecution).not.toMatch(/Call\s+[`']?omre_write_report[`']?\s+tool/i);
@@ -157,7 +158,7 @@ describe("buildReviewCodePrompt", () => {
 
     withHierarchicalRepo((cwd) => {
       clearLoadConfigCache();
-      const hierBundle = buildReviewCodePrompt({ args: "", cwd }, true);
+      const hierBundle = buildReviewCodePrompt({ args: "", cwd });
       expect(hierBundle.prompt).toContain("useHierarchicalArbitration: true");
       const hierExecution = getExecutionRequirements(hierBundle.prompt);
       expect(hierExecution).not.toMatch(/Call\s+[`']?omre_write_report[`']?\s+tool/i);
@@ -180,7 +181,7 @@ describe("renderLocalDryRun", () => {
 
   it("with empty args, output is unchanged from today (no scope line)", () => {
     withCleanGitRepo((cwd) => {
-      const markdown = renderLocalDryRun({ args: "", cwd }, true);
+      const markdown = renderLocalDryRun({ args: "", cwd });
       expect(markdown).toContain("Review Code Dry Run");
       expect(markdown).toContain("Estimated tasks");
       expect(markdown).not.toContain("Resolved scope");
@@ -189,7 +190,7 @@ describe("renderLocalDryRun", () => {
 
   it("with branch:main args, shows resolved branch scope", () => {
     withCleanGitRepo((cwd) => {
-      const markdown = renderLocalDryRun({ args: "branch:main", cwd }, true);
+      const markdown = renderLocalDryRun({ args: "branch:main", cwd });
       expect(markdown).toContain("Resolved scope: branch (main)");
       expect(markdown).toContain("Estimated tasks");
     });
@@ -197,7 +198,7 @@ describe("renderLocalDryRun", () => {
 
   it("with ../etc args, shows path traversal error inline", () => {
     withCleanGitRepo((cwd) => {
-      const markdown = renderLocalDryRun({ args: "../etc", cwd }, true);
+      const markdown = renderLocalDryRun({ args: "../etc", cwd });
       expect(markdown).toContain("Resolved scope: error (PATH_TRAVERSAL)");
       expect(markdown).toContain("Path traversal");
     });
@@ -207,7 +208,7 @@ describe("renderLocalDryRun", () => {
     withRepoWithBranches(
       { auth: { "auth/index.ts": "// auth\n" } },
       (cwd) => {
-        const markdown = renderLocalDryRun({ args: "auth", cwd }, true);
+        const markdown = renderLocalDryRun({ args: "auth", cwd });
         expect(markdown).toContain("Resolved scope: ambiguous");
         expect(markdown).toContain("branch:auth");
         expect(markdown).toContain("path:auth");
@@ -219,7 +220,7 @@ describe("renderLocalDryRun", () => {
 describe("[P2] formatScopeDetail — prompt scope readability", () => {
   it("branch scope shows name in parentheses", () => {
     withCleanGitRepo((cwd) => {
-      const bundle = buildReviewCodePrompt({ args: "branch:main", cwd }, true);
+      const bundle = buildReviewCodePrompt({ args: "branch:main", cwd });
       expect(bundle.prompt).toContain("Resolved review scope: branch (main)");
     });
   });
@@ -230,7 +231,7 @@ describe("[P2] formatScopeDetail — prompt scope readability", () => {
         cwd,
         encoding: "utf8",
       }).trim();
-      const bundle = buildReviewCodePrompt({ args: `commit:${sha}`, cwd }, true);
+      const bundle = buildReviewCodePrompt({ args: `commit:${sha}`, cwd });
       expect(bundle.prompt).toContain(`Resolved review scope: commit (${sha})`);
     });
   });
@@ -240,7 +241,7 @@ describe("[P2] formatScopeDetail — prompt scope readability", () => {
       fs.writeFileSync(path.join(cwd, "second.txt"), "second\n", "utf8");
       execFileSync("git", ["add", "second.txt"], { cwd, stdio: "ignore" });
       execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "second"], { cwd, stdio: "ignore" });
-      const bundle = buildReviewCodePrompt({ args: "range:HEAD~1..HEAD", cwd }, true);
+      const bundle = buildReviewCodePrompt({ args: "range:HEAD~1..HEAD", cwd });
       expect(bundle.prompt).toContain("Resolved review scope: range (HEAD~1..HEAD)");
     });
   });
@@ -250,8 +251,73 @@ describe("[P2] formatScopeDetail — prompt scope readability", () => {
       fs.mkdirSync(path.join(cwd, "src"), { recursive: true });
       fs.writeFileSync(path.join(cwd, "src", "a.ts"), "// a\n", "utf8");
       fs.writeFileSync(path.join(cwd, "src", "b.ts"), "// b\n", "utf8");
-      const bundle = buildReviewCodePrompt({ args: "src/a.ts,src/b.ts", cwd }, true);
+      const bundle = buildReviewCodePrompt({ args: "src/a.ts,src/b.ts", cwd });
       expect(bundle.prompt).toContain("Resolved review scope: paths (src/a.ts, src/b.ts)");
     });
+  });
+});
+
+describe("persistReport", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    clearLoadConfigCache();
+    const absoluteTmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-cfg-"));
+    tmpDir = path.relative(process.cwd(), absoluteTmpDir);
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 3 });
+  });
+
+  function createValidReportMarkdown(): string {
+    const lines: string[] = [];
+    lines.push("# Review Results");
+    lines.push("");
+    lines.push("## Run");
+    lines.push("");
+    lines.push("- Target: current-change");
+    lines.push("- Run ID: 20260519-141258-095");
+    lines.push("");
+    lines.push("## Coverage");
+    lines.push("");
+    lines.push("All dimensions reviewed.");
+    lines.push("");
+    lines.push("## Findings");
+    lines.push("");
+    lines.push("No issues found.");
+    lines.push("");
+    lines.push("### Detail");
+    lines.push("");
+    for (let i = 0; i < 40; i++) {
+      lines.push(`- Item ${i + 1}: reviewed.`);
+    }
+    lines.push("");
+    lines.push("## Summary");
+    lines.push("");
+    lines.push("Clean report.");
+    return lines.join("\n");
+  }
+
+  it("persistReport writes both markdown and JSON files", () => {
+    const markdown = createValidReportMarkdown();
+    const json = { ok: true };
+    const written = persistReport(markdown, json, tmpDir, undefined, undefined);
+    expect(written.length).toBeGreaterThanOrEqual(2);
+    for (const p of written) {
+      expect(fs.existsSync(p)).toBe(true);
+    }
+    const latestMd = fs.readFileSync(path.join(tmpDir, ".omre", "reports", "latest.md"), "utf8");
+    const latestJson = JSON.parse(fs.readFileSync(path.join(tmpDir, ".omre", "reports", "latest.json"), "utf8"));
+    expect(latestMd).toBe(markdown);
+    expect(latestJson).toEqual(json);
+  });
+
+  it("persistReport with degradedSlices propagates them to writeReport", () => {
+    const markdown = createValidReportMarkdown();
+    const json = { ok: true };
+    persistReport(markdown, json, tmpDir, [{ slice_id: "s1", missing_dimensions: ["security"] }], undefined);
+    const latestMd = fs.readFileSync(path.join(tmpDir, ".omre", "reports", "latest.md"), "utf8");
+    expect(latestMd).toContain("s1");
   });
 });

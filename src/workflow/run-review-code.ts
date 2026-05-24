@@ -53,9 +53,9 @@ function stripEchoFlag(args: string): { cleaned: string; isEchoMode: boolean } {
   return { cleaned, isEchoMode: true };
 }
 
-export function buildReviewCodePrompt(input: ReviewCodeInput = {}, trusted = false): ReviewCodePromptBundle {
+export function buildReviewCodePrompt(input: ReviewCodeInput = {}): ReviewCodePromptBundle {
   const cwd = input.cwd ?? process.cwd();
-  const config = loadConfig(cwd, trusted);
+  const config = loadConfig(cwd);
 
   const { cleaned: userArgsText, isEchoMode } = stripEchoFlag(input.args ?? "");
 
@@ -221,9 +221,9 @@ function formatResolvedScopeLine(scope: ReviewScope): string {
   }
 }
 
-export function renderLocalDryRun(input: ReviewCodeInput = {}, trusted = false): string {
+export function renderLocalDryRun(input: ReviewCodeInput = {}): string {
   const cwd = input.cwd ?? process.cwd();
-  const config = loadConfig(cwd, trusted);
+  const config = loadConfig(cwd);
 
   let scopeLine = "";
   let scope: ReviewScope | undefined;
@@ -258,7 +258,7 @@ export function renderLocalDryRun(input: ReviewCodeInput = {}, trusted = false):
   return `# Review Code Dry Run\n\nEstimated tasks: ${plan.estimatedTasks}\n\nFiles:\n${formatFileList(files)}\n`;
 }
 
-export function persistReport(markdown: string, json: unknown, cwd = process.cwd(), degradedSlices?: Array<{ slice_id: string; missing_dimensions: string[] }>, missingDimensionsGlobal?: string[], trusted = false, runId?: string): string[] {
-  const config = loadConfig(cwd, trusted);
+export function persistReport(markdown: string, json: unknown, cwd = process.cwd(), degradedSlices?: Array<{ slice_id: string; missing_dimensions: string[] }>, missingDimensionsGlobal?: string[], runId?: string): string[] {
+  const config = loadConfig(cwd);
   return writeReport(config, { target: "current-change", markdown, json, degradedSlices, missingDimensionsGlobal, runId }, cwd);
 }
