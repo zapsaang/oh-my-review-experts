@@ -25,7 +25,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run check-schema
-      - run: npm run test
+      - run: npm run test:coverage
       - run: npm run build
       - run: node dist/cli.js doctor
       - name: Upload build artifacts
