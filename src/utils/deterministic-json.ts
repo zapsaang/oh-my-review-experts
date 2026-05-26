@@ -6,14 +6,30 @@
  * caused by Zod internal ordering changes.
  */
 
+function isPlainObject(obj: unknown): obj is Record<string, unknown> {
+  if (!obj || typeof obj !== "object") {
+    return false;
+  }
+  const proto = Object.getPrototypeOf(obj);
+  return proto === Object.prototype || proto === null;
+}
+
 export function sortKeysDeep(obj: unknown): unknown {
   if (Array.isArray(obj)) {
     return obj.map(sortKeysDeep);
   }
+  if (obj instanceof Date) {
+    return obj;
+  }
   if (obj && typeof obj === "object") {
+    if (!isPlainObject(obj)) {
+      throw new TypeError(
+        `Cannot deterministically serialize non-plain object: ${obj.constructor?.name ?? "[unknown]"}`,
+      );
+    }
     const sorted: Record<string, unknown> = {};
     for (const key of Object.keys(obj).sort()) {
-      sorted[key] = sortKeysDeep((obj as Record<string, unknown>)[key]);
+      sorted[key] = sortKeysDeep(obj[key]);
     }
     return sorted;
   }
