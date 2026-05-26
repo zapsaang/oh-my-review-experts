@@ -261,3 +261,200 @@ describe("dry-run CLI", () => {
     }
   });
 });
+
+describe("init CLI", () => {
+  const originalCwd = process.cwd();
+
+  afterEach(() => {
+    process.exitCode = originalExitCode;
+  });
+
+  it("creates config file when it does not exist", () => {
+    const tmpDir = fs.mkdtempSync(".omre-init-test-");
+    const tmpDirAbs = path.resolve(tmpDir);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("exit");
+    });
+
+    try {
+      process.chdir(tmpDir);
+      const program = createCliProgram();
+      program.parse(["node", "omre", "init"]);
+
+      const configFile = path.join(tmpDirAbs, ".opencode", "oh-my-review-experts.jsonc");
+      expect(fs.existsSync(configFile)).toBe(true);
+
+      const logOutput = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+      expect(logOutput).toContain("created:");
+      expect(logOutput).toContain("oh-my-review-experts.jsonc");
+    } finally {
+      process.chdir(originalCwd);
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+      exitSpy.mockRestore();
+    }
+  });
+
+  it("warns when config already exists without --force", () => {
+    const tmpDir = fs.mkdtempSync(".omre-init-test-");
+    const tmpDirAbs = path.resolve(tmpDir);
+    const configDir = path.join(tmpDirAbs, ".opencode");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, "oh-my-review-experts.jsonc"), "{}", "utf8");
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("exit");
+    });
+
+    try {
+      process.chdir(tmpDir);
+      const program = createCliProgram();
+      program.parse(["node", "omre", "init"]);
+
+      const logOutput = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+      expect(logOutput).toContain("exists:");
+      expect(logOutput).toContain("oh-my-review-experts.jsonc");
+    } finally {
+      process.chdir(originalCwd);
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+      exitSpy.mockRestore();
+    }
+  });
+
+  it("overwrites config with --force", () => {
+    const tmpDir = fs.mkdtempSync(".omre-init-test-");
+    const tmpDirAbs = path.resolve(tmpDir);
+    const configDir = path.join(tmpDirAbs, ".opencode");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, "oh-my-review-experts.jsonc"), "old content", "utf8");
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => {
+      throw new Error("exit");
+    });
+
+    try {
+      process.chdir(tmpDir);
+      const program = createCliProgram();
+      program.parse(["node", "omre", "init", "--force"]);
+
+      const configFile = path.join(configDir, "oh-my-review-experts.jsonc");
+      const content = fs.readFileSync(configFile, "utf8");
+      expect(content).not.toBe("old content");
+
+      const logOutput = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+      expect(logOutput).toContain("created:");
+    } finally {
+      process.chdir(originalCwd);
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+      exitSpy.mockRestore();
+    }
+  });
+});
+
+describe("doctor CLI --clean-reports", () => {
+  afterEach(() => {
+    process.exitCode = originalExitCode;
+  });
+
+  it("removes stray reports and prints cleanup message when --clean-reports is set", () => {
+    process.exitCode = undefined;
+    const captured = captureOutput();
+    const tmpDir = fs.mkdtempSync(".omre-doctor-clean-");
+    const strayFile = path.join(tmpDir, "foo-report.md");
+    fs.writeFileSync(strayFile, "# Stray", "utf8");
+
+    try {
+      runDoctor({
+        cwd: tmpDir,
+        output: captured.output,
+        contractChecks: cleanContractChecks,
+        cleanReports: true,
+      });
+      const text = stripAnsi(captured.lines.join("\n"));
+      expect(text).toContain("--clean-reports applied");
+      expect(fs.existsSync(strayFile)).toBe(false);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("doctor CLI --strict", () => {
+  afterEach(() => {
+    process.exitCode = originalExitCode;
+  });
+
+  it("sets exitCode to 1 with strict when layout warnings exist", () => {
+    process.exitCode = undefined;
+    const captured = captureOutput();
+    const tmpDir = fs.mkdtempSync(".omre-doctor-strict-");
+    fs.writeFileSync(path.join(tmpDir, "foo-report.md"), "# Stray", "utf8");
+
+    try {
+      runDoctor({
+        cwd: tmpDir,
+        output: captured.output,
+        contractChecks: cleanContractChecks,
+        strict: true,
+      });
+      expect(process.exitCode).toBe(1);
+      const text = stripAnsi(captured.lines.join("\n"));
+      expect(text).toContain("foo-report.md");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not set exitCode with strict when no warnings exist", () => {
+    process.exitCode = undefined;
+    const captured = captureOutput();
+    const tmpDir = fs.mkdtempSync(".omre-doctor-strict-clean-");
+
+    try {
+      runDoctor({
+        cwd: tmpDir,
+        output: captured.output,
+        contractChecks: cleanContractChecks,
+        strict: true,
+      });
+      expect(process.exitCode).toBeUndefined();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps exitCode 2 with strict when contract warnings exist", () => {
+    process.exitCode = undefined;
+    const captured = captureOutput();
+    const tmpDir = fs.mkdtempSync(".omre-doctor-strict-contract-");
+    const warningChecks: DoctorContractChecks = {
+      checkPromptExampleSchemaIdentity: () => ["fake contract violation"],
+      checkAgentToolWhitelist: () => [],
+    };
+
+    try {
+      runDoctor({
+        cwd: tmpDir,
+        output: captured.output,
+        contractChecks: warningChecks,
+        strict: true,
+      });
+      expect(process.exitCode).toBe(2);
+      const text = stripAnsi(captured.lines.join("\n"));
+      expect(text).toContain("fake contract violation");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
