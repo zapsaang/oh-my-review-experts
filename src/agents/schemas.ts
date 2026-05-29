@@ -7,6 +7,9 @@
 
 import { z } from "zod";
 
+import { SEVERITY_VALUES, type SeverityLevel } from "../shared/severity.js";
+export { SEVERITY_VALUES, type SeverityLevel };
+
 /** Builds string validators whose messages preserve the "must be non-empty" grep contract. */
 const nonEmpty = (label: string) => z.string().min(1, `${label} must be non-empty`);
 
@@ -29,9 +32,6 @@ export const SCHEMA_VERSION = "1";
  * Update this when bumping the MAJOR version (e.g. /^2(\.\d+)?$/ for v2).
  */
 export const SCHEMA_VERSION_PATTERN = /^1(\.\d+)?$/;
-
-export const SEVERITY_VALUES = ["critical", "high", "medium", "low"] as const;
-export type SeverityLevel = (typeof SEVERITY_VALUES)[number];
 
 export const CONFIDENCE_VALUES = ["high", "medium", "low"] as const;
 export type ConfidenceLevel = (typeof CONFIDENCE_VALUES)[number];

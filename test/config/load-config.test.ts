@@ -254,6 +254,13 @@ describe("defaultConfigJsonc", () => {
     const jsonc2 = defaultConfigJsonc();
     expect(jsonc1).toBe(jsonc2);
   });
+
+  it("includes memory with enabled: true", () => {
+    const jsonc = defaultConfigJsonc();
+    const parsed = JSON.parse(jsonc);
+    expect(parsed).toHaveProperty("memory");
+    expect(parsed.memory).toHaveProperty("enabled", true);
+  });
 });
 
 describe("agents field deep-merge", () => {

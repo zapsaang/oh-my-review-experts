@@ -4,6 +4,7 @@ import { loadConfig } from "../config/load-config.js";
 import { writeReport, type DegradedSlice } from "../tools/report.js";
 import { assertSafePath } from "../tools/fs-utils.js";
 import { parseHandoffJsonHeader } from "../tools/handoff.js";
+import { severityRank, type SeverityLevel } from "../shared/severity.js";
 
 /**
  * Server-side report finalization for the review-code workflow.
@@ -216,14 +217,6 @@ function mergeHandoffs(handoffs: ParsedHandoff[]): MergedResult {
   };
 }
 
-function severityRank(severity: unknown): number {
-  if (severity === "critical") return 0;
-  if (severity === "high") return 1;
-  if (severity === "medium") return 2;
-  if (severity === "low") return 3;
-  return 4;
-}
-
 function renderFindingMarkdown(
   finding: Record<string, unknown>,
   sliceId: string,
@@ -331,7 +324,7 @@ function renderMarkdownReport(merged: MergedResult, runId: string): string {
       lines.push(`### Slice ${slice.slice_id}`);
       lines.push("");
       const orderedFindings = [...slice.findings].sort((a, b) => {
-        const sevDiff = severityRank(a.severity) - severityRank(b.severity);
+        const sevDiff = (severityRank[a.severity as SeverityLevel] ?? 4) - (severityRank[b.severity as SeverityLevel] ?? 4);
         if (sevDiff !== 0) return sevDiff;
         return parseFindingId(a).localeCompare(parseFindingId(b));
       });

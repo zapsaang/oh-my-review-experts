@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { writeReport, validateReportMarkdown, renderCoverageWarning } from "../../src/tools/report.js";
 import { OmreConfig } from "../../src/config/schema.js";
+import { DEFAULT_MEMORY_CONFIG } from "../../src/memory/config.js";
 
 function createTestConfig(overrides: Partial<OmreConfig["report"]> = {}): OmreConfig {
   return {
@@ -17,6 +18,7 @@ function createTestConfig(overrides: Partial<OmreConfig["report"]> = {}): OmreCo
     report: { enabled: true, directory: ".omre/reports", latestMarkdown: "latest.md", latestJson: "latest.json", timestamped: false, ...overrides },
     handoff: { enabled: true, directory: ".omre/handoffs" },
     reviewers: { default: ["spec", "quality"], bySliceType: { "business-module": [], "migration": [], "api-contract": [], "dependency-change": [], "infra-change": [], "shared-library": [], "test-only": [], "docs-only": [] } },
+    memory: DEFAULT_MEMORY_CONFIG,
   };
 }
 

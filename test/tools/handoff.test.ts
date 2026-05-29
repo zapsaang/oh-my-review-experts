@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { writeHandoff, readHandoffs, parseHandoffJsonHeader } from "../../src/tools/handoff.js";
 import { OmreConfig } from "../../src/config/schema.js";
+import { DEFAULT_MEMORY_CONFIG } from "../../src/memory/config.js";
 
 function createTestConfig(overrides: Partial<OmreConfig["handoff"]> = {}): OmreConfig {
   return {
@@ -17,6 +18,7 @@ function createTestConfig(overrides: Partial<OmreConfig["handoff"]> = {}): OmreC
     report: { enabled: true, directory: ".omre/reports", latestMarkdown: "latest.md", latestJson: "latest.json", timestamped: false },
     handoff: { enabled: true, directory: ".omre/handoffs", ...overrides },
     reviewers: { default: ["spec", "quality"], bySliceType: { "business-module": [], "migration": [], "api-contract": [], "dependency-change": [], "infra-change": [], "shared-library": [], "test-only": [], "docs-only": [] } },
+    memory: DEFAULT_MEMORY_CONFIG,
   };
 }
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MemoryConfigSchema, DEFAULT_MEMORY_CONFIG } from "../memory/config.js";
 
 // Security: Path traversal prevention helpers
 // These patterns ensure user-controlled path segments cannot escape the project directory.
@@ -216,6 +217,7 @@ export const OmreConfigSchema = z.object({
       "Reviewer dimensions per slice type. Unknown slice types are rejected by design."
     ),
   }).default(() => structuredClone(DEFAULT_REVIEWERS)).describe("Reviewer dimension assignment settings."),
+  memory: MemoryConfigSchema.default(() => structuredClone(DEFAULT_MEMORY_CONFIG)).describe("Review Memory v0.4 settings."),
 }).meta({
   $id: "https://raw.githubusercontent.com/zapsaang/oh-my-review-experts/main/schemas/oh-my-review-experts.schema.json",
   title: "Oh My Review Experts Config",

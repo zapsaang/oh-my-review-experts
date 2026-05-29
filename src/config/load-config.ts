@@ -200,6 +200,7 @@ export function defaultConfigJsonc(): string {
     report: defaults.report,
     handoff: defaults.handoff,
     reviewers: defaults.reviewers,
+    memory: defaults.memory,
   };
   return JSON.stringify(config, null, 2) + "\n";
 }

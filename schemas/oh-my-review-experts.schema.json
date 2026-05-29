@@ -453,6 +453,261 @@
       },
       "type": "object"
     },
+    "memory": {
+      "additionalProperties": false,
+      "default": {
+        "compaction": {
+          "enabled": true,
+          "maxSegmentAgeHours": 168,
+          "maxSegmentsBeforeCompaction": 50
+        },
+        "dedupe": {
+          "contentHashThreshold": 0.85,
+          "fingerprintThreshold": 0.92
+        },
+        "directory": ".omre/memory",
+        "enabled": true,
+        "indexing": {
+          "excludePatterns": [
+            "node_modules/**",
+            "dist/**",
+            ".git/**",
+            "coverage/**"
+          ],
+          "includePatterns": [
+            "**/*.{ts,tsx,js,jsx,py,go,rs,java}"
+          ],
+          "maxFileSizeKb": 512
+        },
+        "privacy": {
+          "allowedTokensInSearchable": [],
+          "redactEvidence": true,
+          "redactProblem": false
+        },
+        "retention": {
+          "autoCompactAfterReview": true,
+          "maxEventsPerFinding": 100,
+          "maxFindingsTotal": 10000
+        },
+        "retrieval": {
+          "crossRunDeduplication": true,
+          "defaultTopK": 5,
+          "similarityThreshold": 0.75
+        },
+        "similarity": {
+          "semanticWeight": 0.4,
+          "tokenWeight": 0.6
+        }
+      },
+      "description": "Review Memory v0.4 settings.",
+      "properties": {
+        "compaction": {
+          "additionalProperties": false,
+          "default": {
+            "enabled": true,
+            "maxSegmentAgeHours": 168,
+            "maxSegmentsBeforeCompaction": 50
+          },
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "maxSegmentAgeHours": {
+              "default": 168,
+              "maximum": 8760,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "maxSegmentsBeforeCompaction": {
+              "default": 50,
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "dedupe": {
+          "additionalProperties": false,
+          "default": {
+            "contentHashThreshold": 0.85,
+            "fingerprintThreshold": 0.92
+          },
+          "properties": {
+            "contentHashThreshold": {
+              "default": 0.85,
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "fingerprintThreshold": {
+              "default": 0.92,
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "directory": {
+          "default": ".omre/memory",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "indexing": {
+          "additionalProperties": false,
+          "default": {
+            "excludePatterns": [
+              "node_modules/**",
+              "dist/**",
+              ".git/**",
+              "coverage/**"
+            ],
+            "includePatterns": [
+              "**/*.{ts,tsx,js,jsx,py,go,rs,java}"
+            ],
+            "maxFileSizeKb": 512
+          },
+          "properties": {
+            "excludePatterns": {
+              "default": [
+                "node_modules/**",
+                "dist/**",
+                ".git/**",
+                "coverage/**"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "includePatterns": {
+              "default": [
+                "**/*.{ts,tsx,js,jsx,py,go,rs,java}"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "maxFileSizeKb": {
+              "default": 512,
+              "maximum": 100000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "privacy": {
+          "additionalProperties": false,
+          "default": {
+            "allowedTokensInSearchable": [],
+            "redactEvidence": true,
+            "redactProblem": false
+          },
+          "properties": {
+            "allowedTokensInSearchable": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "redactEvidence": {
+              "default": true,
+              "type": "boolean"
+            },
+            "redactProblem": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "retention": {
+          "additionalProperties": false,
+          "default": {
+            "autoCompactAfterReview": true,
+            "maxEventsPerFinding": 100,
+            "maxFindingsTotal": 10000
+          },
+          "properties": {
+            "autoCompactAfterReview": {
+              "default": true,
+              "type": "boolean"
+            },
+            "maxEventsPerFinding": {
+              "default": 100,
+              "maximum": 100000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "maxFindingsTotal": {
+              "default": 10000,
+              "maximum": 1000000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "retrieval": {
+          "additionalProperties": false,
+          "default": {
+            "crossRunDeduplication": true,
+            "defaultTopK": 5,
+            "similarityThreshold": 0.75
+          },
+          "properties": {
+            "crossRunDeduplication": {
+              "default": true,
+              "type": "boolean"
+            },
+            "defaultTopK": {
+              "default": 5,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "similarityThreshold": {
+              "default": 0.75,
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "similarity": {
+          "additionalProperties": false,
+          "default": {
+            "semanticWeight": 0.4,
+            "tokenWeight": 0.6
+          },
+          "properties": {
+            "semanticWeight": {
+              "default": 0.4,
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "tokenWeight": {
+              "default": 0.6,
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
     "partialRerun": {
       "additionalProperties": false,
       "default": {
