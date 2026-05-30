@@ -1,0 +1,66 @@
+{
+  "run_id": "20260530-120000-001",
+  "status": "degraded",
+  "slices": [
+    {
+      "slice_id": "auth-module",
+      "findings": [
+        {
+          "id": "sec-1",
+          "severity": "high",
+          "file": "src/auth.ts",
+          "line": 42,
+          "title": "Hardcoded JWT secret in source",
+          "description": "The JWT secret is embedded directly in the source code, making it visible in version control.",
+          "evidence": "const SECRET = 'bearer abcdefghijklmnopqrstuvwxyz12345';",
+          "confidence": "high",
+          "classification": "injection",
+          "category": "secret-leak",
+          "impact": "Any developer with repo access can extract the secret and forge tokens.",
+          "recommendation": "Move the secret to an environment variable and inject it at runtime."
+        },
+        {
+          "id": "sec-2",
+          "severity": "medium",
+          "file": "src/middleware.ts",
+          "line": "87-92",
+          "title": "Missing rate limit on login endpoint",
+          "description": "The login route does not enforce any rate limiting, leaving it open to brute-force attacks.",
+          "confidence": "medium",
+          "classification": "authz-gap"
+        }
+      ]
+    },
+    {
+      "slice_id": "queue-worker",
+      "findings": [
+        {
+          "id": "perf-1",
+          "severity": "critical",
+          "file": "src/queue.ts",
+          "line": 115,
+          "title": "O(n²) loop in job deduplication",
+          "description": "The deduplication logic uses nested loops over the full job array.",
+          "evidence": "for (let i = 0; i < jobs.length; i++) { for (let j = 0; j < jobs.length; j++) { ... } }",
+          "confidence": "high",
+          "classification": "bad-complexity",
+          "category": "algorithm",
+          "impact": "Queue processing time grows quadratically with job count, causing timeouts under load.",
+          "recommendation": "Replace with a Set-based lookup or maintain a hash map of seen job IDs."
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_slices": 2,
+    "total_findings": 3,
+    "handoffs_consumed": 2
+  },
+  "degraded_slices": [
+    {
+      "slice_id": "queue-worker",
+      "missing_dimensions": ["concurrency"]
+    }
+  ],
+  "missing_dimensions_global": ["concurrency"]
+}
