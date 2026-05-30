@@ -18,7 +18,8 @@
       "line": 42,
       "title": "Hardcoded JWT secret in source",
       "description": "The JWT secret is embedded directly in the source code, making it visible in version control.",
-      "evidence": "const SECRET = 'super-secret-key-123';",
+      "evidence": "const SECRET = 'bearer abcdefghijklmnopqrstuvwxyz12345';",
+
       "confidence": "high",
       "classification": "injection",
       "category": "secret-leak",
@@ -70,7 +71,7 @@
 - Category: secret-leak
 - File: src/auth.ts
 - Lines: 42
-- Evidence: const SECRET = 'super-secret-key-123';
+- Evidence: const SECRET = 'bearer abcdefghijklmnopqrstuvwxyz12345';
 - Impact: Any developer with repo access can extract the secret and forge tokens.
 - Recommendation: Move the secret to an environment variable and inject it at runtime.
 

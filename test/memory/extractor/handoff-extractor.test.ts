@@ -42,7 +42,8 @@ describe("extractFromHandoffs", () => {
       category: "secret-leak",
       title: "Hardcoded JWT secret in source",
       problem: "Any developer with repo access can extract the secret and forge tokens.",
-      evidence: "const SECRET = 'super-secret-key-123';",
+      evidence: "const SECRET = 'bearer abcdefghijklmnopqrstuvwxyz12345';",
+
       recommendation: "Move the secret to an environment variable and inject it at runtime.",
       locations: [{ path: "src/auth.ts", line: 42 }],
     });
