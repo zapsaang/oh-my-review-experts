@@ -264,14 +264,14 @@ describe("materialized memory store", () => {
     expect(readMaterializedState(paths)).toEqual(state);
   });
 
-  it("rebuilds findings only from finding.discovered events", () => {
+  it("rebuilds unique findings from finding.discovered events", () => {
     const first = validFinding();
     const second = relatedFinding();
 
     const state = rebuildMaterializedStateFromEvents([
       seenAgainEvent({ eventId: "evt_seen_before_discovery", findingId: first.id }),
       discoveredEvent({ eventId: "evt_discovered_first", finding: first }),
-      relatedEvent({ eventId: "evt_related_noop", findingId: first.id, relatedFindingId: second.id }),
+      discoveredEvent({ eventId: "evt_discovered_duplicate", finding: first }),
       discoveredEvent({ eventId: "evt_discovered_second", finding: second }),
     ]);
 
@@ -294,24 +294,92 @@ describe("materialized memory store", () => {
     expect(rebuilt?.findings).toEqual([discovered.finding]);
   });
 
-  it("keeps PR2 event variants as no-ops in PR1", () => {
+  it("replays finding.seen_again by incrementing occurrence and deduplicating run IDs", () => {
+    const original = validFinding();
+    const originalOccurrence = {
+      ...original.occurrence,
+      runIds: [...original.occurrence.runIds],
+    };
+    const firstSeenAgainAt = "2026-05-29T00:00:00.000Z";
+    const secondSeenAgainAt = "2026-05-30T00:00:00.000Z";
+
+    const state = rebuildMaterializedStateFromEvents([
+      discoveredEvent({ finding: original }),
+      seenAgainEvent({
+        eventId: "evt_seen_again_first",
+        at: firstSeenAgainAt,
+        findingId: original.id,
+        runId: "run-20260529-repeat",
+      }),
+      seenAgainEvent({
+        eventId: "evt_seen_again_second",
+        at: secondSeenAgainAt,
+        findingId: original.id,
+        runId: "run-20260529-repeat",
+      }),
+    ]);
+
+    expect(state.findings[0]?.occurrence).toEqual({
+      ...originalOccurrence,
+      count: originalOccurrence.count + 2,
+      lastSeenAt: secondSeenAgainAt,
+      runIds: [...originalOccurrence.runIds, "run-20260529-repeat"],
+    });
+  });
+
+  it("replays finding.status_changed by updating the finding status", () => {
     const original = validFinding();
 
     const state = rebuildMaterializedStateFromEvents([
       discoveredEvent({ finding: original }),
-      seenAgainEvent({ findingId: original.id, runId: "run-20260528-repeat" }),
       statusChangedEvent({ findingId: original.id, from: "open", to: "acknowledged" }),
-      regressedEvent({ findingId: original.id, fromStatus: "fixed", toStatus: "open" }),
-      relatedEvent({ findingId: original.id, relatedFindingId }),
     ]);
 
-    // PR2: finding.seen_again will update occurrence count and lastSeenAt.
-    // PR2: finding.status_changed will update the finding status.
-    // PR2: finding.regressed will record fixed-to-open regressions.
-    // PR2: finding.related will populate the related index.
-    expect(state.findings).toEqual([original]);
-    expect(state.findings[0]?.occurrence).toEqual(original.occurrence);
+    expect(state.findings[0]?.status).toBe("acknowledged");
+  });
+
+  it("replays finding.regressed by reopening the finding and refreshing occurrence metadata", () => {
+    const original = validFinding({ status: "fixed" });
+    const originalOccurrence = {
+      ...original.occurrence,
+      runIds: [...original.occurrence.runIds],
+    };
+    const regressedAt = "2026-05-29T12:00:00.000Z";
+
+    const state = rebuildMaterializedStateFromEvents([
+      discoveredEvent({ finding: original }),
+      regressedEvent({
+        at: regressedAt,
+        findingId: original.id,
+        fromStatus: "fixed",
+        toStatus: "open",
+        runId: "run-20260529-regression",
+      }),
+    ]);
+
     expect(state.findings[0]?.status).toBe("open");
-    expect(state.relatedIndex).toMatchObject({ relations: [], byFindingId: {} });
+    expect(state.findings[0]?.occurrence).toEqual({
+      ...originalOccurrence,
+      lastSeenAt: regressedAt,
+      runIds: [...originalOccurrence.runIds, "run-20260529-regression"],
+    });
+  });
+
+  it("replays finding.related by populating and deduplicating the related index", () => {
+    const first = validFinding();
+    const second = relatedFinding();
+    const relation = { findingId: first.id, relatedFindingId: second.id, relationType: "same-root-cause" };
+
+    const state = rebuildMaterializedStateFromEvents([
+      discoveredEvent({ eventId: "evt_discovered_first", finding: first }),
+      discoveredEvent({ eventId: "evt_discovered_second", finding: second }),
+      relatedEvent({ eventId: "evt_related_first", findingId: first.id, relatedFindingId: second.id }),
+      relatedEvent({ eventId: "evt_related_duplicate", findingId: first.id, relatedFindingId: second.id }),
+    ]);
+
+    expect(state.relatedIndex.relations).toEqual([relation]);
+    expect(state.relatedIndex.byFindingId).toEqual({
+      [first.id]: [relation],
+    });
   });
 });

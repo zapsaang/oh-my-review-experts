@@ -67,6 +67,8 @@ export function writeMaterializedState(
 export function rebuildMaterializedStateFromEvents(events: MemoryEvent[]): MaterializedState {
   const findings: MemoryFinding[] = [];
   const findingIds = new Set<string>();
+  const relations: RelatedIndex["relations"] = [];
+  const byFindingId: RelatedIndex["byFindingId"] = {};
 
   for (const event of events) {
     switch (event.type) {
@@ -78,19 +80,51 @@ export function rebuildMaterializedStateFromEvents(events: MemoryEvent[]): Mater
         break;
       }
       case "finding.seen_again": {
-        // PR2: update occurrence count, lastSeenAt
+        const finding = findings.find((candidate) => candidate.id === event.findingId);
+        if (finding) {
+          finding.occurrence.count += 1;
+          finding.occurrence.lastSeenAt = event.at;
+          if (!finding.occurrence.runIds.includes(event.runId)) {
+            finding.occurrence.runIds.push(event.runId);
+          }
+        }
         break;
       }
       case "finding.status_changed": {
-        // PR2: update finding status
+        const finding = findings.find((candidate) => candidate.id === event.findingId);
+        if (finding) {
+          finding.status = event.to;
+        }
         break;
       }
       case "finding.regressed": {
-        // PR2: handle regression
+        const finding = findings.find((candidate) => candidate.id === event.findingId);
+        if (finding) {
+          finding.status = event.toStatus;
+          finding.occurrence.lastSeenAt = event.at;
+          if (!finding.occurrence.runIds.includes(event.runId)) {
+            finding.occurrence.runIds.push(event.runId);
+          }
+        }
         break;
       }
       case "finding.related": {
-        // PR2: update related index
+        const relation = {
+          findingId: event.findingId,
+          relatedFindingId: event.relatedFindingId,
+          relationType: event.relationType,
+        };
+        const alreadyRecorded = relations.some((existing) => (
+          existing.findingId === relation.findingId
+          && existing.relatedFindingId === relation.relatedFindingId
+          && existing.relationType === relation.relationType
+        ));
+
+        if (!alreadyRecorded) {
+          relations.push(relation);
+          byFindingId[relation.findingId] = byFindingId[relation.findingId] ?? [];
+          byFindingId[relation.findingId].push(relation);
+        }
         break;
       }
       default:
@@ -102,8 +136,8 @@ export function rebuildMaterializedStateFromEvents(events: MemoryEvent[]): Mater
   const relatedIndex: RelatedIndex = {
     schemaVersion: 1,
     generatedAt: now,
-    relations: [],
-    byFindingId: {},
+    relations,
+    byFindingId,
   };
 
   const manifest: MemoryManifest = {
