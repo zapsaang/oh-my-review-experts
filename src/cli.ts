@@ -12,6 +12,7 @@ import { defaultConfigJsonc, findConfigFiles, loadConfig } from "./config/load-c
 import { AGENT_TIER_MAP } from "./config/provider-presets.js"
 import { ALL_AGENTS, registerAgents } from "./agents/registry.js"
 import { renderLocalDryRun } from "./workflow/run-review-code.js"
+import { registerMemoryCli } from "./memory/cli.js"
 
 import {
   checkAgentRegistration,
@@ -244,7 +245,7 @@ export function runDoctor(options: RunDoctorOptions = {}): void {
   }
 
   // Register OMRE agents; skip-on-conflict preserves existing opencode.json slots
-  const { registered, skipped } = registerAgents(probeConfig, omreConfig);
+  const { skipped } = registerAgents(probeConfig, omreConfig);
   const agentStatus = checkAgentRegistration(probeConfig)
   const agentLine = `agents: ${agentStatus.registered}/${agentStatus.expected} registered`
   if (agentStatus.registered === agentStatus.expected) {
@@ -399,6 +400,8 @@ export function createCliProgram(): Command {
         process.exit(1)
       }
     })
+
+  registerMemoryCli(program)
 
   return program
 }
