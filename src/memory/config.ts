@@ -13,13 +13,28 @@ export const MemoryConfigSchema = z.object({
     excludePatterns: ["node_modules/**", "dist/**", ".git/**", "coverage/**"],
   })),
   retrieval: z.object({
+    enabled: z.boolean().default(false),
     defaultTopK: z.number().int().min(1).max(100).default(5),
     similarityThreshold: z.number().min(0).max(1).default(0.75),
     crossRunDeduplication: z.boolean().default(true),
+    maxContextItems: z.number().int().min(1).max(100).default(6),
+    maxContextChars: z.number().int().min(1000).max(100000).default(8000),
+    includeFixedAsRegressionCandidates: z.boolean().default(true),
+    includeFalsePositive: z.boolean().default(false),
+    byReviewer: z.record(z.string(), z.object({
+      topK: z.number().int().min(1).max(100).optional(),
+      enabled: z.boolean().optional(),
+    })).default({}),
   }).default(() => structuredClone({
+    enabled: false,
     defaultTopK: 5,
     similarityThreshold: 0.75,
     crossRunDeduplication: true,
+    maxContextItems: 6,
+    maxContextChars: 8000,
+    includeFixedAsRegressionCandidates: true,
+    includeFalsePositive: false,
+    byReviewer: {},
   })),
   dedupe: z.object({
     fingerprintThreshold: z.number().min(0).max(1).default(0.92),

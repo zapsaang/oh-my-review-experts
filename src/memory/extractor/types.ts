@@ -11,6 +11,8 @@ export interface RawFinding {
   problem: string;
   evidence?: string;
   recommendation?: string;
+  id?: string;
+  confidence?: string;
   locations: RawLocation[];
 }
 

@@ -68,6 +68,16 @@ function toRawFinding(finding: JsonObject, sliceReviewer: string, title: string)
     rawFinding.recommendation = recommendation;
   }
 
+  const id = stringValue(finding.id);
+  if (id !== undefined) {
+    rawFinding.id = id;
+  }
+
+  const confidence = stringValue(finding.confidence);
+  if (confidence !== undefined) {
+    rawFinding.confidence = confidence;
+  }
+
   return rawFinding;
 }
 

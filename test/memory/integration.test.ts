@@ -201,7 +201,7 @@ describe("memory index-latest integration pipeline", () => {
     );
     expect(malformedFinding?.evidence).toBe("[EVIDENCE_MISSING]");
     expect(malformedFinding?.metadata.sourceMalformed).toBe(true);
-    expect(malformedFinding?.status).toBe("acknowledged");
+    expect(malformedFinding?.status).toBe("confirmed");
 
     const relatedIndex = RelatedIndexSchema.parse(readJsonFile<unknown>(paths.relatedIndexFile));
     expect(relatedIndex.relations).toHaveLength(1);

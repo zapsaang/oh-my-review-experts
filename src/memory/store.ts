@@ -4,6 +4,7 @@ import {
   MemoryFindingSchema,
   MemoryManifestSchema,
   RelatedIndexSchema,
+  normalizeMemoryStatus,
   type MemoryFinding,
   type MemoryEvent,
   type MemoryManifest,
@@ -30,7 +31,13 @@ export function readMaterializedState(paths: MemoryPaths): MaterializedState | n
   if (fs.existsSync(paths.memoryFile)) {
     const memoryRaw = fs.readFileSync(paths.memoryFile, "utf8");
     const lines = memoryRaw.split("\n").filter((line) => line.trim() !== "");
-    findings = lines.map((line) => MemoryFindingSchema.parse(JSON.parse(line)));
+    findings = lines.map((line) => {
+      const raw = JSON.parse(line) as Record<string, unknown>;
+      if (typeof raw.status === "string") {
+        raw.status = normalizeMemoryStatus(raw.status);
+      }
+      return MemoryFindingSchema.parse(raw);
+    });
   }
 
   let relatedIndex: RelatedIndex = {
@@ -60,8 +67,13 @@ export function writeMaterializedState(
   paths: MemoryPaths,
   state: MaterializedState,
 ): void {
+  const canonicalFindings = state.findings.map((finding) => MemoryFindingSchema.parse(finding));
+  state.findings = canonicalFindings;
+
   // Write memory.jsonl FIRST
-  const memoryContent = state.findings.map((finding) => JSON.stringify(finding)).join("\n") + "\n";
+  const memoryContent = canonicalFindings
+    .map((finding) => JSON.stringify(finding))
+    .join("\n") + "\n";
   writeFileAtomicOverwrite(paths.memoryFile, memoryContent);
 
   // Write related-index.json SECOND
@@ -83,8 +95,10 @@ export function rebuildMaterializedStateFromEvents(events: MemoryEvent[]): Mater
     switch (event.type) {
       case "finding.discovered": {
         if (!findingIds.has(event.finding.id)) {
-          findings.push(event.finding);
-          findingIds.add(event.finding.id);
+          const finding = event.finding;
+          finding.status = normalizeMemoryStatus(finding.status) as MemoryFinding["status"];
+          findings.push(finding);
+          findingIds.add(finding.id);
         }
         break;
       }
@@ -102,14 +116,14 @@ export function rebuildMaterializedStateFromEvents(events: MemoryEvent[]): Mater
       case "finding.status_changed": {
         const finding = findings.find((candidate) => candidate.id === event.findingId);
         if (finding) {
-          finding.status = event.to;
+          finding.status = normalizeMemoryStatus(event.to) as MemoryFinding["status"];
         }
         break;
       }
       case "finding.regressed": {
         const finding = findings.find((candidate) => candidate.id === event.findingId);
         if (finding) {
-          finding.status = event.toStatus;
+          finding.status = normalizeMemoryStatus(event.toStatus) as MemoryFinding["status"];
           finding.occurrence.lastSeenAt = event.at;
           if (!finding.occurrence.runIds.includes(event.runId)) {
             finding.occurrence.runIds.push(event.runId);

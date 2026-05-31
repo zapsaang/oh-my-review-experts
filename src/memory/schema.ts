@@ -3,7 +3,32 @@ import { SEVERITY_VALUES } from "../shared/severity.js";
 
 const MEMORY_FINDING_ID_PATTERN = /^mem_[a-z0-9]{16,64}$/;
 
-export const MemoryStatus = z.enum(["open", "acknowledged", "fixed", "false_positive", "wont_fix"]);
+export function normalizeMemoryStatus(value: string): string {
+  switch (value) {
+    case "acknowledged":
+      return "confirmed";
+    case "false_positive":
+      return "false-positive";
+    case "wont_fix":
+      return "ignored";
+    default:
+      return value;
+  }
+}
+
+const CanonicalMemoryStatus = z.enum([
+  "open",
+  "confirmed",
+  "fixed",
+  "ignored",
+  "false-positive",
+  "stale",
+]);
+
+export const MemoryStatus = z.preprocess(
+  (val) => (typeof val === "string" ? normalizeMemoryStatus(val) : val),
+  CanonicalMemoryStatus,
+);
 
 const MemoryFindingIdSchema = z.string().regex(MEMORY_FINDING_ID_PATTERN);
 
@@ -11,15 +36,22 @@ export const MemoryFindingSchema = z.object({
   schemaVersion: z.literal(1),
   id: MemoryFindingIdSchema,
   fingerprint: z.string().min(16),
+  sourceFindingId: z.string().optional(),
   repo: z.object({
     rootHash: z.string().min(16),
+    remoteHash: z.string().optional(),
     packagePath: z.string().default("."),
+    packageName: z.string().optional(),
+    packageKind: z.string().optional(),
   }),
   origin: z.object({
     runId: z.string().min(1),
-    sourceType: z.enum(["report", "manual", "import"]),
+    sourceType: z.enum(["report", "handoff", "manual", "import"]),
     sourcePath: z.string(),
     createdAt: z.string().datetime(),
+    commitSha: z.string().optional(),
+    baseSha: z.string().optional(),
+    headSha: z.string().optional(),
   }),
   reviewer: z.string().min(1),
   severity: z.enum(SEVERITY_VALUES),
@@ -28,6 +60,8 @@ export const MemoryFindingSchema = z.object({
   title: z.string().min(1).max(240),
   problem: z.string().min(1),
   evidence: z.string().min(1),
+  recommendation: z.string().optional(),
+  confidence: z.enum(["high", "medium", "low"]).optional(),
   locations: z.array(z.object({
     path: z.string(),
     line: z.union([z.number(), z.string()]).optional(),
@@ -48,6 +82,7 @@ export const MemoryFindingSchema = z.object({
     recommendationTruncated: z.boolean().default(false),
     sourceMalformed: z.boolean().default(false),
   }),
+  tags: z.array(z.string()).default([]),
   contentHash: z.string().min(16),
 });
 

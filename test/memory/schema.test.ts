@@ -191,6 +191,83 @@ describe("MemoryFindingSchema", () => {
 
     expect(parsed.repo.packagePath).toBe(".");
   });
+
+  it("normalizes legacy acknowledged status to confirmed", () => {
+    const parsed = MemoryFindingSchema.parse(validFinding({ status: "acknowledged" }));
+    expect(parsed.status).toBe("confirmed");
+  });
+
+  it("normalizes legacy false_positive status to false-positive", () => {
+    const parsed = MemoryFindingSchema.parse(validFinding({ status: "false_positive" }));
+    expect(parsed.status).toBe("false-positive");
+  });
+
+  it("normalizes legacy wont_fix status to ignored", () => {
+    const parsed = MemoryFindingSchema.parse(validFinding({ status: "wont_fix" }));
+    expect(parsed.status).toBe("ignored");
+  });
+
+  it("accepts canonical stale status", () => {
+    const result = MemoryFindingSchema.safeParse(validFinding({ status: "stale" }));
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.status).toBe("stale");
+    }
+  });
+
+  it("defaults missing tags to empty array", () => {
+    const parsed = MemoryFindingSchema.parse(validFinding());
+    expect(parsed.tags).toEqual([]);
+  });
+
+  it("accepts missing optional new fields and defaults tags", () => {
+    const parsed = MemoryFindingSchema.parse(validFinding());
+    expect(parsed.sourceFindingId).toBeUndefined();
+    expect(parsed.recommendation).toBeUndefined();
+    expect(parsed.confidence).toBeUndefined();
+    expect(parsed.repo.remoteHash).toBeUndefined();
+    expect(parsed.repo.packageName).toBeUndefined();
+    expect(parsed.repo.packageKind).toBeUndefined();
+    expect(parsed.origin.commitSha).toBeUndefined();
+    expect(parsed.origin.baseSha).toBeUndefined();
+    expect(parsed.origin.headSha).toBeUndefined();
+    expect(parsed.tags).toEqual([]);
+  });
+
+  it("accepts new optional fields when provided", () => {
+    const parsed = MemoryFindingSchema.parse(validFinding({
+      sourceFindingId: "sf123",
+      recommendation: "Use prepared statements",
+      confidence: "high",
+      repo: {
+        rootHash: "repo1234567890abcd",
+        packagePath: "packages/core",
+        remoteHash: "remote123",
+        packageName: "core",
+        packageKind: "lib",
+      },
+      origin: {
+        runId: "run-20260528",
+        sourceType: "report",
+        sourcePath: ".omre/reports/latest.json",
+        createdAt: timestamp,
+        commitSha: "abc123",
+        baseSha: "base456",
+        headSha: "head789",
+      },
+      tags: ["sql", "injection"],
+    }));
+    expect(parsed.sourceFindingId).toBe("sf123");
+    expect(parsed.recommendation).toBe("Use prepared statements");
+    expect(parsed.confidence).toBe("high");
+    expect(parsed.repo.remoteHash).toBe("remote123");
+    expect(parsed.repo.packageName).toBe("core");
+    expect(parsed.repo.packageKind).toBe("lib");
+    expect(parsed.origin.commitSha).toBe("abc123");
+    expect(parsed.origin.baseSha).toBe("base456");
+    expect(parsed.origin.headSha).toBe("head789");
+    expect(parsed.tags).toEqual(["sql", "injection"]);
+  });
 });
 
 describe("MemoryEventSchema", () => {

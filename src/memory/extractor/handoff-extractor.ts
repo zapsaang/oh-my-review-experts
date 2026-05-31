@@ -127,8 +127,10 @@ function normalizeStructuredFinding(
   const recommendation = stringValue(record.recommendation) ?? markdownFinding?.fields.Recommendation;
   const file = stringValue(record.file) ?? markdownFinding?.fields.File;
   const line = record.line ?? markdownFinding?.fields.Lines;
+  const id = stringValue(record.id) ?? markdownFinding?.fields.ID;
+  const confidence = stringValue(record.confidence) ?? markdownFinding?.fields.Confidence;
 
-  return buildRawFinding({ reviewer, severity, category, title, problem, evidence, recommendation, file, line });
+  return buildRawFinding({ reviewer, severity, category, title, problem, evidence, recommendation, file, line, id, confidence });
 }
 
 function normalizeMarkdownFinding(finding: MarkdownFinding, reviewer: string): RawFinding | undefined {
@@ -142,6 +144,8 @@ function normalizeMarkdownFinding(finding: MarkdownFinding, reviewer: string): R
     recommendation: finding.fields.Recommendation,
     file: finding.fields.File,
     line: finding.fields.Lines,
+    id: finding.fields.ID,
+    confidence: finding.fields.Confidence,
   });
 }
 
@@ -155,6 +159,8 @@ function buildRawFinding(input: {
   recommendation: string | undefined;
   file: string | undefined;
   line: unknown;
+  id?: string | undefined;
+  confidence?: string | undefined;
 }): RawFinding | undefined {
   if (!input.severity || !input.category || !input.title || !input.problem) {
     return undefined;
@@ -168,6 +174,8 @@ function buildRawFinding(input: {
     problem: input.problem,
     evidence: input.evidence,
     recommendation: input.recommendation,
+    id: input.id,
+    confidence: input.confidence,
     locations: buildLocations(input.file, input.line),
   };
 }

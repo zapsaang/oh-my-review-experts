@@ -43,6 +43,7 @@ function validFinding(overrides: Partial<MemoryFinding> = {}): MemoryFinding {
       recommendationTruncated: false,
       sourceMalformed: false,
     },
+    tags: [],
     contentHash: "ch1234567890abcdef",
   } satisfies MemoryFinding;
 

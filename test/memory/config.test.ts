@@ -21,6 +21,57 @@ describe("MemoryConfigSchema", () => {
     expect(config.retrieval.defaultTopK).toBe(5);
   });
 
+  it("defaults retrieval enabled", () => {
+    const config = MemoryConfigSchema.parse({});
+
+    expect(config.retrieval.enabled).toBe(false);
+  });
+
+  it("defaults retrieval maxContextItems", () => {
+    const config = MemoryConfigSchema.parse({});
+
+    expect(config.retrieval.maxContextItems).toBe(6);
+  });
+
+  it("defaults retrieval maxContextChars", () => {
+    const config = MemoryConfigSchema.parse({});
+
+    expect(config.retrieval.maxContextChars).toBe(8000);
+  });
+
+  it("defaults retrieval includeFixedAsRegressionCandidates", () => {
+    const config = MemoryConfigSchema.parse({});
+
+    expect(config.retrieval.includeFixedAsRegressionCandidates).toBe(true);
+  });
+
+  it("defaults retrieval includeFalsePositive", () => {
+    const config = MemoryConfigSchema.parse({});
+
+    expect(config.retrieval.includeFalsePositive).toBe(false);
+  });
+
+  it("defaults retrieval byReviewer", () => {
+    const config = MemoryConfigSchema.parse({});
+
+    expect(config.retrieval.byReviewer).toEqual({});
+  });
+
+  it("merges partial byReviewer overrides", () => {
+    const config = MemoryConfigSchema.parse({
+      retrieval: {
+        byReviewer: {
+          security: { topK: 10 },
+        },
+      },
+    });
+
+    expect(config.retrieval.byReviewer).toEqual({
+      security: { topK: 10 },
+    });
+    expect(config.retrieval.defaultTopK).toBe(5);
+  });
+
   it("merges partial input with defaults", () => {
     const config = MemoryConfigSchema.parse({
       enabled: false,
@@ -48,6 +99,47 @@ describe("MemoryConfigSchema", () => {
     expect(() => MemoryConfigSchema.parse({
       dedupe: { contentHashThreshold: -0.1 },
     })).toThrow();
+  });
+
+  it("rejects maxContextItems below minimum", () => {
+    expect(() => MemoryConfigSchema.parse({
+      retrieval: { maxContextItems: 0 },
+    })).toThrow();
+  });
+
+  it("rejects maxContextItems above maximum", () => {
+    expect(() => MemoryConfigSchema.parse({
+      retrieval: { maxContextItems: 101 },
+    })).toThrow();
+  });
+
+  it("rejects maxContextChars below minimum", () => {
+    expect(() => MemoryConfigSchema.parse({
+      retrieval: { maxContextChars: 999 },
+    })).toThrow();
+  });
+
+  it("rejects maxContextChars above maximum", () => {
+    expect(() => MemoryConfigSchema.parse({
+      retrieval: { maxContextChars: 100001 },
+    })).toThrow();
+  });
+
+  it("preserves old retrieval fields", () => {
+    const config = MemoryConfigSchema.parse({
+      retrieval: {
+        defaultTopK: 8,
+        similarityThreshold: 0.8,
+        crossRunDeduplication: false,
+      },
+    });
+
+    expect(config.retrieval.defaultTopK).toBe(8);
+    expect(config.retrieval.similarityThreshold).toBe(0.8);
+    expect(config.retrieval.crossRunDeduplication).toBe(false);
+    expect(config.retrieval.enabled).toBe(false);
+    expect(config.retrieval.maxContextItems).toBe(6);
+    expect(config.retrieval.maxContextChars).toBe(8000);
   });
 });
 

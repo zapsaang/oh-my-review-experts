@@ -65,6 +65,7 @@ function validFinding(overrides: Partial<MemoryFinding> = {}): MemoryFinding {
       recommendationTruncated: false,
       sourceMalformed: false,
     },
+    tags: [],
     contentHash: "ch1234567890abcdef",
   } satisfies MemoryFinding;
 
@@ -163,7 +164,7 @@ function statusChangedEvent(overrides: Partial<StatusChangedEvent> = {}): Status
     at: timestamp,
     findingId,
     from: "open",
-    to: "acknowledged",
+    to: "confirmed",
     markedBy: "reviewer@example.com",
   } satisfies StatusChangedEvent;
 
@@ -332,10 +333,10 @@ describe("materialized memory store", () => {
 
     const state = rebuildMaterializedStateFromEvents([
       discoveredEvent({ finding: original }),
-      statusChangedEvent({ findingId: original.id, from: "open", to: "acknowledged" }),
+      statusChangedEvent({ findingId: original.id, from: "open", to: "confirmed" }),
     ]);
 
-    expect(state.findings[0]?.status).toBe("acknowledged");
+    expect(state.findings[0]?.status).toBe("confirmed");
   });
 
   it("replays finding.regressed by reopening the finding and refreshing occurrence metadata", () => {
@@ -380,6 +381,112 @@ describe("materialized memory store", () => {
     expect(state.relatedIndex.relations).toEqual([relation]);
     expect(state.relatedIndex.byFindingId).toEqual({
       [first.id]: [relation],
+    });
+  });
+
+  describe("legacy status compatibility", () => {
+    it("reads legacy acknowledged status as confirmed", () => {
+      // @ts-expect-error legacy status value for backward-compatibility test
+      const finding = validFinding({ status: "acknowledged" });
+      const state = validState({ findings: [finding] });
+      writeDataFilesWithoutManifest(paths, state);
+      fs.writeFileSync(paths.manifestFile, JSON.stringify(validManifest()), "utf8");
+
+      const read = readMaterializedState(paths);
+      expect(read).not.toBeNull();
+      expect(read!.findings[0]!.status).toBe("confirmed");
+    });
+
+    it("reads legacy false_positive status as false-positive", () => {
+      // @ts-expect-error legacy status value for backward-compatibility test
+      const finding = validFinding({ status: "false_positive" });
+      const state = validState({ findings: [finding] });
+      writeDataFilesWithoutManifest(paths, state);
+      fs.writeFileSync(paths.manifestFile, JSON.stringify(validManifest()), "utf8");
+
+      const read = readMaterializedState(paths);
+      expect(read).not.toBeNull();
+      expect(read!.findings[0]!.status).toBe("false-positive");
+    });
+
+    it("reads legacy wont_fix status as ignored", () => {
+      // @ts-expect-error legacy status value for backward-compatibility test
+      const finding = validFinding({ status: "wont_fix" });
+      const state = validState({ findings: [finding] });
+      writeDataFilesWithoutManifest(paths, state);
+      fs.writeFileSync(paths.manifestFile, JSON.stringify(validManifest()), "utf8");
+
+      const read = readMaterializedState(paths);
+      expect(read).not.toBeNull();
+      expect(read!.findings[0]!.status).toBe("ignored");
+    });
+
+    it("rebuilds from events with legacy status and writes canonical status", () => {
+      // @ts-expect-error legacy status value for backward-compatibility test
+      const legacyFinding = validFinding({ status: "acknowledged" });
+
+      const state = rebuildMaterializedStateFromEvents([
+        discoveredEvent({ finding: legacyFinding }),
+      ]);
+
+      expect(state.findings[0]!.status).toBe("confirmed");
+    });
+
+    it("replays old status_changed event with legacy status without crashing", () => {
+      const original = validFinding();
+
+      const state = rebuildMaterializedStateFromEvents([
+        discoveredEvent({ finding: original }),
+        // @ts-expect-error legacy status value for backward-compatibility test
+        statusChangedEvent({ findingId: original.id, from: "open", to: "acknowledged" }),
+      ]);
+
+      expect(state.findings[0]!.status).toBe("confirmed");
+    });
+
+    it("replays old regressed event with legacy status without crashing", () => {
+      const original = validFinding({ status: "fixed" });
+
+      const state = rebuildMaterializedStateFromEvents([
+        discoveredEvent({ finding: original }),
+        regressedEvent({
+          findingId: original.id,
+          fromStatus: "fixed",
+          // @ts-expect-error legacy status value for backward-compatibility test
+          toStatus: "wont_fix",
+          runId: "run-20260529-regression",
+        }),
+      ]);
+
+      expect(state.findings[0]!.status).toBe("ignored");
+    });
+
+    it("materializes mixed old and new records correctly", () => {
+      // @ts-expect-error legacy status value for backward-compatibility test
+      const legacyAcknowledged = validFinding({ id: "mem_legacyack1234567", status: "acknowledged" });
+      // @ts-expect-error legacy status value for backward-compatibility test
+      const legacyFalsePositive = validFinding({ id: "mem_legacyfp12345678", status: "false_positive" });
+      // @ts-expect-error legacy status value for backward-compatibility test
+      const legacyWontFix = validFinding({ id: "mem_legacywf123456789", status: "wont_fix" });
+      const canonicalOpen = validFinding({ id: "mem_canonicalopen12345", status: "open" });
+      const canonicalFixed = validFinding({ id: "mem_canonicalfixed1234", status: "fixed" });
+
+      const state = validState({
+        findings: [legacyAcknowledged, legacyFalsePositive, legacyWontFix, canonicalOpen, canonicalFixed],
+      });
+      writeDataFilesWithoutManifest(paths, state);
+      fs.writeFileSync(paths.manifestFile, JSON.stringify(validManifest()), "utf8");
+
+      const read = readMaterializedState(paths);
+      expect(read).not.toBeNull();
+      expect(read!.findings).toHaveLength(5);
+
+      const byId = Object.fromEntries(read!.findings.map((f) => [f.id, f.status]));
+      expect(byId["mem_legacyack1234567"]).toBe("confirmed");
+      expect(byId["mem_legacyfp12345678"]).toBe("false-positive");
+      expect(byId["mem_legacywf123456789"]).toBe("ignored");
+      expect(byId["mem_canonicalopen12345"]).toBe("open");
+      expect(byId["mem_canonicalfixed1234"]).toBe("fixed");
     });
   });
 });

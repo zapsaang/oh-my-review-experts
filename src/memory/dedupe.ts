@@ -1,5 +1,6 @@
 import { nextEventId, type EventBatchContext } from "./events.js";
 import { jaccardSimilarity } from "./similarity.js";
+import { normalizeMemoryStatus } from "./schema.js";
 import type { MemoryEvent, MemoryFinding } from "./schema.js";
 
 export interface DeduplicateContext {
@@ -119,7 +120,7 @@ function emitSeenAgainEvents(
     matchedBy,
   });
 
-  if (matchedFinding.status === "fixed") {
+  if (normalizeMemoryStatus(matchedFinding.status) === "fixed") {
     events.push({
       type: "finding.regressed",
       eventId: nextEventId(ctx.batchCtx),

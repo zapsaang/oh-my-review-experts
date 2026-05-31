@@ -490,8 +490,14 @@
           "maxFindingsTotal": 10000
         },
         "retrieval": {
+          "byReviewer": {},
           "crossRunDeduplication": true,
           "defaultTopK": 5,
+          "enabled": false,
+          "includeFalsePositive": false,
+          "includeFixedAsRegressionCandidates": true,
+          "maxContextChars": 8000,
+          "maxContextItems": 6,
           "similarityThreshold": 0.75
         },
         "similarity": {
@@ -659,17 +665,68 @@
         "retrieval": {
           "additionalProperties": false,
           "default": {
+            "byReviewer": {},
             "crossRunDeduplication": true,
             "defaultTopK": 5,
+            "enabled": false,
+            "includeFalsePositive": false,
+            "includeFixedAsRegressionCandidates": true,
+            "maxContextChars": 8000,
+            "maxContextItems": 6,
             "similarityThreshold": 0.75
           },
           "properties": {
+            "byReviewer": {
+              "additionalProperties": {
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "topK": {
+                    "maximum": 100,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "default": {},
+              "propertyNames": {
+                "type": "string"
+              },
+              "type": "object"
+            },
             "crossRunDeduplication": {
               "default": true,
               "type": "boolean"
             },
             "defaultTopK": {
               "default": 5,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "enabled": {
+              "default": false,
+              "type": "boolean"
+            },
+            "includeFalsePositive": {
+              "default": false,
+              "type": "boolean"
+            },
+            "includeFixedAsRegressionCandidates": {
+              "default": true,
+              "type": "boolean"
+            },
+            "maxContextChars": {
+              "default": 8000,
+              "maximum": 100000,
+              "minimum": 1000,
+              "type": "integer"
+            },
+            "maxContextItems": {
+              "default": 6,
               "maximum": 100,
               "minimum": 1,
               "type": "integer"

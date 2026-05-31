@@ -9,7 +9,7 @@ import type { SeverityLevel } from "../shared/severity.js";
 
 export interface NormalizeContext {
   runId: string;
-  sourceType: "report" | "manual" | "import";
+  sourceType: "report" | "handoff" | "manual" | "import";
   sourcePath: string;
   createdAt: string;
   repoRoot: string;
@@ -47,6 +47,19 @@ export function normalizeSeverity(severity: string): SeverityLevel {
   }
 }
 
+function normalizeConfidence(confidence: string): "high" | "medium" | "low" | undefined {
+  switch (confidence.trim().toLowerCase()) {
+    case "high":
+      return "high";
+    case "medium":
+      return "medium";
+    case "low":
+      return "low";
+    default:
+      return undefined;
+  }
+}
+
 export function normalizeMemoryFinding(raw: RedactedRawFinding, ctx: NormalizeContext): MemoryFinding {
   const reviewer = normalizeRequiredText(raw.reviewer, "[REVIEWER_MISSING]");
   const category = normalizeRequiredText(raw.category, "[CATEGORY_MISSING]");
@@ -67,6 +80,10 @@ export function normalizeMemoryFinding(raw: RedactedRawFinding, ctx: NormalizeCo
     paths: locations.map((location) => location.path),
   }));
 
+  const normalizedConfidence = "confidence" in raw && typeof raw.confidence === "string"
+    ? normalizeConfidence(raw.confidence)
+    : undefined;
+
   const finding: MemoryFinding = {
     schemaVersion: 1,
     id: generateMemoryFindingId(),
@@ -74,6 +91,8 @@ export function normalizeMemoryFinding(raw: RedactedRawFinding, ctx: NormalizeCo
     repo: {
       rootHash: ctx.repoRootHash,
       packagePath: packageIdentity.packagePath,
+      packageName: packageIdentity.packageName,
+      packageKind: packageIdentity.packageKind,
     },
     origin: {
       runId: ctx.runId,
@@ -83,11 +102,13 @@ export function normalizeMemoryFinding(raw: RedactedRawFinding, ctx: NormalizeCo
     },
     reviewer: reviewer.text,
     severity: normalizeSeverity(raw.severity),
-    status: evidence.malformed ? "acknowledged" : "open",
+    status: evidence.malformed ? "confirmed" : "open",
     category: category.text,
     title: title.text,
     problem: problem.text,
     evidence: evidence.text,
+    recommendation: recommendation.text.length > 0 ? recommendation.text : undefined,
+    confidence: normalizedConfidence,
     locations,
     occurrence: {
       firstSeenAt: ctx.createdAt,
@@ -105,8 +126,17 @@ export function normalizeMemoryFinding(raw: RedactedRawFinding, ctx: NormalizeCo
       recommendationTruncated: recommendation.truncated,
       sourceMalformed,
     },
+    tags: [],
     contentHash,
   };
+
+  if ("id" in raw && typeof raw.id === "string") {
+    (finding as Record<string, unknown>).sourceFindingId = raw.id;
+  }
+
+  if (finding.confidence === undefined) {
+    delete (finding as Partial<MemoryFinding>).confidence;
+  }
 
   finding.fingerprint = buildStrongFingerprint(finding);
   return finding;

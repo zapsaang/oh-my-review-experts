@@ -45,6 +45,8 @@ describe("extractFromReport", () => {
         "The JWT secret is embedded directly in the source code, making it visible in version control.",
       evidence: "const SECRET = 'bearer abcdefghijklmnopqrstuvwxyz12345';",
       recommendation: "Move the secret to an environment variable and inject it at runtime.",
+      id: "sec-1",
+      confidence: "high",
       locations: [{ path: "src/auth.ts", line: 42 }],
     });
   });
