@@ -16,7 +16,7 @@ function sha256(input: string): string {
 }
 
 export function generateBatchId(runId: string): string {
-  return sha256(runId).slice(0, 16);
+  return sha256(`${runId}:${Date.now()}:${randomBytes(8).toString("hex")}`).slice(0, 16);
 }
 
 export function generateEventId(batchId: string, seq: number): string {
@@ -46,6 +46,11 @@ export interface WriteEventSegmentResult {
   eventsWritten: number;
 }
 
+export interface ReadAllEventSegmentsResult {
+  events: MemoryEvent[];
+  skipped: number;
+}
+
 export function writeEventSegment(
   paths: MemoryPaths,
   events: MemoryEvent[],
@@ -64,8 +69,9 @@ export function writeEventSegment(
   return { segmentPath, eventsWritten: events.length };
 }
 
-export function readAllEventSegments(paths: MemoryPaths): MemoryEvent[] {
+export function readAllEventSegments(paths: MemoryPaths): ReadAllEventSegmentsResult {
   const events: MemoryEvent[] = [];
+  let skipped = 0;
   const dirs = [paths.segmentsDir, paths.compactedDir];
 
   for (const dir of dirs) {
@@ -83,10 +89,14 @@ export function readAllEventSegments(paths: MemoryPaths): MemoryEvent[] {
           const result = MemoryEventSchema.safeParse(parsed);
           if (result.success) {
             events.push(result.data);
-          } else if (process.env.NODE_ENV !== "production") {
-            console.warn(`Skipped invalid event in ${filePath}:`, result.error.message);
+          } else {
+            skipped++;
+            if (process.env.NODE_ENV !== "production") {
+              console.warn(`Skipped invalid event in ${filePath}:`, result.error.message);
+            }
           }
         } catch {
+          skipped++;
           if (process.env.NODE_ENV !== "production") {
             console.warn(`Skipped malformed JSON line in ${filePath}`);
           }
@@ -95,7 +105,7 @@ export function readAllEventSegments(paths: MemoryPaths): MemoryEvent[] {
     }
   }
 
-  return events.sort(compareMemoryEvents);
+  return { events: events.sort(compareMemoryEvents), skipped };
 }
 
 export function compareMemoryEvents(a: MemoryEvent, b: MemoryEvent): number {

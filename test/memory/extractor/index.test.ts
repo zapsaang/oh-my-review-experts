@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { extractRawFindings } from "../../../src/memory/extractor/index.js";
+import { extractRawFindings, extractStructuredFindings } from "../../../src/memory/extractor/index.js";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const reportFixturePath = join(testDir, "../fixtures/latest.json");
@@ -52,6 +52,65 @@ describe("extractRawFindings", () => {
       .map((f) => f.title);
     expect(handoffTitles).toContain("Hardcoded JWT secret in source");
     expect(handoffTitles).toContain("Missing rate limit on login endpoint");
+  });
+
+  it("returns report and handoff findings separately while preserving flat compat order", () => {
+    const handoffDir = makeTempDir();
+    copyFileSync(handoffFixturePath, join(handoffDir, "security.md"));
+
+    const structured = extractStructuredFindings({
+      reportPath: reportFixturePath,
+      handoffDir,
+    });
+    const flat = extractRawFindings({
+      reportPath: reportFixturePath,
+      handoffDir,
+      sources: ["reports", "handoffs"],
+    });
+
+    expect(structured.report).toHaveLength(3);
+    expect(structured.handoffs).toHaveLength(2);
+    expect(structured.report.every((f) => f.reviewer === "auth-module" || f.reviewer === "queue-worker")).toBe(true);
+    expect(structured.handoffs.every((f) => f.reviewer === "omre-reviewer-security")).toBe(true);
+    expect(flat).toEqual([...structured.report, ...structured.handoffs]);
+  });
+
+  it("structured extraction prevents position-slicing fragility", () => {
+    const handoffDir = makeTempDir();
+    copyFileSync(handoffFixturePath, join(handoffDir, "security.md"));
+
+    const rawFindings = extractRawFindings({
+      reportPath: reportFixturePath,
+      handoffDir,
+      sources: ["reports", "handoffs"],
+    });
+    const structured = extractStructuredFindings({
+      reportPath: reportFixturePath,
+      handoffDir,
+      sources: ["reports", "handoffs"],
+    });
+
+    expect(extractStructuredFindings).toBeTypeOf("function");
+    expect(rawFindings).toEqual([...structured.report, ...structured.handoffs]);
+
+    const reportFindingCount = structured.report.length;
+    const sameFlatFindingsWithDifferentInternalOrder = [
+      ...structured.handoffs,
+      ...structured.report,
+    ];
+
+    // Mirrors the HEAD~1 cli.ts split: rawFindings.slice(0, reportFindingCount).
+    const positionSlicedReportFindings = sameFlatFindingsWithDifferentInternalOrder.slice(0, reportFindingCount);
+    const positionSlicedHandoffFindings = sameFlatFindingsWithDifferentInternalOrder.slice(reportFindingCount);
+
+    expect(positionSlicedReportFindings).not.toEqual(structured.report);
+    expect(positionSlicedHandoffFindings).not.toEqual(structured.handoffs);
+    expect(positionSlicedReportFindings.some((f) => f.reviewer === "omre-reviewer-security")).toBe(true);
+    expect(positionSlicedHandoffFindings.some((f) => f.reviewer === "auth-module" || f.reviewer === "queue-worker")).toBe(true);
+    expect(structured.report).toHaveLength(3);
+    expect(structured.handoffs).toHaveLength(2);
+    expect(structured.report.every((f) => f.reviewer === "auth-module" || f.reviewer === "queue-worker")).toBe(true);
+    expect(structured.handoffs.every((f) => f.reviewer === "omre-reviewer-security")).toBe(true);
   });
 
   it("returns only report findings when sources is ['reports']", () => {

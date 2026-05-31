@@ -12,6 +12,8 @@ import {
 import type { MemoryPaths } from "./paths.js";
 import { writeFileAtomicOverwrite } from "../tools/fs-utils.js";
 
+export const CURRENT_MEMORY_EVENT_SCHEMA_VERSION = 1;
+
 export interface MaterializedState {
   findings: MemoryFinding[];
   manifest: MemoryManifest;
@@ -19,12 +21,10 @@ export interface MaterializedState {
 }
 
 export function readMaterializedState(paths: MemoryPaths): MaterializedState | null {
-  if (!fs.existsSync(paths.manifestFile)) {
+  const manifest = readMemoryManifest(paths);
+  if (manifest === null) {
     return null;
   }
-
-  const manifestRaw = fs.readFileSync(paths.manifestFile, "utf8");
-  const manifest = MemoryManifestSchema.parse(JSON.parse(manifestRaw));
 
   let findings: MemoryFinding[] = [];
   if (fs.existsSync(paths.memoryFile)) {
@@ -45,6 +45,15 @@ export function readMaterializedState(paths: MemoryPaths): MaterializedState | n
   }
 
   return { findings, manifest, relatedIndex };
+}
+
+export function readMemoryManifest(paths: MemoryPaths): MemoryManifest | null {
+  if (!fs.existsSync(paths.manifestFile)) {
+    return null;
+  }
+
+  const manifestRaw = fs.readFileSync(paths.manifestFile, "utf8");
+  return MemoryManifestSchema.parse(JSON.parse(manifestRaw));
 }
 
 export function writeMaterializedState(
@@ -142,7 +151,7 @@ export function rebuildMaterializedStateFromEvents(events: MemoryEvent[]): Mater
 
   const manifest: MemoryManifest = {
     schemaVersion: 1,
-    eventSchemaVersion: 1,
+    eventSchemaVersion: CURRENT_MEMORY_EVENT_SCHEMA_VERSION,
     viewSchemaVersion: 1,
     lastRebuiltAt: now,
     materializedHash: hashFindings(findings),

@@ -62,12 +62,10 @@ function validFinding(overrides: Partial<MemoryFinding> = {}): MemoryFinding {
 
 function ctx(runId = "run-dedupe"): {
   runId: string;
-  sourcePath: string;
   batchCtx: EventBatchContext;
 } {
   return {
     runId,
-    sourcePath,
     batchCtx: createEventBatchContext(runId),
   };
 }
@@ -90,13 +88,13 @@ describe("deduplicateAndGenerateEvents", () => {
 
   it("emits finding.discovered and appends unmatched new findings", () => {
     const newFinding = validFinding({ id: "mem_1111111111111111" });
+    const dedupeCtx = ctx();
 
-    const result = deduplicateAndGenerateEvents([newFinding], [], ctx(), thresholds);
+    const result = deduplicateAndGenerateEvents([newFinding], [], dedupeCtx, thresholds);
 
-    expect(result.events).toEqual([
+    expect(result.events).toMatchObject([
       {
         type: "finding.discovered",
-        eventId: generateEventId(createEventBatchContext("run-dedupe").batchId, 0),
         at: timestamp,
         finding: newFinding,
       },
@@ -108,14 +106,13 @@ describe("deduplicateAndGenerateEvents", () => {
   it("emits finding.seen_again for exact fingerprint matches without appending duplicates", () => {
     const existing = validFinding({ id: "mem_2222222222222222", fingerprint: "fp-matching-123456" });
     const incoming = validFinding({ id: "mem_3333333333333333", fingerprint: existing.fingerprint });
+    const dedupeCtx = ctx("run-repeat");
 
-    const result = deduplicateAndGenerateEvents([incoming], [existing], ctx("run-repeat"), thresholds);
+    const result = deduplicateAndGenerateEvents([incoming], [existing], dedupeCtx, thresholds);
 
-    expect(result.events).toEqual([
+    expect(result.events).toMatchObject([
       {
         type: "finding.seen_again",
-        eventId: generateEventId(createEventBatchContext("run-repeat").batchId, 0),
-        at: timestamp,
         findingId: existing.id,
         runId: "run-repeat",
         sourcePath,
@@ -138,7 +135,7 @@ describe("deduplicateAndGenerateEvents", () => {
     const result = deduplicateAndGenerateEvents(
       [incoming],
       [existing],
-      { runId: "run-regression", sourcePath, batchCtx },
+      { runId: "run-regression", batchCtx },
       thresholds,
     );
 
@@ -242,6 +239,10 @@ describe("deduplicateAndGenerateEvents", () => {
 
     expect(result.events).toMatchObject([
       {
+        type: "finding.discovered",
+        finding: incoming,
+      },
+      {
         type: "finding.related",
         findingId: incoming.id,
         relatedFindingId: existing.id,
@@ -249,11 +250,36 @@ describe("deduplicateAndGenerateEvents", () => {
       },
     ]);
     expect(result.events.map((event) => event.type)).not.toContain("finding.seen_again");
-    expect(result.findings).toEqual([existing]);
+    expect(result.findings).toEqual([existing, incoming]);
     expectSchemaValid(result.events);
   });
 
-  it("emits schema-valid unique deterministic event IDs for the same fixed batch context", () => {
+  it("retains incoming finding and emits finding.discovered BEFORE finding.related for cross-path matches", () => {
+    const existing = validFinding({
+      id: "mem_crosspathexisting",
+      fingerprint: "fp-cross-existing",
+      locations: [{ path: "src/users.ts", line: 15 }],
+      problem: "Database query lacks parameterization allowing SQL injection.",
+    });
+    const incoming = validFinding({
+      id: "mem_crosspathincoming",
+      fingerprint: "fp-cross-incoming",
+      locations: [{ path: "src/orders.ts", line: 33 }],
+      problem: "Database query lacks parameterization allowing SQL injection.",
+    });
+    const result = deduplicateAndGenerateEvents([incoming], [existing], ctx("run-crosspath"), thresholds);
+
+    const eventTypes = result.events.map((event) => event.type);
+    expect(eventTypes).toContain("finding.discovered");
+    expect(eventTypes).toContain("finding.related");
+    const discoveredIndex = eventTypes.indexOf("finding.discovered");
+    const relatedIndex = eventTypes.indexOf("finding.related");
+    expect(discoveredIndex).toBeLessThan(relatedIndex);
+    expect(result.findings).toContainEqual(incoming);
+    expectSchemaValid(result.events);
+  });
+
+  it("emits schema-valid unique event IDs within each batch context", () => {
     const existing = validFinding({
       id: "mem_cccccccccccccccc",
       fingerprint: "fp-deterministic-1",
@@ -261,16 +287,51 @@ describe("deduplicateAndGenerateEvents", () => {
     });
     const incoming = validFinding({ id: "mem_dddddddddddddddd", fingerprint: existing.fingerprint });
 
-    const first = deduplicateAndGenerateEvents([incoming], [existing], ctx("run-deterministic"), thresholds);
-    const second = deduplicateAndGenerateEvents([incoming], [existing], ctx("run-deterministic"), thresholds);
+    const firstCtx = ctx("run-deterministic");
+    const secondCtx = ctx("run-deterministic");
+    const first = deduplicateAndGenerateEvents([incoming], [existing], firstCtx, thresholds);
+    const second = deduplicateAndGenerateEvents([incoming], [existing], secondCtx, thresholds);
     const eventIds = first.events.map((event) => event.eventId);
+    const secondEventIds = second.events.map((event) => event.eventId);
 
-    expect(eventIds).toEqual(second.events.map((event) => event.eventId));
     expect(new Set(eventIds).size).toBe(eventIds.length);
     expect(eventIds).toEqual([
-      generateEventId(createEventBatchContext("run-deterministic").batchId, 0),
-      generateEventId(createEventBatchContext("run-deterministic").batchId, 1),
+      generateEventId(firstCtx.batchCtx.batchId, 0),
+      generateEventId(firstCtx.batchCtx.batchId, 1),
     ]);
+    expect(secondEventIds).toEqual([
+      generateEventId(secondCtx.batchCtx.batchId, 0),
+      generateEventId(secondCtx.batchCtx.batchId, 1),
+    ]);
+    expect(eventIds).not.toEqual(secondEventIds);
     expectSchemaValid(first.events);
+    expectSchemaValid(second.events);
+  });
+
+  it("attributes finding.seen_again to the incoming finding's origin.sourcePath", () => {
+    const handoffPath = ".omre/handoffs/20260530-120000-001/security.md";
+    const reportPath = ".omre/reports/latest.json";
+
+    const existing = validFinding({
+      id: "mem_mixed_source_existing",
+      fingerprint: "fp-mixed-source-001",
+      origin: { ...validFinding().origin, sourcePath: handoffPath },
+    });
+
+    const incoming = validFinding({
+      id: "mem_mixed_source_incoming",
+      fingerprint: existing.fingerprint,
+      origin: { ...validFinding().origin, sourcePath: reportPath },
+    });
+
+    const batchCtx = createEventBatchContext("run-mixed");
+    const mixedCtx = { runId: "run-mixed", batchCtx };
+
+    const result = deduplicateAndGenerateEvents([incoming], [existing], mixedCtx, thresholds);
+
+    const seenAgain = result.events.find((e) => e.type === "finding.seen_again");
+    expect(seenAgain).toBeDefined();
+    expect(seenAgain!.sourcePath).toBe(reportPath);
+    expectSchemaValid(result.events);
   });
 });

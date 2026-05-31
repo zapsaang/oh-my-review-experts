@@ -5,14 +5,16 @@ import type { Command } from "commander";
 import { loadConfig } from "../config/load-config.js";
 import { deduplicateAndGenerateEvents, type DeduplicateThresholds } from "./dedupe.js";
 import { compareMemoryEvents, createEventBatchContext, readAllEventSegments, writeEventSegment } from "./events.js";
-import { extractRawFindings } from "./extractor/index.js";
+import { extractStructuredFindings } from "./extractor/index.js";
 import type { RawFinding } from "./extractor/types.js";
 import { normalizeMemoryFinding, type NormalizeContext } from "./normalize.js";
-import { ensureMemoryDirs, resolveMemoryPaths } from "./paths.js";
+import { ensureMemoryDirs, resolveMemoryPaths, type MemoryPaths } from "./paths.js";
 import { redactRawFinding } from "./redaction.js";
 import type { MemoryFinding } from "./schema.js";
 import {
+  CURRENT_MEMORY_EVENT_SCHEMA_VERSION,
   readMaterializedState,
+  readMemoryManifest,
   rebuildMaterializedStateFromEvents,
   writeMaterializedState,
 } from "./store.js";
@@ -103,16 +105,10 @@ export function runIndexLatest(options: IndexLatestOptions = {}): IndexLatestRes
   const handoffSourcePath = toRepoRelativePath(repoRoot, handoffDir);
   const extractReportPath = reportExists ? reportPath : undefined;
   const extractHandoffDir = handoffDirExists ? handoffDir : undefined;
-  const rawFindings = extractRawFindings({
+  const { report: reportFindings, handoffs: handoffFindings } = extractStructuredFindings({
     reportPath: extractReportPath,
     handoffDir: extractHandoffDir,
-    sources: ["reports", "handoffs"],
   });
-  const reportFindingCount = reportExists && handoffDirExists
-    ? extractRawFindings({ reportPath, sources: ["reports"] }).length
-    : reportExists ? rawFindings.length : 0;
-  const reportFindings = rawFindings.slice(0, reportFindingCount);
-  const handoffFindings = rawFindings.slice(reportFindingCount);
   const newFindings = [
     ...normalizeRawFindings(reportFindings, {
       ...baseNormalizeCtx,
@@ -127,12 +123,12 @@ export function runIndexLatest(options: IndexLatestOptions = {}): IndexLatestRes
   ];
   const rawFindingsCount = reportFindings.length + handoffFindings.length;
   const existingState = readMaterializedState(paths);
+  assertSupportedEventSchema(existingState?.manifest.eventSchemaVersion);
   const existingFindings = existingState?.findings ?? [];
   const batchCtx = createEventBatchContext(runId);
   const thresholds = thresholdsFromConfig(config.memory);
   const dedupeResult = deduplicateAndGenerateEvents(newFindings, existingFindings, {
     runId,
-    sourcePath: reportExists ? reportSourcePath : handoffSourcePath,
     batchCtx,
   }, thresholds);
   const discoveredCount = dedupeResult.events.filter((event) => event.type === "finding.discovered").length;
@@ -162,10 +158,14 @@ export function runIndexLatest(options: IndexLatestOptions = {}): IndexLatestRes
     return result;
   }
 
+  assertCompatibleEventSchema(paths);
   ensureMemoryDirs(paths);
 
   const segment = writeEventSegment(paths, dedupeResult.events.sort(compareMemoryEvents), runId);
-  const allEvents = readAllEventSegments(paths);
+  const { events: allEvents, skipped } = readAllEventSegments(paths);
+  if (skipped > 0) {
+    output.log(`warning: skipped ${skipped} corrupted event lines during rebuild`);
+  }
   const state = rebuildMaterializedStateFromEvents(allEvents);
   writeMaterializedState(paths, state);
 
@@ -191,6 +191,17 @@ function emptyIndexLatestResult(dryRun: boolean): IndexLatestResult {
   };
 }
 
+function assertSupportedEventSchema(eventSchemaVersion: number | undefined): void {
+  if (eventSchemaVersion === undefined || eventSchemaVersion === CURRENT_MEMORY_EVENT_SCHEMA_VERSION) {
+    return;
+  }
+
+  throw new Error(
+    `Memory event schema version mismatch: manifest has eventSchemaVersion ${eventSchemaVersion}, `
+      + `but this CLI supports ${CURRENT_MEMORY_EVENT_SCHEMA_VERSION}`,
+  );
+}
+
 function resolveInputPath(repoRoot: string, inputPath: string, context: string): string {
   const resolvedPath = path.resolve(repoRoot, inputPath);
   assertSafePath(resolvedPath, repoRoot, context);
@@ -206,6 +217,19 @@ function normalizeRawFindings(rawFindings: RawFinding[], ctx: NormalizeContext):
   return rawFindings
     .map((finding) => redactRawFinding(finding))
     .map((finding) => normalizeMemoryFinding(finding, ctx));
+}
+
+function assertCompatibleEventSchema(paths: MemoryPaths): void {
+  const manifest = readMemoryManifest(paths);
+  if (manifest === null) {
+    return;
+  }
+
+  if (manifest.eventSchemaVersion !== CURRENT_MEMORY_EVENT_SCHEMA_VERSION) {
+    throw new Error(
+      `Memory event schema version mismatch: manifest has eventSchemaVersion ${manifest.eventSchemaVersion}, but this CLI supports ${CURRENT_MEMORY_EVENT_SCHEMA_VERSION}. Refusing to rebuild memory from event segments.`,
+    );
+  }
 }
 
 function readRunIdFromReport(reportPath: string): string {

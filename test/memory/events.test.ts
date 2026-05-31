@@ -111,12 +111,13 @@ describe("memory event helpers", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("generates deterministic 16-character hex batch IDs", () => {
+  it("generates 16-character hex batch IDs with per-call entropy", () => {
     const first = generateBatchId("run-20260528");
     const second = generateBatchId("run-20260528");
 
     expect(first).toMatch(/^[a-f0-9]{16}$/);
-    expect(second).toBe(first);
+    expect(second).toMatch(/^[a-f0-9]{16}$/);
+    expect(second).not.toBe(first);
     expect(generateBatchId("run-20260529")).not.toBe(first);
   });
 
@@ -133,13 +134,26 @@ describe("memory event helpers", () => {
     const ctx = createEventBatchContext("run-20260528");
 
     expect(ctx.runId).toBe("run-20260528");
-    expect(ctx.batchId).toBe(generateBatchId("run-20260528"));
+    expect(ctx.batchId).toMatch(/^[a-f0-9]{16}$/);
     expect(ctx.seqCounter).toBe(0);
     expect(Date.parse(ctx.createdAt)).not.toBeNaN();
 
     expect(nextEventId(ctx)).toBe(generateEventId(ctx.batchId, 0));
     expect(nextEventId(ctx)).toBe(generateEventId(ctx.batchId, 1));
     expect(ctx.seqCounter).toBe(2);
+  });
+
+  it("generates globally unique event IDs across separate batch contexts with the same runId", () => {
+    const ctx1 = createEventBatchContext("run-x");
+    const ctx2 = createEventBatchContext("run-x");
+
+    const ids1 = [nextEventId(ctx1), nextEventId(ctx1), nextEventId(ctx1)];
+    const ids2 = [nextEventId(ctx2), nextEventId(ctx2), nextEventId(ctx2)];
+
+    const allIds = [...ids1, ...ids2];
+    const uniqueIds = new Set(allIds);
+
+    expect(uniqueIds.size).toBe(allIds.length);
   });
 
   it("sorts memory events by timestamp ascending and then eventId ascending", () => {
@@ -220,10 +234,28 @@ describe("memory event helpers", () => {
     writeJsonl(path.join(paths.compactedDir, "compacted.jsonl"), [sameTime, earlier]);
     fs.writeFileSync(path.join(paths.segmentsDir, "ignored.txt"), `${JSON.stringify(discoveredEvent({ eventId: "evt_ignored" }))}\n`, "utf8");
 
-    const events = readAllEventSegments(paths);
+    const { events, skipped } = readAllEventSegments(paths);
 
     expect(safeParseSpy).toHaveBeenCalledTimes(4);
     expect(warnSpy).toHaveBeenCalled();
+    expect(skipped).toBe(2);
     expect(events.map((event) => event.eventId)).toEqual(["evt_earlier", "evt_middle", "evt_later"]);
+  });
+
+  it("surfaces corruption by returning skipped line count instead of silently dropping", () => {
+    const validEvent = discoveredEvent({ eventId: "evt_valid", at: "2026-05-28T00:00:01.000Z" });
+    const malformedLine = "this is not valid json at all";
+
+    const segmentPath = path.join(paths.segmentsDir, "corrupted.jsonl");
+    fs.mkdirSync(paths.segmentsDir, { recursive: true });
+    fs.writeFileSync(segmentPath, `${JSON.stringify(validEvent)}\n${malformedLine}\n`, "utf8");
+
+    const result = readAllEventSegments(paths);
+
+    expect(Array.isArray(result)).toBe(false);
+    expect(result).toHaveProperty("events");
+    expect(result).toHaveProperty("skipped");
+    expect(result.skipped).toBeGreaterThanOrEqual(1);
+    expect(result.events.map((e) => e.eventId)).toEqual(["evt_valid"]);
   });
 });

@@ -126,6 +126,31 @@ function segmentFiles(repoRoot: string, memoryDir?: string): string[] {
   return fs.readdirSync(paths.segmentsDir).filter((file) => file.endsWith(".jsonl"));
 }
 
+function writeMemoryManifest(repoRoot: string, eventSchemaVersion: number): void {
+  const paths = resolveMemoryPaths(repoRoot);
+  fs.mkdirSync(paths.materializedDir, { recursive: true });
+  fs.writeFileSync(
+    paths.manifestFile,
+    JSON.stringify({
+      schemaVersion: 1,
+      eventSchemaVersion,
+      viewSchemaVersion: 1,
+      lastRebuiltAt: "2026-05-30T12:00:00.000Z",
+      materializedHash: "0123456789abcdef",
+      relatedIndexHash: "fedcba9876543210",
+      includedEventFiles: [],
+      compactedInputSegments: [],
+      gcSummary: {
+        deletedRawSegments: 0,
+        deletedTmpFiles: 0,
+        deletedQuarantineFiles: 0,
+      },
+      quarantine: [],
+    }),
+    "utf8",
+  );
+}
+
 describe("memory index-latest CLI", () => {
   afterEach(() => {
     process.chdir(originalCwd);
@@ -161,7 +186,7 @@ describe("memory index-latest CLI", () => {
     expect(fs.existsSync(paths.root)).toBe(false);
     expect(fs.existsSync(paths.memoryFile)).toBe(false);
     expect(fs.existsSync(paths.manifestFile)).toBe(false);
-    expect(readAllEventSegments(paths)).toEqual([]);
+    expect(readAllEventSegments(paths)).toEqual({ events: [], skipped: 0 });
     const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
     expect(output).toContain("dry-run");
     expect(output).toContain("findings extracted: 2");
@@ -180,7 +205,7 @@ describe("memory index-latest CLI", () => {
 
     const paths = resolveMemoryPaths(repoRoot);
     expect(segmentFiles(repoRoot)).toHaveLength(1);
-    const events = readAllEventSegments(paths);
+    const { events } = readAllEventSegments(paths);
     expect(events).toHaveLength(2);
     expect(events.every((event) => event.type === "finding.discovered")).toBe(true);
     const state = readMaterializedState(paths);
@@ -259,6 +284,43 @@ describe("memory index-latest CLI", () => {
     expect(readMaterializedState(configuredPaths)?.findings).toHaveLength(2);
   });
 
+  it("skips incompatible event lines during rebuild instead of failing fast", () => {
+    const repoRoot = makeTempRepo();
+    const runId = "20260530-120000-001";
+    writeLatestReport(repoRoot, runId);
+    writeHandoff(repoRoot, runId);
+    const paths = resolveMemoryPaths(repoRoot);
+    fs.mkdirSync(paths.segmentsDir, { recursive: true });
+    fs.writeFileSync(path.join(paths.segmentsDir, "future-schema.jsonl"), "{\"type\":\"future.event\"}\n", "utf8");
+    process.chdir(repoRoot);
+    const log = vi.fn();
+
+    const result = runIndexLatest({ output: { log, error: () => {} } });
+
+    const output = log.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(output).toContain("warning: skipped 1 corrupted event lines during rebuild");
+    expect(result.materializedFindings).toBe(2);
+    expect(readAllEventSegments(paths).skipped).toBe(1);
+    expect(segmentFiles(repoRoot)).toContain("future-schema.jsonl");
+  });
+
+  it("rejects an incompatible manifest event schema before rebuilding from event segments", () => {
+    const repoRoot = makeTempRepo();
+    const runId = "20260530-120000-001";
+    writeLatestReport(repoRoot, runId);
+    writeHandoff(repoRoot, runId);
+    writeMemoryManifest(repoRoot, 999);
+    const paths = resolveMemoryPaths(repoRoot);
+    fs.mkdirSync(paths.segmentsDir, { recursive: true });
+    fs.writeFileSync(path.join(paths.segmentsDir, "future-schema.jsonl"), "{\"type\":\"future.event\"}\n", "utf8");
+    process.chdir(repoRoot);
+
+    expect(() => runIndexLatest({ output: { log: () => {}, error: () => {} } })).toThrow(
+      "Memory event schema version mismatch: manifest has eventSchemaVersion 999, but this CLI supports 1",
+    );
+    expect(segmentFiles(repoRoot)).toEqual(["future-schema.jsonl"]);
+  });
+
   it("writes nothing when latest report and run handoffs contain no findings", () => {
     const repoRoot = makeTempRepo();
     process.chdir(repoRoot);
@@ -268,7 +330,7 @@ describe("memory index-latest CLI", () => {
 
     const paths = resolveMemoryPaths(repoRoot);
     expect(segmentFiles(repoRoot)).toEqual([]);
-    expect(readAllEventSegments(paths)).toEqual([]);
+    expect(readAllEventSegments(paths)).toEqual({ events: [], skipped: 0 });
     expect(readMaterializedState(paths)).toBeNull();
     const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
     expect(output).toContain("findings extracted: 0");
@@ -292,7 +354,7 @@ describe("memory index-latest CLI", () => {
     expect(logSpy).not.toHaveBeenCalled();
   });
 
-  it("uses extractRawFindings and sorts generated events before writing", async () => {
+  it("uses extractStructuredFindings and sorts generated events before writing", async () => {
     vi.resetModules();
     const repoRoot = makeTempRepo();
     const runId = "20260530-120000-001";
@@ -318,12 +380,12 @@ describe("memory index-latest CLI", () => {
       sourcePath: ".omre/reports/latest.json",
       matchedBy: "test",
     };
-    const extractRawFindings = vi.fn(() => []);
+    const extractStructuredFindings = vi.fn(() => ({ report: [], handoffs: [] }));
     const deduplicateAndGenerateEvents = vi.fn(() => ({
       events: [laterEvent, earlierEvent],
       findings: [],
     }));
-    vi.doMock("../../src/memory/extractor/index.js", () => ({ extractRawFindings }));
+    vi.doMock("../../src/memory/extractor/index.js", () => ({ extractStructuredFindings }));
     vi.doMock("../../src/memory/dedupe.js", () => ({ deduplicateAndGenerateEvents }));
     const { runIndexLatest: runIndexLatestWithMocks } = await import("../../src/memory/cli.js");
 
@@ -331,10 +393,9 @@ describe("memory index-latest CLI", () => {
 
     const reportPath = path.join(repoRoot, ".omre", "reports", "latest.json");
     const handoffDir = path.join(repoRoot, ".omre", "handoffs", runId);
-    expect(extractRawFindings).toHaveBeenCalledWith({
+    expect(extractStructuredFindings).toHaveBeenCalledWith({
       reportPath,
       handoffDir,
-      sources: ["reports", "handoffs"],
     });
     const paths = resolveMemoryPaths(repoRoot);
     const [segmentFile] = segmentFiles(repoRoot);

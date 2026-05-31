@@ -4,7 +4,6 @@ import type { MemoryEvent, MemoryFinding } from "./schema.js";
 
 export interface DeduplicateContext {
   runId: string;
-  sourcePath: string;
   batchCtx: EventBatchContext;
 }
 
@@ -38,12 +37,19 @@ export function deduplicateAndGenerateEvents(
   for (const finding of newFindings) {
     const seenAgainMatch = findSeenAgainMatch(finding, findings, thresholds);
     if (seenAgainMatch) {
-      emitSeenAgainEvents(events, seenAgainMatch.finding, seenAgainMatch.matchedBy, ctx);
+      emitSeenAgainEvents(events, seenAgainMatch.finding, finding, seenAgainMatch.matchedBy, ctx);
       continue;
     }
 
     const relatedFinding = findRelatedFinding(finding, findings, thresholds.crossPathRelated);
     if (relatedFinding) {
+      events.push({
+        type: "finding.discovered",
+        eventId: nextEventId(ctx.batchCtx),
+        at: new Date().toISOString(),
+        finding,
+      });
+      findings.push(finding);
       events.push({
         type: "finding.related",
         eventId: nextEventId(ctx.batchCtx),
@@ -99,6 +105,7 @@ function findSeenAgainMatch(
 function emitSeenAgainEvents(
   events: MemoryEvent[],
   matchedFinding: MemoryFinding,
+  incomingFinding: MemoryFinding,
   matchedBy: MatchReason,
   ctx: DeduplicateContext,
 ): void {
@@ -108,7 +115,7 @@ function emitSeenAgainEvents(
     at: new Date().toISOString(),
     findingId: matchedFinding.id,
     runId: ctx.runId,
-    sourcePath: ctx.sourcePath,
+    sourcePath: incomingFinding.origin.sourcePath,
     matchedBy,
   });
 

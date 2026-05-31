@@ -121,7 +121,7 @@ function readSegmentEvents(segmentPath: string) {
 
 function expectSchemaValidDiskState(repoRoot: string, expectedFindings: number, expectedEvents: number) {
   const paths = resolveMemoryPaths(repoRoot);
-  const events = readAllEventSegments(paths);
+  const { events } = readAllEventSegments(paths);
   const state = readMaterializedState(paths);
 
   expect(events).toHaveLength(expectedEvents);
@@ -173,18 +173,19 @@ describe("memory index-latest integration pipeline", () => {
     expect(result.runId).toBe("20260530-120000-001");
     expect(result.rawFindings).toBe(7);
     expect(result.normalizedFindings).toBe(7);
-    expect(result.eventsGenerated).toBe(7);
-    expect(result.materializedFindings).toBe(6);
+    expect(result.eventsGenerated).toBe(8);
+    expect(result.materializedFindings).toBe(7);
     expect(result.segmentPath).toBeDefined();
 
-    const { paths, events, state } = expectSchemaValidDiskState(repoRoot, 6, 7);
-    expect(events.filter((event) => event.type === "finding.discovered")).toHaveLength(6);
+    const { paths, events, state } = expectSchemaValidDiskState(repoRoot, 7, 8);
+    expect(events.filter((event) => event.type === "finding.discovered")).toHaveLength(7);
     expect(events.filter((event) => event.type === "finding.related")).toHaveLength(1);
     expect(state?.findings.map((finding) => finding.title).sort()).toEqual([
       "Hardcoded JWT secret in source",
       "Hardcoded JWT secret in source",
       "Missing rate limit on login endpoint",
       "Missing rate limit on login endpoint",
+      "Missing tenant validation before database query",
       "Missing tenant validation before database query",
       "O(n²) loop in job deduplication",
     ].sort());
@@ -211,6 +212,7 @@ describe("memory index-latest integration pipeline", () => {
     expect(relation.relationType).toBe("similar-cross-path");
     expect(relatedIndex.byFindingId[relation.findingId]).toEqual([relation]);
     expect(state?.findings.some((finding) => finding.id === relation.relatedFindingId)).toBe(true);
+    expect(state?.findings.some((finding) => finding.id === relation.findingId)).toBe(true);
   });
 
   it("deduplicates a second index-latest run into seen_again events while keeping one materialized finding per fingerprint", () => {
@@ -229,9 +231,13 @@ describe("memory index-latest integration pipeline", () => {
     expect(secondRun.findingsDeduplicated).toBe(5);
     expect(secondRun.segmentPath).toBeDefined();
 
+    const firstRunEvents = readSegmentEvents(firstRun.segmentPath ?? "");
     const secondRunEvents = readSegmentEvents(secondRun.segmentPath ?? "");
     expect(secondRunEvents).toHaveLength(5);
     expect(secondRunEvents.every((event) => event.type === "finding.seen_again")).toBe(true);
+
+    const allIds = [...firstRunEvents.map((e) => e.eventId), ...secondRunEvents.map((e) => e.eventId)];
+    expect(new Set(allIds).size).toBe(allIds.length);
 
     const { paths, events, state } = expectSchemaValidDiskState(repoRoot, 5, 10);
     expect(fs.readdirSync(paths.segmentsDir).filter((file) => file.endsWith(".jsonl"))).toHaveLength(2);
@@ -259,5 +265,13 @@ describe("memory index-latest integration pipeline", () => {
       "report:auth-module:Missing rate limit on login endpoint",
       "report:queue-worker:O(n²) loop in job deduplication",
     ].sort());
+
+    for (const finding of state?.findings ?? []) {
+      if (finding.origin.sourceType === "report") {
+        expect(finding.origin.sourcePath).toBe(".omre/reports/latest.json");
+      } else if (finding.origin.sourceType === "import") {
+        expect(finding.origin.sourcePath).toBe(`.omre/handoffs/${result.runId}`);
+      }
+    }
   });
 });
