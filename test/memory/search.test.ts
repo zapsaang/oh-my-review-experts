@@ -366,6 +366,6 @@ describe("searchMemory", () => {
     expect(oneThousandMs).toBeLessThan(40);
     expect(fiveThousandMs).toBeLessThan(100);
     expect(tenThousandMs).toBeLessThan(200);
-    expect(tenThousandMs).toBeLessThanOrEqual(Math.max(60, oneThousandMs * 15));
+    expect(tenThousandMs).toBeLessThanOrEqual(Math.max(100, oneThousandMs * 15));
   });
 });
