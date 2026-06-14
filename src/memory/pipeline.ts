@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Stats } from "node:fs";
-import { runIndexLatest, type IndexLatestResult } from "./cli.js";
+import { runIndexLatest, type IndexLatestResult } from "./indexing.js";
 import type { MemoryConfig } from "./config.js";
 import { buildMemoryContextPack, type MemoryContextPack } from "./context-pack.js";
 import { resolveMemoryPaths } from "./paths.js";

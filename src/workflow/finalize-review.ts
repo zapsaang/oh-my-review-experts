@@ -5,7 +5,7 @@ import { writeReport, type DegradedSlice } from "../tools/report.js";
 import { assertSafePath } from "../tools/fs-utils.js";
 import { parseHandoffJsonHeader } from "../tools/handoff.js";
 import { severityRank, type SeverityLevel } from "../shared/severity.js";
-import { runIndexLatest } from "../memory/cli.js";
+import { runIndexLatest } from "../memory/indexing.js";
 import { checkAutoCompactThreshold } from "../memory/pipeline.js";
 
 /**

@@ -80,7 +80,7 @@ async function loadFinalizeReviewWithMemoryMocks(options: {
     options.checkAutoCompactThreshold ?? (() => ({ needsCompaction: false }))
   );
 
-  vi.doMock("../../src/memory/cli.js", () => ({
+  vi.doMock("../../src/memory/indexing.js", () => ({
     runIndexLatest: runIndexLatestMock,
   }));
   vi.doMock("../../src/memory/pipeline.js", () => ({
@@ -96,7 +96,7 @@ async function loadFinalizeReviewWithMemoryMocks(options: {
 }
 
 afterEach(() => {
-  vi.doUnmock("../../src/memory/cli.js");
+  vi.doUnmock("../../src/memory/indexing.js");
   vi.doUnmock("../../src/memory/pipeline.js");
   vi.resetModules();
   vi.restoreAllMocks();
