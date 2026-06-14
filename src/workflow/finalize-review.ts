@@ -5,6 +5,8 @@ import { writeReport, type DegradedSlice } from "../tools/report.js";
 import { assertSafePath } from "../tools/fs-utils.js";
 import { parseHandoffJsonHeader } from "../tools/handoff.js";
 import { severityRank, type SeverityLevel } from "../shared/severity.js";
+import { runIndexLatest } from "../memory/cli.js";
+import { checkAutoCompactThreshold } from "../memory/pipeline.js";
 
 /**
  * Server-side report finalization for the review-code workflow.
@@ -28,6 +30,10 @@ export interface FinalizeReviewResult {
   handoffsConsumed: number;
   degradedSlices: DegradedSlice[];
   missingDimensionsGlobal: string[];
+  memoryIndexResult?: {
+    success: boolean;
+    error?: string;
+  };
 }
 
 interface ParsedHandoff {
@@ -67,6 +73,11 @@ function asObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function summarizeError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  return message.replace(/\s+/g, " ").trim().slice(0, 300);
 }
 
 function parseFindingId(finding: Record<string, unknown>): string {
@@ -435,10 +446,28 @@ export function finalizeReview(input: FinalizeReviewInput): FinalizeReviewResult
     input.cwd,
   );
 
+  let memoryIndexResult: FinalizeReviewResult["memoryIndexResult"];
+  if (config.memory.enabled) {
+    if (config.memory.indexing?.autoIndexAfterReview !== false) {
+      try {
+        runIndexLatest({ cwd: input.cwd });
+        memoryIndexResult = { success: true };
+      } catch (err) {
+        memoryIndexResult = {
+          success: false,
+          error: summarizeError(err),
+        };
+      }
+    }
+
+    checkAutoCompactThreshold(input.cwd, config.memory);
+  }
+
   return {
     written,
     handoffsConsumed: merged.handoffs.length,
     degradedSlices: merged.degradedSlices,
     missingDimensionsGlobal: merged.missingDimensionsGlobal,
+    memoryIndexResult,
   };
 }

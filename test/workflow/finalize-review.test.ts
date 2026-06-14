@@ -1,7 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 
 // ---------------------------------------------------------------------------
 // Local interfaces for the missing src/workflow/finalize-review.ts module.
@@ -24,6 +23,29 @@ interface FinalizeReviewResult {
   handoffsConsumed: number;
   degradedSlices: DegradedSlice[];
   missingDimensionsGlobal: string[];
+  memoryIndexResult?: {
+    success: boolean;
+    error?: string;
+  };
+}
+
+interface IndexLatestOptions {
+  cwd?: string;
+}
+
+interface IndexLatestResult {
+  runId: string;
+  rawFindings: number;
+  normalizedFindings: number;
+  existingFindings: number;
+  eventsGenerated: number;
+  findingsDeduplicated: number;
+  dryRun: boolean;
+}
+
+interface AutoCompactThresholdResult {
+  needsCompaction: boolean;
+  reason?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -42,6 +64,44 @@ async function loadFinalizeReview(): Promise<{
   };
 }
 
+async function loadFinalizeReviewWithMemoryMocks(options: {
+  runIndexLatest?: (input: IndexLatestOptions) => IndexLatestResult;
+  checkAutoCompactThreshold?: (cwd: string, memoryConfig: unknown) => AutoCompactThresholdResult;
+} = {}): Promise<{
+  finalizeReview(input: FinalizeReviewInput): FinalizeReviewResult;
+  runIndexLatestMock: ReturnType<typeof vi.fn<(input: IndexLatestOptions) => IndexLatestResult>>;
+  checkAutoCompactThresholdMock: ReturnType<typeof vi.fn<(cwd: string, memoryConfig: unknown) => AutoCompactThresholdResult>>;
+}> {
+  vi.resetModules();
+  const runIndexLatestMock = vi.fn<(input: IndexLatestOptions) => IndexLatestResult>(
+    options.runIndexLatest ?? (() => buildIndexLatestResult())
+  );
+  const checkAutoCompactThresholdMock = vi.fn<(cwd: string, memoryConfig: unknown) => AutoCompactThresholdResult>(
+    options.checkAutoCompactThreshold ?? (() => ({ needsCompaction: false }))
+  );
+
+  vi.doMock("../../src/memory/cli.js", () => ({
+    runIndexLatest: runIndexLatestMock,
+  }));
+  vi.doMock("../../src/memory/pipeline.js", () => ({
+    checkAutoCompactThreshold: checkAutoCompactThresholdMock,
+  }));
+
+  const mod = await loadFinalizeReview();
+  return {
+    finalizeReview: mod.finalizeReview,
+    runIndexLatestMock,
+    checkAutoCompactThresholdMock,
+  };
+}
+
+afterEach(() => {
+  vi.doUnmock("../../src/memory/cli.js");
+  vi.doUnmock("../../src/memory/pipeline.js");
+  vi.resetModules();
+  vi.restoreAllMocks();
+});
+
 // ---------------------------------------------------------------------------
 // Fixture helpers
 // ---------------------------------------------------------------------------
@@ -50,8 +110,14 @@ function createTempProject(): string {
   const absoluteTmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-finalize-"));
   const relativeTmpDir = path.relative(process.cwd(), absoluteTmpDir);
   fs.mkdirSync(path.join(absoluteTmpDir, ".omre"), { recursive: true });
+  writeProjectConfig(absoluteTmpDir);
+  return relativeTmpDir;
+}
+
+function writeProjectConfig(cwd: string, overrides: Record<string, unknown> = {}): void {
+  fs.mkdirSync(path.join(cwd, ".omre"), { recursive: true });
   fs.writeFileSync(
-    path.join(absoluteTmpDir, ".omre", "config.json"),
+    path.join(cwd, ".omre", "config.json"),
     JSON.stringify({
       report: {
         enabled: true,
@@ -64,10 +130,22 @@ function createTempProject(): string {
         enabled: true,
         directory: ".omre/handoffs",
       },
+      ...overrides,
     }),
     "utf8"
   );
-  return relativeTmpDir;
+}
+
+function buildIndexLatestResult(): IndexLatestResult {
+  return {
+    runId: "mock-run",
+    rawFindings: 1,
+    normalizedFindings: 1,
+    existingFindings: 0,
+    eventsGenerated: 1,
+    findingsDeduplicated: 0,
+    dryRun: false,
+  };
 }
 
 function buildHandoffJsonHeader(
@@ -265,6 +343,87 @@ describe("finalizeReview [Fix 2-B RED]", () => {
 
       const mod = await loadFinalizeReview();
       expect(() => mod.finalizeReview({ runId, cwd })).toThrow();
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("auto-indexes after writeReport succeeds and returns memoryIndexResult.success=true", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-auto-index-success";
+      writeHandoffFile(cwd, runId, "handoff-1.md");
+      let latestJsonExistedWhenIndexRan = false;
+
+      const mod = await loadFinalizeReviewWithMemoryMocks({
+        runIndexLatest: (options) => {
+          expect(options).toEqual({ cwd });
+          latestJsonExistedWhenIndexRan = fs.existsSync(path.join(cwd, ".omre", "reports", "latest.json"));
+          return buildIndexLatestResult();
+        },
+      });
+
+      const result = mod.finalizeReview({ runId, cwd });
+
+      expect(latestJsonExistedWhenIndexRan).toBe(true);
+      expect(mod.runIndexLatestMock).toHaveBeenCalledTimes(1);
+      expect(mod.checkAutoCompactThresholdMock).toHaveBeenCalledTimes(1);
+      expect(mod.checkAutoCompactThresholdMock).toHaveBeenCalledWith(cwd, expect.objectContaining({ enabled: true }));
+      expect(result.memoryIndexResult).toEqual({ success: true });
+      expect(result.written.some((filePath) => filePath.endsWith("latest.json"))).toBe(true);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps written reports when auto-indexing throws and returns memoryIndexResult.error", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-auto-index-failure";
+      writeHandoffFile(cwd, runId, "handoff-1.md");
+      const indexFailure = new Error("Memory event schema version mismatch: manifest has eventSchemaVersion 999");
+
+      const mod = await loadFinalizeReviewWithMemoryMocks({
+        runIndexLatest: () => {
+          throw indexFailure;
+        },
+      });
+
+      const result = mod.finalizeReview({ runId, cwd });
+      const latestJsonPath = path.join(cwd, ".omre", "reports", "latest.json");
+
+      expect(mod.runIndexLatestMock).toHaveBeenCalledTimes(1);
+      expect(result.written.some((filePath) => filePath.endsWith("latest.json"))).toBe(true);
+      expect(fs.existsSync(latestJsonPath)).toBe(true);
+      expect(result.memoryIndexResult?.success).toBe(false);
+      expect(result.memoryIndexResult?.error).toContain("eventSchemaVersion 999");
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("does not call runIndexLatest when auto-index after review is disabled", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-auto-index-disabled";
+      writeProjectConfig(cwd, {
+        memory: {
+          enabled: true,
+          indexing: {
+            autoIndexAfterReview: false,
+          },
+        },
+      });
+      writeHandoffFile(cwd, runId, "handoff-1.md");
+
+      const mod = await loadFinalizeReviewWithMemoryMocks();
+
+      const result = mod.finalizeReview({ runId, cwd });
+
+      expect(mod.runIndexLatestMock).not.toHaveBeenCalled();
+      expect(result.memoryIndexResult).toBeUndefined();
+      expect(result.written.some((filePath) => filePath.endsWith("latest.json"))).toBe(true);
+      expect(fs.existsSync(path.join(cwd, ".omre", "reports", "latest.json"))).toBe(true);
     } finally {
       fs.rmSync(cwd, { recursive: true, force: true });
     }
