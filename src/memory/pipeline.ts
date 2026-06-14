@@ -47,7 +47,8 @@ export function retrieveMemoryContext(input: RetrieveMemoryContextInput): Memory
   try {
     const paths = resolveMemoryPaths(input.repoRoot, input.memoryConfig.directory);
     state = readMaterializedState(paths);
-  } catch {
+  } catch (err) {
+    console.warn(`memory: failed to read materialized state, skipping retrieval: ${errorSummary(err)}`);
     return undefined;
   }
 
@@ -180,9 +181,14 @@ function readSegmentStats(cwd: string, memoryConfig: MemoryConfig): Stats[] {
     }
 
     return stats;
-  } catch {
+  } catch (err) {
+    console.warn(`memory: failed to read segment stats: ${errorSummary(err)}`);
     return [];
   }
+}
+
+function errorSummary(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 function oldestMtimeMs(stats: Stats[]): number | undefined {

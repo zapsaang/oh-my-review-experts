@@ -13,7 +13,7 @@ import {
   type RetrieveMemoryContextInput,
 } from "../../src/memory/pipeline.js";
 import type { MemoryFinding, MemoryManifest, RelatedIndex } from "../../src/memory/schema.js";
-import { writeMaterializedState } from "../../src/memory/store.js";
+import * as memoryStore from "../../src/memory/store.js";
 
 vi.mock("../../src/memory/cli.js", () => ({
   runIndexLatest: vi.fn((): IndexLatestResult => ({
@@ -26,6 +26,14 @@ vi.mock("../../src/memory/cli.js", () => ({
     dryRun: false,
   })),
 }));
+
+vi.mock("../../src/memory/store.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/memory/store.js")>();
+  return {
+    ...actual,
+    readMaterializedState: vi.fn(actual.readMaterializedState),
+  };
+});
 
 const timestamp = "2026-06-01T12:00:00.000Z";
 const tempDirs: string[] = [];
@@ -158,7 +166,7 @@ function emptyRelatedIndex(): RelatedIndex {
 function writeMemoryState(repoRoot: string, memoryConfig: MemoryConfig, findings: MemoryFinding[]): void {
   const paths = resolveMemoryPaths(repoRoot, memoryConfig.directory);
   ensureMemoryDirs(paths);
-  writeMaterializedState(paths, {
+  memoryStore.writeMaterializedState(paths, {
     findings,
     manifest: validManifest(),
     relatedIndex: emptyRelatedIndex(),
@@ -180,6 +188,7 @@ function writeSegment(repoRoot: string, memoryConfig: MemoryConfig, fileName: st
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.clearAllMocks();
   for (const dir of tempDirs.splice(0)) {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -231,6 +240,20 @@ describe("buildSearchQuery", () => {
 });
 
 describe("retrieveMemoryContext", () => {
+  it("warns and returns undefined when materialized state reading fails", () => {
+    const repoRoot = makeTempRepo();
+    const memoryConfig = memoryConfigWith();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.mocked(memoryStore.readMaterializedState).mockImplementationOnce(() => {
+      throw new Error("corrupt manifest");
+    });
+
+    const result = retrieveMemoryContext(retrievalInput(repoRoot, memoryConfig));
+
+    expect(result).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith("memory: failed to read materialized state, skipping retrieval: corrupt manifest");
+  });
+
   it("returns undefined instead of throwing when the materialized manifest is corrupt", () => {
     const repoRoot = makeTempRepo();
     const memoryConfig = memoryConfigWith();
@@ -323,6 +346,21 @@ describe("retrieveMemoryContext", () => {
 });
 
 describe("checkAutoCompactThreshold", () => {
+  it("warns and keeps needsCompaction=false when segment stats cannot be read", () => {
+    const repoRoot = makeTempRepo();
+    const memoryConfig = memoryConfigWith();
+    writeSegment(repoRoot, memoryConfig, "unreadable.jsonl");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(fs, "statSync").mockImplementation(() => {
+      throw new Error("EACCES");
+    });
+
+    const result = checkAutoCompactThreshold(repoRoot, memoryConfig);
+
+    expect(result).toEqual({ needsCompaction: false });
+    expect(warnSpy).toHaveBeenCalledWith("memory: failed to read segment stats: EACCES");
+  });
+
   it("returns needsCompaction=false when segment count and age are under thresholds", () => {
     const repoRoot = makeTempRepo();
     const memoryConfig = memoryConfigWith({
