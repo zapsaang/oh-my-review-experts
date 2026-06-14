@@ -22,6 +22,10 @@ export interface BuildMemoryContextPackInput extends BuildMemoryContextPackOptio
   relatedIndex?: RelatedIndex;
 }
 
+export function encodeUntrustedMemoryField(value: string): string {
+  return JSON.stringify(value);
+}
+
 interface NormalizedBuildInput {
   hits: RankedMemoryHit[];
   relatedIndex?: RelatedIndex;
@@ -156,10 +160,10 @@ function renderHit(hit: RankedMemoryHit, relatedIndex: RelatedIndex | undefined)
   return [
     "--- memory item ---",
     `memory id: ${finding.id}`,
-    `reviewer: ${singleLine(finding.reviewer)}`,
+    `reviewer: ${encodeUntrustedMemoryField(finding.reviewer)}`,
     `severity: ${finding.severity}`,
     `status: ${finding.status}`,
-    `title: ${singleLine(finding.title)}`,
+    `title: ${encodeUntrustedMemoryField(finding.title)}`,
     `primary paths: ${formatPrimaryPaths(finding.locations)}`,
     `lastSeenAt: ${finding.occurrence.lastSeenAt}`,
     `occurrence count: ${finding.occurrence.count}`,
@@ -173,8 +177,8 @@ function formatPrimaryPaths(locations: RankedMemoryHit["finding"]["locations"]):
   const paths: string[] = [];
 
   for (const location of locations) {
-    const path = singleLine(location.path);
-    if (path.length > 0 && !paths.includes(path)) {
+    const path = encodeUntrustedMemoryField(location.path);
+    if (location.path.length > 0 && !paths.includes(path)) {
       paths.push(path);
     }
   }
@@ -183,9 +187,9 @@ function formatPrimaryPaths(locations: RankedMemoryHit["finding"]["locations"]):
 }
 
 function formatSafeSummary(redactedText: string): string {
-  const summary = singleLine(redactedText);
+  const summary = encodeUntrustedMemoryField(redactedText);
 
-  return summary.length > 0 ? summary : "(none)";
+  return redactedText.length > 0 ? summary : "(none)";
 }
 
 function formatRelatedMemoryIds(findingId: string, relatedIndex: RelatedIndex | undefined): string {
@@ -196,7 +200,12 @@ function formatRelatedMemoryIds(findingId: string, relatedIndex: RelatedIndex | 
   }
 
   return relations
-    .map((relation) => `${singleLine(relation.relatedFindingId)} (${singleLine(relation.relationType)})`)
+    .map((relation) => {
+      const relatedFindingId = encodeUntrustedMemoryField(relation.relatedFindingId);
+      const relationType = encodeUntrustedMemoryField(relation.relationType);
+
+      return `${relatedFindingId} (${relationType})`;
+    })
     .join(", ");
 }
 
