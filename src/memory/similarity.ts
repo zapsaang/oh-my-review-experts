@@ -54,6 +54,17 @@ export function tokenizeForSimilarity(input: string): string[] {
   return tokens;
 }
 
+export function stripMarkdownFences(input: string): string {
+  return input
+    .split(/\r?\n/)
+    .filter((line) => !line.trim().startsWith("```"))
+    .join("\n");
+}
+
+export function normalizeWhitespace(input: string): string {
+  return input.replace(/\s+/g, " ").trim();
+}
+
 export function jaccardSimilarity(a: string, b: string): number {
   const tokensA = new Set(tokenizeForSimilarity(a));
   const tokensB = new Set(tokenizeForSimilarity(b));
