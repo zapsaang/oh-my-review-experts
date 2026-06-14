@@ -7,10 +7,12 @@ export const MemoryConfigSchema = z.object({
     maxFileSizeKb: z.number().int().min(1).max(100000).default(512),
     includePatterns: z.array(z.string()).default(["**/*.{ts,tsx,js,jsx,py,go,rs,java}"]),
     excludePatterns: z.array(z.string()).default(["node_modules/**", "dist/**", ".git/**", "coverage/**"]),
+    autoIndexAfterReview: z.boolean().default(true),
   }).default(() => structuredClone({
     maxFileSizeKb: 512,
     includePatterns: ["**/*.{ts,tsx,js,jsx,py,go,rs,java}"],
     excludePatterns: ["node_modules/**", "dist/**", ".git/**", "coverage/**"],
+    autoIndexAfterReview: true,
   })),
   retrieval: z.object({
     enabled: z.boolean().default(false),
@@ -24,6 +26,7 @@ export const MemoryConfigSchema = z.object({
     byReviewer: z.record(z.string(), z.object({
       topK: z.number().int().min(1).max(100).optional(),
       enabled: z.boolean().optional(),
+      includeReviewers: z.array(z.string()).optional(),
     })).default({}),
   }).default(() => structuredClone({
     enabled: false,
@@ -79,4 +82,6 @@ export const MemoryConfigSchema = z.object({
   })),
 });
 
-export const DEFAULT_MEMORY_CONFIG = MemoryConfigSchema.parse({});
+export type MemoryConfig = z.infer<typeof MemoryConfigSchema>;
+
+export const DEFAULT_MEMORY_CONFIG: MemoryConfig = MemoryConfigSchema.parse({});

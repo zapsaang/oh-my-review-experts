@@ -468,6 +468,7 @@
         "directory": ".omre/memory",
         "enabled": true,
         "indexing": {
+          "autoIndexAfterReview": true,
           "excludePatterns": [
             "node_modules/**",
             "dist/**",
@@ -567,6 +568,7 @@
         "indexing": {
           "additionalProperties": false,
           "default": {
+            "autoIndexAfterReview": true,
             "excludePatterns": [
               "node_modules/**",
               "dist/**",
@@ -579,6 +581,10 @@
             "maxFileSizeKb": 512
           },
           "properties": {
+            "autoIndexAfterReview": {
+              "default": true,
+              "type": "boolean"
+            },
             "excludePatterns": {
               "default": [
                 "node_modules/**",
@@ -682,6 +688,12 @@
                 "properties": {
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "includeReviewers": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
                   },
                   "topK": {
                     "maximum": 100,

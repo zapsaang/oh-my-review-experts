@@ -15,6 +15,12 @@ describe("MemoryConfigSchema", () => {
     expect(config.directory).toBe(".omre/memory");
   });
 
+  it("defaults indexing autoIndexAfterReview", () => {
+    const config = MemoryConfigSchema.parse({});
+
+    expect(config.indexing.autoIndexAfterReview).toBe(true);
+  });
+
   it("defaults retrieval defaultTopK", () => {
     const config = MemoryConfigSchema.parse({});
 
@@ -61,14 +67,17 @@ describe("MemoryConfigSchema", () => {
     const config = MemoryConfigSchema.parse({
       retrieval: {
         byReviewer: {
-          security: { topK: 10 },
+          security: { topK: 10, includeReviewers: ["security", "spec"] },
+          quality: { enabled: false },
         },
       },
     });
 
     expect(config.retrieval.byReviewer).toEqual({
-      security: { topK: 10 },
+      security: { topK: 10, includeReviewers: ["security", "spec"] },
+      quality: { enabled: false },
     });
+    expect(config.retrieval.byReviewer.quality.includeReviewers).toBeUndefined();
     expect(config.retrieval.defaultTopK).toBe(5);
   });
 
