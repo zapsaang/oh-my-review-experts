@@ -740,6 +740,47 @@ describe("writeHandoff round-trip", () => {
     expect(findings[0].severity).toBe("high");
   });
 
+  it("preserves memory regression fields in the JSON header", () => {
+    const config = createTestConfig({ directory: "handoffs" });
+    const secretToken = "token: abcdef1234567890abcdef1234567890";
+    const { filePath } = writeHandoff(
+      config,
+      {
+        agent: "omre-reviewer-security",
+        dimension: "security",
+        status: "completed",
+        filesInspected: ["src/auth.ts"],
+        findings: [
+          {
+            id: "sec-1",
+            severity: "high",
+            file: "src/auth.ts",
+            line: 42,
+            title: "SQL Injection regression",
+            description: "User input is concatenated into SQL again",
+            evidence: "query = 'SELECT * FROM users WHERE id = ' + userId",
+            confidence: "high",
+            classification: "injection",
+            memoryRefs: ["mem_auth_1", "mem_fixed_2"],
+            isRegression: true,
+            regressionReason: `Previously fixed pattern recurred with ${secretToken}`,
+          },
+        ],
+      },
+      tmpDir,
+    );
+
+    const content = fs.readFileSync(filePath, "utf8");
+    const result = parseHandoffJsonHeader(content);
+    expect(result.success).toBe(true);
+    const data = result.data as Record<string, unknown>;
+    const findings = data.findings as Array<Record<string, unknown>>;
+    expect(findings[0].memoryRefs).toEqual(["mem_auth_1", "mem_fixed_2"]);
+    expect(findings[0].isRegression).toBe(true);
+    expect(findings[0].regressionReason).toContain("[REDACTED_TOKEN]");
+    expect(findings[0].regressionReason).not.toContain("abcdef1234567890abcdef1234567890");
+  });
+
   it("secret redaction does not corrupt JSON header validity", () => {
     const config = createTestConfig({ directory: "handoffs" });
     const simulatedSecret = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";

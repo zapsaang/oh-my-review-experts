@@ -190,7 +190,7 @@ export const tools = {
 
   omre_finalize_review: tool({
     description:
-      "Assemble and persist the final review report from handoff files under .omre/handoffs/{runId}/. Returns { ok: true, written, handoffsConsumed, degradedSlices, missingDimensionsGlobal } on success, or { ok: false, errors } on failure.",
+      "Assemble and persist the final review report from handoff files under .omre/handoffs/{runId}/. Returns { ok: true, written, handoffsConsumed, degradedSlices, missingDimensionsGlobal, memoryIndexResult } on success, or { ok: false, errors } on failure.",
     args: {
       runId: z.string().min(1),
       cwd: z.string().optional(),
@@ -210,6 +210,7 @@ export const tools = {
           handoffsConsumed: result.handoffsConsumed,
           degradedSlices: result.degradedSlices,
           missingDimensionsGlobal: result.missingDimensionsGlobal,
+          memoryIndexResult: result.memoryIndexResult,
         });
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
@@ -241,6 +242,10 @@ export const tools = {
         dimension: z.string().optional(),
         target: z.object({ kind: z.string(), value: z.string() }).optional(),
         sliceId: z.string().optional(),
+        memoryContext: z.object({
+          allowedMemoryIds: z.array(z.string()),
+          regressionCandidateIds: z.array(z.string()),
+        }).optional(),
       }).optional(),
     },
     async execute(input, context) {

@@ -34,6 +34,9 @@ export interface HandoffFinding {
   category?: string;
   impact?: string;
   recommendation?: string;
+  memoryRefs?: string[];
+  isRegression?: boolean;
+  regressionReason?: string;
 }
 
 function buildJsonHeader(payload: HandoffPayload, resolvedTaskId: string): Record<string, unknown> {
@@ -60,6 +63,9 @@ function buildJsonHeader(payload: HandoffPayload, resolvedTaskId: string): Recor
       if (f.category !== undefined) base.category = redactSecrets(f.category);
       if (f.impact !== undefined) base.impact = redactSecrets(f.impact);
       if (f.recommendation !== undefined) base.recommendation = redactSecrets(f.recommendation);
+      if (f.memoryRefs !== undefined) base.memoryRefs = f.memoryRefs;
+      if (f.isRegression !== undefined) base.isRegression = f.isRegression;
+      if (f.regressionReason !== undefined) base.regressionReason = redactSecrets(f.regressionReason);
       return base;
     }),
     meta: {

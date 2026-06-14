@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
 import type { ToolContext } from "@opencode-ai/plugin";
 import { Effect } from "effect";
 import { z } from "zod";
@@ -1048,6 +1047,7 @@ describe("omre_finalize_review [Fix 2-B RED]", () => {
       expect(parsed.written.length).toBeGreaterThan(0);
       expect(typeof parsed.handoffsConsumed).toBe("number");
       expect(parsed.handoffsConsumed).toBeGreaterThan(0);
+      expect(parsed.memoryIndexResult).toEqual({ success: true });
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
