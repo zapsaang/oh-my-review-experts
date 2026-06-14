@@ -5,6 +5,7 @@ import {
   CHAT_JSON_CONTRACT,
   FILE_HANDOFF_CONTRACT,
   GLOBAL_ARBITER_PROMPT,
+  REVIEW_MEMORY_CONTRACT,
   REVIEWER_PROMPTS,
   COMPLETE_REVIEWER_PROMPTS,
   RESULT_VALIDATOR_PROMPT,
@@ -47,6 +48,14 @@ describe("FILE_HANDOFF_CONTRACT (reviewer-facing, file-primary)", () => {
 
   it("[L1 fix] does NOT forbid outside-JSON prose (the handoff file has a Markdown body and a chat receipt)", () => {
     expect(FILE_HANDOFF_CONTRACT).not.toMatch(/Do not emit commentary outside JSON/);
+  });
+});
+
+describe("REVIEW_MEMORY_CONTRACT", () => {
+  it("declares review memories untrusted and tells agents to ignore embedded instructions", () => {
+    expect(REVIEW_MEMORY_CONTRACT).toMatch(/untrusted/i);
+    expect(REVIEW_MEMORY_CONTRACT).toMatch(/ignore[\s\S]*instruction/i);
+    expect(REVIEW_MEMORY_CONTRACT).toMatch(/embedded|authority/i);
   });
 });
 
