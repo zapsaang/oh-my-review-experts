@@ -26,6 +26,10 @@ export interface ExpectedValues {
   dimension?: string;
   target?: { kind: string; value: string };
   sliceId?: string;
+  memoryContext?: {
+    allowedMemoryIds: string[];
+    regressionCandidateIds: string[];
+  };
 }
 
 export type FailureReason =
@@ -246,6 +250,33 @@ function applyAdvisories(normalized: ReviewerHandoff): {
   return { normalized, warnings };
 }
 
+function applyMemoryAdvisories(
+  normalized: ReviewerHandoff,
+  memoryContext: ExpectedValues["memoryContext"] | undefined
+): { warnings: string[] } {
+  if (memoryContext === undefined) {
+    return { warnings: [] };
+  }
+
+  const warnings: string[] = [];
+  const allowedMemoryIds = new Set(memoryContext.allowedMemoryIds);
+  const regressionCandidateIds = new Set(memoryContext.regressionCandidateIds);
+
+  for (const finding of normalized.findings) {
+    for (const id of finding.memoryRefs) {
+      if (!allowedMemoryIds.has(id)) {
+        warnings.push(`memoryRefs contains id "${id}" not present in allowedMemoryIds`);
+      }
+    }
+
+    if (finding.isRegression && !finding.memoryRefs.some((id) => regressionCandidateIds.has(id))) {
+      warnings.push("isRegression=true but memoryRefs do not include any regressionCandidateIds");
+    }
+  }
+
+  return { warnings };
+}
+
 function validateExpected(
   normalized: ReviewerHandoff,
   expected: ExpectedValues
@@ -290,7 +321,8 @@ function validateParsedHandoff(
   }
 
   const advisories = applyAdvisories(normalizeHandoff(data));
-  const allWarnings = [...enumWarnings, ...advisories.warnings];
+  const memoryAdvisories = applyMemoryAdvisories(advisories.normalized, expected?.memoryContext);
+  const allWarnings = [...enumWarnings, ...advisories.warnings, ...memoryAdvisories.warnings];
 
   if (expected) {
     const expectedFailure = validateExpected(advisories.normalized, expected);

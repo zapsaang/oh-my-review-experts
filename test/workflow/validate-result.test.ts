@@ -40,6 +40,8 @@ function createValidHandoff(): ReviewerHandoff {
         evidence: "const API_KEY = 'sk-...'",
         confidence: "high",
         classification: "injection",
+        memoryRefs: [],
+        isRegression: false,
       },
     ],
     meta: { total_findings: 1, notes: "" },
@@ -122,6 +124,25 @@ describe("validateReviewerHandoff", () => {
     if (result.isValid) {
       expect(result.normalized.schema_version).toBe(SCHEMA_VERSION);
       expect(result.normalized.findings).toHaveLength(1);
+    }
+  });
+
+  it("keeps legacy handoffs valid and defaults memory regression fields", () => {
+    const handoff = createValidHandoff();
+    const legacyFinding: Record<string, unknown> = { ...handoff.findings[0] };
+    delete legacyFinding.memoryRefs;
+    delete legacyFinding.isRegression;
+    delete legacyFinding.regressionReason;
+    const legacyHandoff = { ...handoff, findings: [legacyFinding] };
+    const filePath = createMockHandoffFile(formatHandoff(legacyHandoff));
+
+    const result = validateReviewerHandoff(filePath);
+
+    expect(result.isValid).toBe(true);
+    if (result.isValid) {
+      expect(result.normalized.findings[0].memoryRefs).toEqual([]);
+      expect(result.normalized.findings[0].isRegression).toBe(false);
+      expect(result.normalized.findings[0].regressionReason).toBeUndefined();
     }
   });
 
@@ -273,6 +294,75 @@ describe("validateReviewerHandoff", () => {
     }
   });
 
+  it("warns when memoryRefs contains an id outside allowedMemoryIds", () => {
+    const handoff = createValidHandoff();
+    handoff.findings[0].memoryRefs = ["mem_auth_1", "mem_unknown"];
+    const filePath = createMockHandoffFile(formatHandoff(handoff));
+    const expected: ExpectedValues = {
+      memoryContext: {
+        allowedMemoryIds: ["mem_auth_1"],
+        regressionCandidateIds: [],
+      },
+    };
+
+    const result = validateReviewerHandoff(filePath, expected);
+
+    expect(result.isValid).toBe(true);
+    expect(result).not.toHaveProperty("failureReason");
+    if (result.isValid) {
+      expect(result.warnings).toContain(
+        'memoryRefs contains id "mem_unknown" not present in allowedMemoryIds',
+      );
+    }
+  });
+
+  it("warns when isRegression lacks a regressionCandidateIds memory ref", () => {
+    const handoff = createValidHandoff();
+    handoff.findings[0].isRegression = true;
+    handoff.findings[0].memoryRefs = [];
+    const filePath = createMockHandoffFile(formatHandoff(handoff));
+    const expected: ExpectedValues = {
+      memoryContext: {
+        allowedMemoryIds: ["mem_fixed_1"],
+        regressionCandidateIds: ["mem_fixed_1"],
+      },
+    };
+
+    const result = validateReviewerHandoff(filePath, expected);
+
+    expect(result.isValid).toBe(true);
+    expect(result).not.toHaveProperty("failureReason");
+    if (result.isValid) {
+      expect(result.warnings).toContain(
+        "isRegression=true but memoryRefs do not include any regressionCandidateIds",
+      );
+    }
+  });
+
+  it("skips memoryContext advisories when memoryContext is absent", () => {
+    const handoff = createValidHandoff();
+    handoff.findings[0].isRegression = true;
+    handoff.findings[0].memoryRefs = ["mem_unknown"];
+    const filePath = createMockHandoffFile(formatHandoff(handoff));
+    const expected: ExpectedValues = {
+      dimension: "security",
+      target: { kind: "working-tree", value: "src/auth.ts" },
+      sliceId: "slice-1",
+    };
+
+    const result = validateReviewerHandoff(filePath, expected);
+
+    expect(result.isValid).toBe(true);
+    if (result.isValid) {
+      expect(result.warnings).not.toContain(
+        'memoryRefs contains id "mem_unknown" not present in allowedMemoryIds',
+      );
+      expect(result.warnings).not.toContain(
+        "isRegression=true but memoryRefs do not include any regressionCandidateIds",
+      );
+    }
+  });
+
   it("emits no warnings when count already matches and classification is standard", () => {
     const handoff = createValidHandoff();
     handoff.meta.total_findings = handoff.findings.length;
@@ -365,6 +455,8 @@ describe("validateReviewerHandoff", () => {
         evidence: "const API_KEY = 'sk-...'",
         confidence: "high",
         classification: "injection",
+        memoryRefs: [],
+        isRegression: false,
       },
       { id: "sec-2", severity: "high" } as unknown as ReviewerHandoff["findings"][0],
     ];
@@ -571,6 +663,20 @@ describe("UnifiedFindingSchema direct validation", () => {
       expect(result.data.severity).toBe("medium");
     }
   });
+
+  it("safeParse fails when regressionReason exceeds 2000 characters", () => {
+    const result = UnifiedFindingSchema.safeParse({
+      ...validFinding,
+      regressionReason: "x".repeat(2001),
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path.length === 1 && i.path[0] === "regressionReason");
+      expect(issue).toBeDefined();
+      expect(issue!.code).toBe("too_big");
+    }
+  });
 });
 
 describe("UnifiedHandoffSchema direct validation", () => {
@@ -645,7 +751,7 @@ describe("Type equivalence", () => {
   });
 });
 
-function formatHandoff(handoff: ReviewerHandoff): string {
+function formatHandoff(handoff: unknown): string {
   return "```json\n" + JSON.stringify(handoff, null, 2) + "\n```";
 }
 
