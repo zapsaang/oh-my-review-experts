@@ -378,11 +378,18 @@ export function createCliProgram(): Command {
 
   program.command("dry-run")
     .description("Show estimated review-code plan without calling models")
+    .option("--with-memory", "preview review memory retrieval even when retrieval is disabled in config", false)
+    .option("--no-memory", "disable review memory retrieval for this dry run", false)
+    .option("--echo-prompt", "accepted for parity with /review-code prompt preview", false)
     .argument("[args...]", "extra review-code guidance")
-    .action((args: string[]) => {
+    .action((args: string[], opts: { withMemory?: boolean; noMemory?: boolean; echoPrompt?: boolean }) => {
       const argsText = args.join(" ")
       try {
-        const output = renderLocalDryRun({ args: argsText })
+        const output = renderLocalDryRun({
+          args: argsText,
+          isWithMemory: !!opts.withMemory,
+          isNoMemory: !!opts.noMemory,
+        })
         // Detect scope-resolution errors surfaced by renderLocalDryRun
         const errorMatch = output.match(/^Resolved scope: error(?: \(([^)]+)\))?\n(.+)$/m)
         if (errorMatch) {

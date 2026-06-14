@@ -1,4 +1,4 @@
-import { buildReviewCodePrompt } from "../workflow/run-review-code.js";
+import { buildReviewCodePrompt, stripMemoryFlags } from "../workflow/run-review-code.js";
 import { loadConfig } from "../config/load-config.js";
 import { OmreConfig } from "../config/schema.js";
 import { ScopeResolutionError, AmbiguousScopeError } from "../workflow/scope-resolver.js";
@@ -85,6 +85,23 @@ export function validateAndSanitizeArgs(args: string): string {
 
 export const MAX_ARGS_LENGTH = 4_000;
 
+interface StrippedMemoryArgs {
+  args: string;
+  isWithMemory: boolean;
+  isNoMemory: boolean;
+}
+
+function stripMemoryFlagsFromArgs(args: string): StrippedMemoryArgs {
+  const trimmed = args.trim();
+  const tokens = trimmed.length === 0 ? [] : trimmed.split(/\s+/);
+  const stripped = stripMemoryFlags(tokens);
+  return {
+    args: stripped.cleaned.join(" "),
+    isWithMemory: stripped.isWithMemory,
+    isNoMemory: stripped.isNoMemory,
+  };
+}
+
 export interface InjectReviewCodeInput {
   command: string;
   args: string;
@@ -116,9 +133,15 @@ export function injectReviewCodePrompt(input: InjectReviewCodeInput): string | u
   if (args.length > MAX_ARGS_LENGTH) {
     args = args.slice(0, MAX_ARGS_LENGTH) + "\n[WARNING: User guidance truncated due to excessive length]";
   }
-  args = validateAndSanitizeArgs(args);
+  const memoryArgs = stripMemoryFlagsFromArgs(args);
+  args = validateAndSanitizeArgs(memoryArgs.args);
   try {
-    return buildReviewCodePrompt({ args, cwd }).prompt;
+    return buildReviewCodePrompt({
+      args,
+      cwd,
+      isWithMemory: memoryArgs.isWithMemory,
+      isNoMemory: memoryArgs.isNoMemory,
+    }).prompt;
   } catch (err) {
     if (err instanceof ScopeResolutionError) {
       return `Error: ${err.message}`;
@@ -142,9 +165,15 @@ export function maybeInjectReviewCodePrompt(text: string, cwd = process.cwd()): 
   if (args.length > MAX_ARGS_LENGTH) {
     args = args.slice(0, MAX_ARGS_LENGTH) + "\n[WARNING: User guidance truncated due to excessive length]";
   }
-  args = validateAndSanitizeArgs(args);
+  const memoryArgs = stripMemoryFlagsFromArgs(args);
+  args = validateAndSanitizeArgs(memoryArgs.args);
   try {
-    return buildReviewCodePrompt({ args, cwd }).prompt;
+    return buildReviewCodePrompt({
+      args,
+      cwd,
+      isWithMemory: memoryArgs.isWithMemory,
+      isNoMemory: memoryArgs.isNoMemory,
+    }).prompt;
   } catch (err) {
     if (err instanceof ScopeResolutionError) {
       return `Error: ${err.message}`;
