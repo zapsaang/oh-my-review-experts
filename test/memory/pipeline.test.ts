@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryConfigSchema, type MemoryConfig } from "../../src/memory/config.js";
-import { runIndexLatest, type IndexLatestResult } from "../../src/memory/cli.js";
+import { runIndexLatest, type IndexLatestResult } from "../../src/memory/indexing.js";
 import { ensureMemoryDirs, resolveMemoryPaths } from "../../src/memory/paths.js";
 import {
   autoIndexAfterReview,
@@ -15,7 +15,7 @@ import {
 import type { MemoryFinding, MemoryManifest, RelatedIndex } from "../../src/memory/schema.js";
 import * as memoryStore from "../../src/memory/store.js";
 
-vi.mock("../../src/memory/cli.js", () => ({
+vi.mock("../../src/memory/indexing.js", () => ({
   runIndexLatest: vi.fn((): IndexLatestResult => ({
     runId: "mock-run",
     rawFindings: 0,
