@@ -3,17 +3,141 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { execFileSync } from "node:child_process";
-import { buildReviewCodePrompt, renderLocalDryRun, persistReport } from "../../src/workflow/run-review-code.js";
+import {
+  buildPerReviewerMemorySection,
+  buildReviewCodePrompt,
+  renderLocalDryRun,
+  persistReport,
+  stripMemoryFlags,
+} from "../../src/workflow/run-review-code.js";
 import { clearLoadConfigCache } from "../../src/config/load-config.js";
+import { ensureMemoryDirs, resolveMemoryPaths } from "../../src/memory/paths.js";
+import type { MemoryContextPack } from "../../src/memory/context-pack.js";
+import type { MemoryFinding, MemoryManifest, RelatedIndex } from "../../src/memory/schema.js";
+import { writeMaterializedState } from "../../src/memory/store.js";
 import {
   withCleanGitRepo,
   withHierarchicalRepo,
   withRepoWithBranches,
 } from "../_helpers/fixture-repo.js";
 
+const memoryTimestamp = "2026-06-01T12:00:00.000Z";
+
 function getExecutionRequirements(prompt: string): string {
   const afterExecution = prompt.split("Execution requirements:")[1] ?? "";
   return afterExecution.split("Unified diff follows")[0] ?? "";
+}
+
+function writeMemoryRetrievalConfig(cwd: string, retrievalEnabled: boolean): void {
+  fs.mkdirSync(path.join(cwd, ".omre"), { recursive: true });
+  fs.writeFileSync(
+    path.join(cwd, ".omre", "config.json"),
+    JSON.stringify({
+      memory: {
+        enabled: true,
+        retrieval: {
+          enabled: retrievalEnabled,
+          similarityThreshold: 0.5,
+          maxContextChars: 4000,
+        },
+      },
+    }),
+    "utf8",
+  );
+  clearLoadConfigCache();
+}
+
+function writeChangedAuthFile(cwd: string): void {
+  fs.mkdirSync(path.join(cwd, "src"), { recursive: true });
+  fs.writeFileSync(
+    path.join(cwd, "src", "auth.ts"),
+    "export const tenantIsolation = false;\n",
+    "utf8",
+  );
+}
+
+function validMemoryFinding(overrides: Partial<MemoryFinding> = {}): MemoryFinding {
+  const finding = {
+    schemaVersion: 1,
+    id: "mem_1111111111111111",
+    fingerprint: "fingerprintvalue1",
+    repo: {
+      rootHash: "repo1234567890abcd",
+      packagePath: ".",
+    },
+    origin: {
+      runId: "run-review-code",
+      sourceType: "report",
+      sourcePath: ".omre/reports/latest.json",
+      createdAt: memoryTimestamp,
+    },
+    reviewer: "security",
+    severity: "high",
+    status: "open",
+    category: "authz",
+    title: "Missing tenant isolation",
+    problem: "Tenant records are queried without checking the caller tenant.",
+    evidence: "db.query('select * from tenants')",
+    locations: [{ path: "src/auth.ts", line: 42 }],
+    occurrence: {
+      firstSeenAt: memoryTimestamp,
+      lastSeenAt: memoryTimestamp,
+      count: 1,
+      runIds: ["run-review-code"],
+    },
+    searchable: {
+      redactedText: "tenant isolation context pack text",
+      tokens: ["tenant", "isolation"],
+    },
+    metadata: {
+      evidenceTruncated: false,
+      problemTruncated: false,
+      recommendationTruncated: false,
+      sourceMalformed: false,
+    },
+    tags: [],
+    contentHash: "contenthashvalue1",
+  } satisfies MemoryFinding;
+
+  return { ...finding, ...overrides };
+}
+
+function validMemoryManifest(): MemoryManifest {
+  return {
+    schemaVersion: 1,
+    eventSchemaVersion: 1,
+    viewSchemaVersion: 1,
+    lastRebuiltAt: memoryTimestamp,
+    materializedHash: "materializedhash1",
+    relatedIndexHash: "relatedindexhash1",
+    includedEventFiles: [],
+    compactedInputSegments: [],
+    gcSummary: {
+      deletedRawSegments: 0,
+      deletedTmpFiles: 0,
+      deletedQuarantineFiles: 0,
+    },
+    quarantine: [],
+  };
+}
+
+function emptyRelatedIndex(): RelatedIndex {
+  return {
+    schemaVersion: 1,
+    generatedAt: memoryTimestamp,
+    relations: [],
+    byFindingId: {},
+  };
+}
+
+function writeMemoryState(cwd: string, findings: MemoryFinding[]): void {
+  const paths = resolveMemoryPaths(path.resolve(cwd));
+  ensureMemoryDirs(paths);
+  writeMaterializedState(paths, {
+    findings,
+    manifest: validMemoryManifest(),
+    relatedIndex: emptyRelatedIndex(),
+  });
 }
 
 describe("buildReviewCodePrompt", () => {
@@ -165,6 +289,125 @@ describe("buildReviewCodePrompt", () => {
       expect(hierExecution).toMatch(/(Delegate|Invoke|Hand off)[^\n]*omre-report-writer[^\n]*runId/i);
     });
   });
+
+  it("strips memory flags from raw args before scope parsing and user guidance", () => {
+    withCleanGitRepo((cwd) => {
+      clearLoadConfigCache();
+      const bundle = buildReviewCodePrompt({ args: "--with-memory focus on auth", cwd });
+
+      expect(bundle.prompt).toContain(JSON.stringify("focus on auth"));
+      expect(bundle.prompt).not.toContain("--with-memory");
+      expect(bundle.prompt).not.toContain("## Review Memory Context");
+    });
+  });
+
+  it("lets --no-memory win when both memory flags are present", () => {
+    withCleanGitRepo((cwd) => {
+      writeMemoryRetrievalConfig(cwd, true);
+      writeChangedAuthFile(cwd);
+      writeMemoryState(cwd, [validMemoryFinding()]);
+
+      const bundle = buildReviewCodePrompt({ args: "--with-memory --no-memory tenant isolation", cwd: path.resolve(cwd) });
+
+      expect(bundle.prompt).toContain(JSON.stringify("tenant isolation"));
+      expect(bundle.prompt).not.toContain("--with-memory");
+      expect(bundle.prompt).not.toContain("--no-memory");
+      expect(bundle.prompt).not.toContain("## Review Memory Context");
+    });
+  });
+
+  it("injects memory context sections with allowed IDs, regression candidates, and validator relay instructions", () => {
+    withCleanGitRepo((cwd) => {
+      writeMemoryRetrievalConfig(cwd, false);
+      writeChangedAuthFile(cwd);
+      writeMemoryState(cwd, [
+        validMemoryFinding({ id: "mem_1111111111111111" }),
+        validMemoryFinding({
+          id: "mem_2222222222222222",
+          status: "fixed",
+          severity: "medium",
+          title: "Fixed tenant isolation gap",
+          searchable: {
+            redactedText: "fixed tenant isolation context pack text",
+            tokens: ["tenant", "isolation"],
+          },
+        }),
+      ]);
+
+      const bundle = buildReviewCodePrompt({ args: "--with-memory tenant isolation", cwd: path.resolve(cwd) });
+
+      expect(bundle.prompt).toContain("## Review Memory Context");
+      expect(bundle.prompt).toContain("--- MEMORY CONTEXT FOR security ON slice-1 START ---");
+      expect(bundle.prompt).toContain("tenant isolation context pack text");
+      expect(bundle.prompt).toContain("allowedMemoryIds: [");
+      expect(bundle.prompt).toContain("mem_1111111111111111");
+      expect(bundle.prompt).toContain("mem_2222222222222222");
+      expect(bundle.prompt).toContain("regressionCandidateIds: [");
+      expect(bundle.prompt).toContain("mem_2222222222222222");
+      expect(bundle.prompt).toContain("--- MEMORY CONTEXT FOR security ON slice-1 END ---");
+      expect(bundle.prompt).toContain("copy the matching MEMORY CONTEXT block into that reviewer's delegation message verbatim");
+      expect(bundle.prompt).toContain("omre_validate_handoff");
+      expect(bundle.prompt).toContain("allowedMemoryIds");
+      expect(bundle.prompt).toContain("regressionCandidateIds");
+    });
+  });
+
+  it("does not inject memory context when retrieval has no hits", () => {
+    withCleanGitRepo((cwd) => {
+      writeMemoryRetrievalConfig(cwd, true);
+      writeChangedAuthFile(cwd);
+      writeMemoryState(cwd, [validMemoryFinding()]);
+
+      const bundle = buildReviewCodePrompt({ args: "cache ttl", cwd: path.resolve(cwd) });
+
+      expect(bundle.prompt).not.toContain("## Review Memory Context");
+      expect(bundle.prompt).not.toContain("MEMORY CONTEXT FOR");
+    });
+  });
+});
+
+describe("stripMemoryFlags", () => {
+  it("removes memory flag tokens and leaves real guidance tokens", () => {
+    expect(stripMemoryFlags(["--with-memory", "focus", "on", "auth"])).toEqual({
+      cleaned: ["focus", "on", "auth"],
+      isWithMemory: true,
+      isNoMemory: false,
+    });
+  });
+
+  it("lets --no-memory win when both flags are present", () => {
+    expect(stripMemoryFlags(["--with-memory", "--no-memory", "focus"])).toEqual({
+      cleaned: ["focus"],
+      isWithMemory: false,
+      isNoMemory: true,
+    });
+  });
+});
+
+describe("buildPerReviewerMemorySection", () => {
+  it("renders deterministic boundaries, context text, allowed IDs, and regression candidate IDs", () => {
+    const pack: MemoryContextPack = {
+      text: "Memory Context Pack\n--- memory item ---\nmemory id: mem_1111111111111111",
+      includedIds: ["mem_1111111111111111", "mem_2222222222222222"],
+      regressionCandidateIds: ["mem_2222222222222222"],
+      truncated: false,
+      totalMatched: 2,
+    };
+
+    expect(buildPerReviewerMemorySection("security", "slice-1", pack)).toBe([
+      "--- MEMORY CONTEXT FOR security ON slice-1 START ---",
+      "reviewer: security",
+      "slice: slice-1",
+      "allowedMemoryIds: [\"mem_1111111111111111\",\"mem_2222222222222222\"]",
+      "regressionCandidateIds: [\"mem_2222222222222222\"]",
+      "",
+      "context:",
+      "Memory Context Pack",
+      "--- memory item ---",
+      "memory id: mem_1111111111111111",
+      "--- MEMORY CONTEXT FOR security ON slice-1 END ---",
+    ].join("\n"));
+  });
 });
 
 describe("renderLocalDryRun", () => {
@@ -214,6 +457,34 @@ describe("renderLocalDryRun", () => {
         expect(markdown).toContain("path:auth");
       }
     );
+  });
+
+  it("shows injected memory section previews for --with-memory", () => {
+    withCleanGitRepo((cwd) => {
+      writeMemoryRetrievalConfig(cwd, false);
+      writeChangedAuthFile(cwd);
+      writeMemoryState(cwd, [validMemoryFinding()]);
+
+      const markdown = renderLocalDryRun({ args: "--with-memory tenant isolation", cwd: path.resolve(cwd) });
+
+      expect(markdown).toContain("Memory retrieval preview");
+      expect(markdown).toContain("slice: slice-1");
+      expect(markdown).toContain("reviewer: security");
+      expect(markdown).toContain("--- MEMORY CONTEXT FOR security ON slice-1 START ---");
+      expect(markdown).toContain("allowedMemoryIds: [\"mem_1111111111111111\"]");
+      expect(markdown).toContain("--- MEMORY CONTEXT FOR security ON slice-1 END ---");
+    });
+  });
+
+  it("prints a clear no-state message when --with-memory has no materialized state", () => {
+    withCleanGitRepo((cwd) => {
+      writeMemoryRetrievalConfig(cwd, false);
+
+      const markdown = renderLocalDryRun({ args: "--with-memory tenant isolation", cwd: path.resolve(cwd) });
+
+      expect(markdown).toContain("Memory retrieval preview: no memory state found");
+      expect(markdown).not.toContain("MEMORY CONTEXT FOR");
+    });
   });
 });
 
