@@ -11,6 +11,7 @@ import { normalizeMemoryFinding, type NormalizeContext } from "./normalize.js";
 import { ensureMemoryDirs, resolveMemoryPaths, type MemoryPaths } from "./paths.js";
 import { rankMemoryHits } from "./ranking.js";
 import { redactRawFinding } from "./redaction.js";
+import { REVIEWER_PREFIX, canonicalReviewerName } from "./reviewer-name.js";
 import type { MemoryFinding } from "./schema.js";
 import { searchMemory } from "./search.js";
 import {
@@ -73,7 +74,6 @@ interface LoadedMaterializedState {
 const REPORT_RELATIVE_PATH = path.join(".omre", "reports", "latest.json");
 const HANDOFF_RELATIVE_ROOT = path.join(".omre", "handoffs");
 const SAFE_RUN_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
-const REVIEWER_PREFIX = "omre-reviewer-";
 const MEMORY_STATUS_VALUES = [
   "open",
   "confirmed",
@@ -111,7 +111,7 @@ export function registerMemoryCli(program: Command): void {
   memory.command("list")
     .description("List materialized memory findings")
     .option("--status <status>", "filter by memory status")
-    .option("--reviewer <reviewer>", "filter by reviewer dimension or omre-reviewer-* alias")
+    .option("--reviewer <reviewer>", `filter by reviewer dimension or ${REVIEWER_PREFIX}* alias`)
     .option("--limit <n>", "maximum findings to print")
     .action((opts: ListCommandOptions) => {
       runMemoryCliAction("memory list", () => runMemoryList({
@@ -307,10 +307,6 @@ function formatSearchHit(finding: MemoryFinding, score: number): string {
 
 function formatListFinding(finding: MemoryFinding): string {
   return `${finding.id} | ${summarizeText(finding.title, 240)} | reviewer=${canonicalReviewerName(finding.reviewer)} | status=${finding.status} | severity=${finding.severity}`;
-}
-
-function canonicalReviewerName(reviewer: string): string {
-  return reviewer.startsWith(REVIEWER_PREFIX) ? reviewer.slice(REVIEWER_PREFIX.length) : reviewer;
 }
 
 function summarizeText(value: string, maxLength: number): string {

@@ -1,4 +1,5 @@
 import path from "node:path/posix";
+import { canonicalReviewerName } from "./reviewer-name.js";
 import type { MemoryFinding } from "./schema.js";
 import { tokenizeForSimilarity } from "./similarity.js";
 
@@ -30,7 +31,6 @@ export interface SearchMemoryResult {
 }
 
 const DEFAULT_SIMILARITY_THRESHOLD = 0.75;
-const REVIEWER_PREFIX = "omre-reviewer-";
 
 export function searchMemory(input: SearchMemoryInput): SearchMemoryResult {
   const queryTokens = tokenizeForSimilarity(input.query);
@@ -96,10 +96,6 @@ function buildReviewerFilter(input: SearchMemoryInput, effectiveReviewers: strin
   }
 
   return new Set(effectiveReviewers.map((reviewer) => canonicalReviewerName(reviewer)));
-}
-
-function canonicalReviewerName(reviewer: string): string {
-  return reviewer.startsWith(REVIEWER_PREFIX) ? reviewer.slice(REVIEWER_PREFIX.length) : reviewer;
 }
 
 function normalizeLimit(limit: number | undefined): number | undefined {
