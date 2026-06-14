@@ -101,6 +101,9 @@ export const UnifiedFindingSchema = z.looseObject({
   evidence: nonEmpty("evidence"),
   confidence: z.enum(CONFIDENCE_VALUES).catch("low"),
   classification: nonEmpty("classification"),
+  memoryRefs: z.array(z.string().regex(/^mem_/)).default([]),
+  isRegression: z.boolean().default(false),
+  regressionReason: z.string().max(2000).optional(),
 });
 export type UnifiedFinding = z.infer<typeof UnifiedFindingSchema>;
 
@@ -207,7 +210,10 @@ export const REVIEWER_FINDING_JSON = `{
   "description": "…",
   "evidence": "…",
   "confidence": "high|medium|low",
-  "classification": "injection|race-condition|provable-regression"
+  "classification": "injection|race-condition|provable-regression",
+  "memoryRefs": ["mem_auth_1"],
+  "isRegression": false,
+  "regressionReason": "Only when a prior fixed or confirmed memory recurs"
 }`;
 
 /** Expected JSON output for a reviewer handoff header (machine-readable contract). */

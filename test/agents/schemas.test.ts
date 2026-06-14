@@ -507,6 +507,9 @@ describe("zodToExample", () => {
       evidence: "string",
       confidence: "high|medium|low",
       classification: "string",
+      memoryRefs: ["string"],
+      isRegression: true,
+      regressionReason: "string",
     });
   });
 });

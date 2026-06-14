@@ -27,7 +27,12 @@ Output JSON only: {
       "description": "string",
       "evidence": "string",
       "confidence": "high|medium|low",
-      "classification": "string"
+      "classification": "string",
+      "memoryRefs": [
+        "string"
+      ],
+      "isRegression": true,
+      "regressionReason": "string"
     }
   ],
   "needs_validation": [
@@ -40,7 +45,12 @@ Output JSON only: {
       "description": "string",
       "evidence": "string",
       "confidence": "high|medium|low",
-      "classification": "string"
+      "classification": "string",
+      "memoryRefs": [
+        "string"
+      ],
+      "isRegression": true,
+      "regressionReason": "string"
     }
   ],
   "rejected": [
@@ -133,7 +143,12 @@ Output JSON only: {
       "description": "string",
       "evidence": "string",
       "confidence": "high|medium|low",
-      "classification": "string"
+      "classification": "string",
+      "memoryRefs": [
+        "string"
+      ],
+      "isRegression": true,
+      "regressionReason": "string"
     }
   ],
   "needs_validation": [
@@ -146,7 +161,12 @@ Output JSON only: {
       "description": "string",
       "evidence": "string",
       "confidence": "high|medium|low",
-      "classification": "string"
+      "classification": "string",
+      "memoryRefs": [
+        "string"
+      ],
+      "isRegression": true,
+      "regressionReason": "string"
     }
   ],
   "rejected": [
