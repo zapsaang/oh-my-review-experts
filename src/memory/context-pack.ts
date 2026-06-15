@@ -209,6 +209,3 @@ function formatRelatedMemoryIds(findingId: string, relatedIndex: RelatedIndex | 
     .join(", ");
 }
 
-function singleLine(value: string): string {
-  return value.replace(/\s+/g, " ").trim();
-}
