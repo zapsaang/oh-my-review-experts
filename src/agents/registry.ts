@@ -138,7 +138,7 @@ export interface RegistrationResult {
   skipped: string[];
 }
 
-function buildAgentConfig(agent: AgentRegistration, omreConfig: OmreConfig): Record<string, unknown> {
+export function buildAgentConfig(agent: AgentRegistration, omreConfig: OmreConfig): Record<string, unknown> {
   const tools: Record<string, boolean> = {};
   for (const t of TOOL_DENY_BASELINE) tools[t] = false;
   for (const t of agent.toolsDenyExtra ?? []) tools[t] = false;

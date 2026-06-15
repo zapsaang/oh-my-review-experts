@@ -6,6 +6,8 @@ import {
   FILE_HANDOFF_CONTRACT,
   GLOBAL_ARBITER_PROMPT,
   REVIEW_MEMORY_CONTRACT,
+  REVIEW_MEMORY_ORCHESTRATION,
+  REVIEW_MEMORY_POLICY,
   REVIEWER_PROMPTS,
   COMPLETE_REVIEWER_PROMPTS,
   RESULT_VALIDATOR_PROMPT,
@@ -359,5 +361,80 @@ describe("REPORT_WRITER_PROMPT", () => {
 
   it("snapshot remains stable", () => {
     expect(REPORT_WRITER_PROMPT).toMatchSnapshot();
+  });
+});
+
+describe("REVIEW_MEMORY_POLICY (reviewer-facing)", () => {
+  it("contains the untrusted-data directive (Rule 0)", () => {
+    expect(REVIEW_MEMORY_POLICY).toMatch(/untrusted/i);
+    expect(REVIEW_MEMORY_POLICY).toMatch(/ignore[\s\S]*instruction/i);
+  });
+
+  it("contains Rules 1-5", () => {
+    expect(REVIEW_MEMORY_POLICY).toContain("Confirm every memory against the current diff");
+    expect(REVIEW_MEMORY_POLICY).toContain("memoryRefs");
+    expect(REVIEW_MEMORY_POLICY).toContain("isRegression=true");
+    expect(REVIEW_MEMORY_POLICY).toContain("Do not report a finding only because a memory exists");
+    expect(REVIEW_MEMORY_POLICY).toContain("false-positive");
+  });
+
+  it("does NOT contain orchestrator delegation instructions", () => {
+    expect(REVIEW_MEMORY_POLICY).not.toContain("When delegating to a reviewer");
+    expect(REVIEW_MEMORY_POLICY).not.toContain("omre_validate_handoff");
+  });
+});
+
+describe("REVIEW_MEMORY_ORCHESTRATION (orchestrator-only)", () => {
+  it("contains delegation instructions", () => {
+    expect(REVIEW_MEMORY_ORCHESTRATION).toContain("When delegating to a reviewer");
+    expect(REVIEW_MEMORY_ORCHESTRATION).toContain("omre_validate_handoff");
+  });
+
+  it("does NOT contain the untrusted-data rules", () => {
+    expect(REVIEW_MEMORY_ORCHESTRATION).not.toMatch(/Rule|untrusted.*historical data/);
+  });
+});
+
+describe("REVIEW_MEMORY_CONTRACT (backward compat)", () => {
+  it("composes from REVIEW_MEMORY_POLICY + REVIEW_MEMORY_ORCHESTRATION", () => {
+    expect(REVIEW_MEMORY_CONTRACT).toContain(REVIEW_MEMORY_POLICY.trim());
+    expect(REVIEW_MEMORY_CONTRACT).toContain(REVIEW_MEMORY_ORCHESTRATION);
+  });
+});
+
+describe("composePrompt (memory policy injection)", () => {
+  it("includes REVIEW_MEMORY_POLICY in every dimension", () => {
+    const dimensions: ReviewDimensionType[] = ["spec", "quality", "security", "performance", "concurrency"];
+    for (const dimension of dimensions) {
+      const composed = composePrompt(dimension);
+      expect(composed, `dimension ${dimension} must contain REVIEW_MEMORY_POLICY`)
+        .toContain(REVIEW_MEMORY_POLICY.trim());
+    }
+  });
+
+  it("places REVIEW_MEMORY_POLICY after FILE_HANDOFF_CONTRACT and before REVIEWER_PROMPTS", () => {
+    const composed = composePrompt("security");
+    const contractIdx = composed.indexOf(FILE_HANDOFF_CONTRACT.trim());
+    const policyIdx = composed.indexOf(REVIEW_MEMORY_POLICY.trim());
+    const reviewerIdx = composed.indexOf(REVIEWER_PROMPTS.security);
+    expect(contractIdx).toBeLessThan(policyIdx);
+    expect(policyIdx).toBeLessThan(reviewerIdx);
+  });
+
+  it("does NOT include orchestrator delegation stanza", () => {
+    const dimensions: ReviewDimensionType[] = ["spec", "quality", "security", "performance", "concurrency"];
+    for (const dimension of dimensions) {
+      const composed = composePrompt(dimension);
+      expect(composed).not.toContain(REVIEW_MEMORY_ORCHESTRATION);
+      expect(composed).not.toContain("When delegating to a reviewer");
+    }
+  });
+});
+
+describe("COMPLETE_REVIEWER_PROMPTS (memory policy presence)", () => {
+  it("every dimension includes REVIEW_MEMORY_POLICY", () => {
+    for (const [dim, prompt] of Object.entries(COMPLETE_REVIEWER_PROMPTS)) {
+      expect(prompt, `dimension=${dim}`).toContain(REVIEW_MEMORY_POLICY.trim());
+    }
   });
 });

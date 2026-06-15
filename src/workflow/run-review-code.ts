@@ -385,6 +385,10 @@ function collectReviewMemorySections(
         continue;
       }
 
+      // encodeUntrustedMemoryField() already JSON-encodes each untrusted memory field,
+      // neutralizing structural delimiters at the field level. The fixed START/END
+      // wrapper added by buildPerReviewerMemorySection therefore needs no extra
+      // delimiter neutralization.
       let text = buildPerReviewerMemorySection(reviewer, slice.slice_id, contextPack);
       let additionLength = `\n\n${text}`.length;
       if (currentLength + additionLength > MAX_REVIEW_MEMORY_CONTEXT_LENGTH - markerReserve) {
