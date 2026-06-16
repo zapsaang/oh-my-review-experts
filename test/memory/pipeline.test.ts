@@ -14,7 +14,7 @@ import {
 } from "../../src/memory/pipeline.js";
 import type { MemoryFinding, MemoryManifest, RelatedIndex } from "../../src/memory/schema.js";
 import * as memoryStore from "../../src/memory/store.js";
-
+import { writeSegment as writeSegmentHelper } from "./_helpers.js";
 vi.mock("../../src/memory/indexing.js", () => ({
   runIndexLatest: vi.fn((): IndexLatestResult => ({
     runId: "mock-run",
@@ -419,6 +419,51 @@ describe("checkAutoCompactThreshold", () => {
     expect(result.needsCompaction).toBe(true);
     expect(result.reason).toContain("oldestSegmentAgeDays=");
     expect(result.reason).toContain(" > rawSegmentKeepDays=1");
+  });
+
+  it("returns needsCompaction=true with a reason when total bytes exceeds the threshold", () => {
+    const repoRoot = makeTempRepo();
+    const memoryConfig = memoryConfigWith({
+      compaction: {
+        minRawSegments: 50,
+        minRawSegmentBytes: 100,
+      },
+      retention: {
+        rawSegmentKeepDays: 1,
+      },
+    });
+    const paths = resolveMemoryPaths(repoRoot, memoryConfig.directory);
+    ensureMemoryDirs(paths);
+    writeSegmentHelper(paths, [], "test", { bytes: 50 });
+    writeSegmentHelper(paths, [], "test", { bytes: 50 });
+    writeSegmentHelper(paths, [], "test", { bytes: 50 });
+
+    const result = checkAutoCompactThreshold(repoRoot, memoryConfig);
+
+    expect(result.needsCompaction).toBe(true);
+    expect(result.reason).toContain("totalBytes");
+    expect(result.reason).toContain("minRawSegmentBytes");
+  });
+
+  it("returns needsCompaction=false when total bytes are below the threshold", () => {
+    const repoRoot = makeTempRepo();
+    const memoryConfig = memoryConfigWith({
+      compaction: {
+        minRawSegments: 50,
+        minRawSegmentBytes: 100,
+      },
+      retention: {
+        rawSegmentKeepDays: 1,
+      },
+    });
+    const paths = resolveMemoryPaths(repoRoot, memoryConfig.directory);
+    ensureMemoryDirs(paths);
+    writeSegmentHelper(paths, [], "test", { bytes: 30 });
+    writeSegmentHelper(paths, [], "test", { bytes: 30 });
+
+    const result = checkAutoCompactThreshold(repoRoot, memoryConfig);
+
+    expect(result.needsCompaction).toBe(false);
   });
 });
 

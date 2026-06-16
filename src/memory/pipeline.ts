@@ -114,6 +114,15 @@ export function checkAutoCompactThreshold(cwd: string, memoryConfig: MemoryConfi
     };
   }
 
+  const totalBytes = segmentStats.reduce((sum, stat) => sum + stat.size, 0);
+  const minRawSegmentBytes = memoryConfig.compaction.minRawSegmentBytes;
+  if (totalBytes >= minRawSegmentBytes) {
+    return {
+      needsCompaction: true,
+      reason: `totalBytes=${totalBytes} >= minRawSegmentBytes=${minRawSegmentBytes}`,
+    };
+  }
+
   const oldestMtime = oldestMtimeMs(segmentStats);
   if (oldestMtime !== undefined) {
     const ageHours = (Date.now() - oldestMtime) / HOURS_IN_MS;
