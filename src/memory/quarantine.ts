@@ -35,7 +35,7 @@ export function quarantineFile(
 ): QuarantineEntry {
   const sourceHash = sha256File(filePath);
   const baseName = path.basename(filePath);
-  const destName = resolveQuarantineDestName(paths.quarantineDir, baseName, sourceHash);
+  const destName = resolveQuarantineDestName(baseName, sourceHash);
   const destPath = path.join(paths.quarantineDir, destName);
   const metaPath = `${destPath}.meta.json`;
 
@@ -65,16 +65,14 @@ export function quarantineFile(
 }
 
 /**
- * Pick a collision-free destination filename inside the quarantine directory.
- * If `{baseName}` is free, it is used as-is. Otherwise a short hash suffix
- * (first 8 chars of the source sha256) is inserted before the extension, e.g.
- * `segment.jsonl` -> `segment-a1b2c3d4.jsonl`.
+ * Build a deterministic quarantine destination filename.
+ * A short hash suffix (first 8 chars of the source sha256) is always inserted
+ * before the extension, e.g. `segment.jsonl` -> `segment-a1b2c3d4.jsonl`.
+ *
+ * Deterministic naming removes the check-then-write race that could allow two
+ * concurrent quarantine operations to overwrite each other.
  */
-function resolveQuarantineDestName(quarantineDir: string, baseName: string, sourceHash: string): string {
-  if (!fs.existsSync(path.join(quarantineDir, baseName))) {
-    return baseName;
-  }
-
+function resolveQuarantineDestName(baseName: string, sourceHash: string): string {
   const ext = path.extname(baseName);
   const stem = baseName.slice(0, baseName.length - ext.length);
   return `${stem}-${sourceHash.slice(0, 8)}${ext}`;

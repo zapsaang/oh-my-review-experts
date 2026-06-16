@@ -12,6 +12,7 @@ describe("quarantineFile", () => {
     const corruptName = `${Date.now()}-corrupt.jsonl`;
     const corruptPath = path.join(paths.segmentsDir, corruptName);
     fs.writeFileSync(corruptPath, "{not-json", { encoding: "utf8", flag: "wx" });
+    const expectedHash = sha256File(corruptPath).slice(0, 8);
 
     const entry = quarantineFile(paths, corruptPath, "parse-error", "failed to parse line");
 
@@ -27,7 +28,8 @@ describe("quarantineFile", () => {
 
     // Destination lives under quarantineDir
     expect(path.dirname(destAbs)).toBe(paths.quarantineDir);
-    expect(path.basename(destAbs)).toBe(corruptName);
+    const stem = corruptName.slice(0, corruptName.length - ".jsonl".length);
+    expect(path.basename(destAbs)).toBe(`${stem}-${expectedHash}.jsonl`);
 
     // Sidecar present and well-formed
     const metaAbs = path.join(paths.root, entry.metaPath);
@@ -44,32 +46,44 @@ describe("quarantineFile", () => {
     expect(meta.sha256).toBe(sha256File(destAbs));
   });
 
-  it("appends a hash suffix when the destination basename collides", () => {
+  it("always appends a source hash suffix to the quarantined filename", () => {
     const paths = makeTempRepo();
-
-    // Pre-existing file in quarantineDir with the target basename.
     const basename = "segment.jsonl";
-    const preexisting = path.join(paths.quarantineDir, basename);
-    fs.writeFileSync(preexisting, "old quarantined content", { encoding: "utf8", flag: "wx" });
-
-    // Source file with the same basename in segmentsDir.
     const sourcePath = path.join(paths.segmentsDir, basename);
-    fs.writeFileSync(sourcePath, "{still-not-json", { encoding: "utf8", flag: "wx" });
+    fs.writeFileSync(sourcePath, "{not-json", { encoding: "utf8", flag: "wx" });
 
     const expectedHash = sha256File(sourcePath).slice(0, 8);
-    const entry = quarantineFile(paths, sourcePath, "checksum-mismatch");
+    const entry = quarantineFile(paths, sourcePath, "parse-error");
 
-    const destAbs = path.join(paths.root, entry.path);
-    expect(path.basename(destAbs)).toBe(`segment-${expectedHash}.jsonl`);
-
-    // Original collision target untouched
-    expect(fs.readFileSync(preexisting, "utf8")).toBe("old quarantined content");
-    // Moved content present at suffixed path
-    expect(fs.readFileSync(destAbs, "utf8")).toBe("{still-not-json");
-    // Source removed
-    expect(fs.existsSync(sourcePath)).toBe(false);
-
+    expect(path.basename(entry.path)).toBe(`segment-${expectedHash}.jsonl`);
     expect(() => QuarantineEntrySchema.parse(entry)).not.toThrow();
+  });
+
+  it("produces unique filenames for different source files", () => {
+    const paths = makeTempRepo();
+    const source1 = path.join(paths.segmentsDir, "segment1.jsonl");
+    const source2 = path.join(paths.segmentsDir, "segment2.jsonl");
+    fs.writeFileSync(source1, "content-a", { encoding: "utf8", flag: "wx" });
+    fs.writeFileSync(source2, "content-b", { encoding: "utf8", flag: "wx" });
+
+    const entry1 = quarantineFile(paths, source1, "parse-error");
+    const entry2 = quarantineFile(paths, source2, "parse-error");
+
+    expect(entry1.path).not.toBe(entry2.path);
+  });
+
+  it("uses the same filename for the same source file (idempotent quarantine)", () => {
+    const paths = makeTempRepo();
+    const sourcePath = path.join(paths.segmentsDir, "segment.jsonl");
+    fs.writeFileSync(sourcePath, "{not-json", { encoding: "utf8", flag: "wx" });
+
+    const entry1 = quarantineFile(paths, sourcePath, "parse-error");
+
+    fs.writeFileSync(sourcePath, "{not-json", { encoding: "utf8" });
+    const entry2 = quarantineFile(paths, sourcePath, "parse-error");
+
+    expect(entry1.path).toBe(entry2.path);
+    expect(fs.readFileSync(path.join(paths.root, entry2.path), "utf8")).toBe("{not-json");
   });
 
   it("omits an absent message from the sidecar", () => {
