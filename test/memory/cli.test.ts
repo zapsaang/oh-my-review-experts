@@ -12,6 +12,7 @@ import {
   makeTempRepo as makeTempMemoryRepo,
   seedManifest,
   writeFinding,
+  writeSegment,
 } from "./_helpers.js";
 
 const originalCwd = process.cwd();
@@ -456,6 +457,34 @@ describe("memory check CLI", () => {
     expect(output).toContain("Version:");
     expect(output).toContain("Segments:");
   });
+
+  it("check via CLI produces output on seeded state with segments", () => {
+    const paths = makeTempMemoryRepo();
+    const finding = writeFinding({ id: "mem_check123456789012" });
+    const event = {
+      type: "finding.discovered" as const,
+      eventId: "evt_check000000000001",
+      at: "2026-05-28T00:00:00.000Z",
+      finding,
+    };
+    writeSegment(paths, [event], "run-check-1");
+    writeSegment(paths, [event], "run-check-2");
+    writeSegment(paths, [event], "run-check-3");
+    writeSegment(paths, [event], "run-check-c", { kind: "compacted" });
+    process.chdir(path.dirname(path.dirname(paths.root)));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "check"]);
+
+    const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(output).toContain("Segments:");
+    expect(output).toContain("raw: 3");
+    expect(output).toContain("compacted: 1");
+    expect(output).toContain("Version:");
+  });
 });
 
 describe("memory mark CLI", () => {
@@ -504,6 +533,31 @@ describe("memory mark CLI", () => {
     const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
     expect(output).toContain("marked mem_test12345678901234: open → confirmed");
   });
+
+  it("invalid mark exits non-zero", () => {
+    const paths = makeTempMemoryRepo();
+    const finding = writeFinding({ id: "mem_markfail0000000001", status: "ignored" });
+    const state = seedManifest(paths);
+    state.findings.push(finding);
+    writeMaterializedState(paths, state);
+    process.chdir(path.dirname(path.dirname(paths.root)));
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called");
+    }) as never);
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+
+    expect(() =>
+      program.parse(["node", "omre", "memory", "mark", "mem_markfail0000000001", "--status", "confirmed"]),
+    ).toThrow();
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const errOutput = errSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(errOutput).toContain("invalid transition: ignored → confirmed");
+  });
 });
 
 describe("memory compact CLI", () => {
@@ -548,6 +602,36 @@ describe("memory compact CLI", () => {
 
     const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
     expect(output).toContain("compacted 0 segments into 0 files");
+  });
+
+  it("compact --dry-run writes nothing", () => {
+    const paths = makeTempMemoryRepo();
+    seedManifest(paths);
+    const event = {
+      type: "finding.discovered" as const,
+      eventId: "evt_compact0000000001",
+      at: "2026-05-28T00:00:00.000Z",
+      finding: writeFinding({ id: "mem_compact00000000001" }),
+    };
+    writeSegment(paths, [event], "run-compact-1");
+    writeSegment(paths, [event], "run-compact-2");
+    writeSegment(paths, [event], "run-compact-3");
+    process.chdir(path.dirname(path.dirname(paths.root)));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const before = fs.readdirSync(paths.compactedDir);
+    const manifestBefore = readMaterializedState(paths)?.manifest.compactedInputSegments;
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "compact", "--dry-run"]);
+
+    expect(fs.readdirSync(paths.compactedDir)).toEqual(before);
+    expect(fs.readdirSync(paths.compactedDir)).toEqual([]);
+    expect(readMaterializedState(paths)?.manifest.compactedInputSegments).toEqual(manifestBefore);
+    const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(output).toContain("compacted 3 segments into 1 files");
   });
 });
 
@@ -595,6 +679,36 @@ describe("memory gc CLI", () => {
     const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
     expect(output).toContain("deleted: tmp=0, empty=0, compacted-raw=0, overflow=0, quarantine=0");
     expect(output).toContain("gc summary updated");
+  });
+
+  it("gc --dry-run writes nothing", () => {
+    const paths = makeTempMemoryRepo();
+    seedManifest(paths);
+    const tmpFile = path.join(paths.tmpDir, "stale.tmp");
+    fs.writeFileSync(tmpFile, "stale", "utf8");
+    const oldTime = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30);
+    fs.utimesSync(tmpFile, oldTime, oldTime);
+    const emptySegment = path.join(paths.segmentsDir, "empty.jsonl");
+    fs.writeFileSync(emptySegment, "", "utf8");
+    process.chdir(path.dirname(path.dirname(paths.root)));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const tmpBefore = fs.readdirSync(paths.tmpDir);
+    const segmentsBefore = fs.readdirSync(paths.segmentsDir);
+    const gcBefore = fs.readdirSync(paths.gcDir);
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "gc", "--dry-run"]);
+
+    expect(fs.readdirSync(paths.tmpDir)).toEqual(tmpBefore);
+    expect(fs.readdirSync(paths.segmentsDir)).toEqual(segmentsBefore);
+    expect(fs.readdirSync(paths.gcDir)).toEqual(gcBefore);
+    expect(fs.existsSync(tmpFile)).toBe(true);
+    expect(fs.existsSync(emptySegment)).toBe(true);
+    const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(output).toContain("deleted: tmp=1, empty=1, compacted-raw=0, overflow=0, quarantine=0");
   });
 });
 

@@ -38,7 +38,7 @@ Reviewing a large diff well is *five different jobs*: spec compliance, code qual
 
 **A handoff protocol, not chat theater.** Subagents write structured markdown to `.omre/handoffs/{runId}/`. The orchestrator reads files, not chat transcripts. Chat output is a receipt; the file is the source of truth. This keeps long reviews reproducible and debuggable.
 
-**Reports that stick around.** Final output lands in `.omre/reports/latest.md` and `latest.json`, with timestamped history under `.omre/reports/history/`. Written atomically via temp-file + rename, so a crash never leaves you with a half-written report.
+**Reports that stick around.** Final output lands in `.omre/reports/latest.md` and `latest.json`, with timestamped history under `.omre/reports/history/`. Each file is written atomically per write (temp-file + rename), so a single file is never half-written. Multi-file updates have no fsync and no cross-file transaction — see [Review Memory](#review-memory) for the full honesty list on the `.omre/memory/` store.
 
 **Agent tiers that reflect real cost tradeoffs.** Each of the 11 subagents is classified by importance — `critical` (spec, security), `standard` (quality, performance, concurrency), `coordination` (slice planner, arbiters), or `utility` (validators, report writer). The `omre doctor` command surfaces every agent's tier alongside its runtime model and source (config override vs. default), so you know exactly which reviewers are running on which model.
 
@@ -304,7 +304,7 @@ omre dry-run               # build the prompt locally, no model calls
     └── 20260507-183012-123.md  # timestamped snapshots
 ```
 
-Written with `writeFileAtomicOverwrite` (temp + rename) for `latest.*`, and `O_EXCL` for history files so concurrent runs never collide.
+Written with `writeFileAtomicOverwrite` (temp + `wx` + rename) for `latest.*` and `O_EXCL` for history files. Per-file atomicity holds; no fsync is issued and there is no cross-file transaction — see [Review Memory](#review-memory) for the full honesty list on the `.omre/memory/` store.
 
 **Handoffs** land in `.omre/handoffs/{runId}/`:
 
@@ -329,6 +329,36 @@ The plugin exposes seven tools for programmatic use:
 
 ---
 
+## Review Memory
+
+OMRE learns from previous review runs. After each review, findings are indexed into `.omre/memory/`. Future reviews retrieve relevant historical findings per slice and reviewer.
+
+Example:
+
+- A security finding marked as `fixed` appears again in a similar auth module.
+- The security reviewer receives it as a regression candidate.
+- The final report links the new finding to the historical memory ID.
+
+```bash
+omre memory check          # Diagnose memory health
+omre memory stats          # Show aggregate counts
+omre memory search "tenant isolation"  # Search historical findings
+omre memory list --status open --reviewer security
+omre memory show mem_xxx   # Show a specific finding
+omre memory mark mem_xxx --status fixed --reason "fixed in abc123"
+omre memory compact        # Merge raw event segments
+omre memory gc             # Clean up old files
+```
+
+`.omre/memory/` is recommended to be gitignored (it may contain internal code paths and evidence). This repo already ignores the parent `.omre/` directory.
+
+**Known limitations (v0.4).** The memory store is single-node and single-process:
+
+- **Concurrency is last-writer-wins.** No file locking, no advisory locks, no process coordination. Two `omre memory` commands running against the same store in parallel can clobber each other.
+- **No fsync durability guarantee.** Writes use `writeFileAtomicOverwrite` (temp + `wx` + rename) for per-file atomicity, but no `fsync`/`fdatasync` is issued, and there is no cross-file transaction. A crash mid-sequence can leave materialized views ahead of the manifest until the next `omre memory compact` or `omre memory index-latest` rebuild.
+
+---
+
 ## Security
 
 `omre` ships with defense-in-depth for a review tool that reads your diffs, writes files, and calls external models:
@@ -339,7 +369,7 @@ The plugin exposes seven tools for programmatic use:
 - **Secret redaction** — `redactSecrets()` scrubs common credential patterns (API keys, tokens, private keys, connection strings) from diffs *before* they reach any model.
 - **Command injection** — Command names are validated against `SAFE_COMMAND_PATTERN` and a forbidden list (`__proto__`, `constructor`, `prototype`).
 - **Diff bounds** — Unified diff is capped at 180KB with a visible truncation marker.
-- **Atomic writes** — No partial files, no mid-crash corruption.
+- **Atomic per-file writes** — `temp + rename` means a single file is never half-written. There is no `fsync` and no cross-file transaction, so a crash mid-sequence can leave in-memory state ahead of the manifest until the next rebuild. The `.omre/memory/` store has no concurrency lock — see [Review Memory](#review-memory).
 - **Permission hook** — The `permission.ask` hook auto-denies write/edit access to `.omre/reports/` and `.omre/handoffs/` from external agents, preventing accidental corruption of review artifacts.
 
 None of these are optional or togglable — they're always on.
