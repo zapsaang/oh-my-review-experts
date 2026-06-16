@@ -1,3 +1,7 @@
+import { runMemoryCheck, renderCheckResult } from "./check.js";
+import { runMemoryMark } from "./mark.js";
+import { runMemoryCompact } from "./compact.js";
+import { runMemoryGc } from "./gc.js";
 import type { Command } from "commander";
 import { loadConfig } from "../config/load-config.js";
 import { runIndexLatest, type IndexLatestOptions, type IndexLatestResult } from "./indexing.js";
@@ -99,6 +103,62 @@ export function registerMemoryCli(program: Command): void {
     .description("Print materialized memory aggregate counts")
     .action(() => {
       runMemoryCliAction("memory stats", () => runMemoryStats());
+    });
+
+  memory.command("check")
+    .description("Check memory store integrity")
+    .action(() => {
+      runMemoryCliAction("memory check", () => {
+        const paths = resolveMemoryPaths(process.cwd());
+        const result = runMemoryCheck(paths);
+        console.log(renderCheckResult(result));
+      });
+    });
+
+  memory.command("mark <id>")
+    .description("Mark a memory finding with a new status")
+    .option("--status <status>", "new status")
+    .option("--reason <reason>", "reason for status change")
+    .action((id: string, opts: { status?: string; reason?: string }) => {
+      runMemoryCliAction("memory mark", () => {
+        const status = parseMemoryStatus(opts.status);
+        if (status === undefined) {
+          throw new Error("--status is required");
+        }
+        const result = runMemoryMark({ findingId: id, status, reason: opts.reason, cwd: process.cwd() });
+        console.log(`marked ${result.findingId}: ${result.previousStatus} → ${result.newStatus}`);
+      });
+    });
+
+  memory.command("compact")
+    .description("Compact raw memory segments")
+    .option("--dry-run", "show what would be compacted without writing", false)
+    .action((opts: { dryRun?: boolean }) => {
+      runMemoryCliAction("memory compact", () => {
+        const result = runMemoryCompact({ cwd: process.cwd(), dryRun: !!opts.dryRun });
+        const totalRaw = result.compactedSegments.reduce((sum, seg) => sum + seg.rawPaths.length, 0);
+        const totalFiles = result.compactedSegments.length;
+        console.log(`compacted ${totalRaw} segments into ${totalFiles} files`);
+        for (const seg of result.compactedSegments) {
+          console.log(`  - ${seg.compactedPath}`);
+        }
+      });
+    });
+
+  memory.command("gc")
+    .description("Garbage collect memory store")
+    .option("--dry-run", "show what would be deleted without writing", false)
+    .option("--quarantine <days>", "quarantine files older than N days")
+    .action((opts: { dryRun?: boolean; quarantine?: string }) => {
+      runMemoryCliAction("memory gc", () => {
+        const result = runMemoryGc({
+          cwd: process.cwd(),
+          dryRun: !!opts.dryRun,
+          quarantine: opts.quarantine ? { olderThanDays: Number(opts.quarantine) } : undefined,
+        });
+        console.log(`deleted: tmp=${result.deleted.tmpFiles}, empty=${result.deleted.emptySegments}, compacted-raw=${result.deleted.compactedRawSegments}, overflow=${result.deleted.overflowRawSegments}, quarantine=${result.deleted.quarantineFiles}`);
+        console.log("gc summary updated");
+      });
     });
 }
 

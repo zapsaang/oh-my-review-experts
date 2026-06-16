@@ -7,7 +7,12 @@ import { createCliProgram } from "../../src/cli.js";
 import { registerMemoryCli, runIndexLatest } from "../../src/memory/cli.js";
 import { readAllEventSegments } from "../../src/memory/events.js";
 import { resolveMemoryPaths } from "../../src/memory/paths.js";
-import { readMaterializedState } from "../../src/memory/store.js";
+import { readMaterializedState, writeMaterializedState } from "../../src/memory/store.js";
+import {
+  makeTempRepo as makeTempMemoryRepo,
+  seedManifest,
+  writeFinding,
+} from "./_helpers.js";
 
 const originalCwd = process.cwd();
 const tempDirs: string[] = [];
@@ -404,5 +409,215 @@ describe("memory index-latest CLI", () => {
       .split("\n")
       .map((line) => JSON.parse(line) as { eventId: string });
     expect(writtenEvents.map((event) => event.eventId)).toEqual(["evt_earlier", "evt_later"]);
+  });
+});
+
+describe("memory check CLI", () => {
+  afterEach(() => {
+    process.chdir(originalCwd);
+    vi.restoreAllMocks();
+    for (const dir of tempDirs.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("registers the check subcommand", () => {
+    const program = new Command();
+    registerMemoryCli(program);
+    const memory = program.commands.find((c) => c.name() === "memory");
+    expect(memory?.commands.map((c) => c.name())).toContain("check");
+  });
+
+  it("shows help for memory check", () => {
+    const program = createCliProgram();
+    program.exitOverride();
+    let out = "";
+    program.configureOutput({
+      writeOut: (str) => { out += str; },
+      writeErr: () => {},
+    });
+    expect(() => program.parse(["node", "omre", "memory", "check", "--help"])).toThrow();
+    expect(out).toContain("check");
+    expect(out).toContain("Check memory store integrity");
+  });
+
+  it("runs check on empty repo without error", () => {
+    const repoRoot = makeTempRepo();
+    process.chdir(repoRoot);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "check"]);
+
+    const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(output).toContain("Memory Check");
+    expect(output).toContain("Version:");
+    expect(output).toContain("Segments:");
+  });
+});
+
+describe("memory mark CLI", () => {
+  afterEach(() => {
+    process.chdir(originalCwd);
+    vi.restoreAllMocks();
+    for (const dir of tempDirs.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("registers the mark subcommand", () => {
+    const program = new Command();
+    registerMemoryCli(program);
+    const memory = program.commands.find((c) => c.name() === "memory");
+    expect(memory?.commands.map((c) => c.name())).toContain("mark");
+  });
+
+  it("shows help for memory mark", () => {
+    const program = createCliProgram();
+    program.exitOverride();
+    let out = "";
+    program.configureOutput({
+      writeOut: (str) => { out += str; },
+      writeErr: () => {},
+    });
+    expect(() => program.parse(["node", "omre", "memory", "mark", "--help"])).toThrow();
+    expect(out).toContain("mark");
+    expect(out).toContain("Mark a memory finding with a new status");
+  });
+
+  it("marks a finding with a status change", () => {
+    const paths = makeTempMemoryRepo();
+    const finding = writeFinding({ id: "mem_test12345678901234", status: "open" });
+    const state = seedManifest(paths);
+    state.findings.push(finding);
+    writeMaterializedState(paths, state);
+    process.chdir(path.dirname(path.dirname(paths.root)));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "mark", "mem_test12345678901234", "--status", "confirmed"]);
+
+    const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(output).toContain("marked mem_test12345678901234: open → confirmed");
+  });
+});
+
+describe("memory compact CLI", () => {
+  afterEach(() => {
+    process.chdir(originalCwd);
+    vi.restoreAllMocks();
+    for (const dir of tempDirs.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("registers the compact subcommand", () => {
+    const program = new Command();
+    registerMemoryCli(program);
+    const memory = program.commands.find((c) => c.name() === "memory");
+    expect(memory?.commands.map((c) => c.name())).toContain("compact");
+  });
+
+  it("shows help for memory compact", () => {
+    const program = createCliProgram();
+    program.exitOverride();
+    let out = "";
+    program.configureOutput({
+      writeOut: (str) => { out += str; },
+      writeErr: () => {},
+    });
+    expect(() => program.parse(["node", "omre", "memory", "compact", "--help"])).toThrow();
+    expect(out).toContain("compact");
+    expect(out).toContain("Compact raw memory segments");
+  });
+
+  it("compacts empty repo gracefully", () => {
+    const repoRoot = makeTempRepo();
+    writeConfig(repoRoot, { enabled: true });
+    process.chdir(repoRoot);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "compact"]);
+
+    const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(output).toContain("compacted 0 segments into 0 files");
+  });
+});
+
+describe("memory gc CLI", () => {
+  afterEach(() => {
+    process.chdir(originalCwd);
+    vi.restoreAllMocks();
+    for (const dir of tempDirs.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("registers the gc subcommand", () => {
+    const program = new Command();
+    registerMemoryCli(program);
+    const memory = program.commands.find((c) => c.name() === "memory");
+    expect(memory?.commands.map((c) => c.name())).toContain("gc");
+  });
+
+  it("shows help for memory gc", () => {
+    const program = createCliProgram();
+    program.exitOverride();
+    let out = "";
+    program.configureOutput({
+      writeOut: (str) => { out += str; },
+      writeErr: () => {},
+    });
+    expect(() => program.parse(["node", "omre", "memory", "gc", "--help"])).toThrow();
+    expect(out).toContain("gc");
+    expect(out).toContain("Garbage collect memory store");
+  });
+
+  it("gc on empty repo gracefully", () => {
+    const repoRoot = makeTempRepo();
+    writeConfig(repoRoot, { enabled: true });
+    fs.mkdirSync(path.join(repoRoot, ".omre", "memory", "gc"), { recursive: true });
+    process.chdir(repoRoot);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "gc"]);
+
+    const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(output).toContain("deleted: tmp=0, empty=0, compacted-raw=0, overflow=0, quarantine=0");
+    expect(output).toContain("gc summary updated");
+  });
+});
+
+describe("memory CLI registration", () => {
+  it("registers all 9 memory subcommands", () => {
+    const program = new Command();
+    registerMemoryCli(program);
+    const memory = program.commands.find((c) => c.name() === "memory");
+    expect(memory).toBeDefined();
+    expect(memory?.commands).toHaveLength(9);
+    const names = memory?.commands.map((c) => c.name());
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "index-latest",
+        "search",
+        "list",
+        "show",
+        "stats",
+        "check",
+        "mark",
+        "compact",
+        "gc",
+      ]),
+    );
   });
 });
