@@ -181,8 +181,12 @@ describe("memory search/list/show/stats CLI", () => {
 
     const memory = program.commands.find((command) => command.name() === "memory");
     expect(memory?.commands.map((command) => command.name()).sort()).toEqual([
+      "check",
+      "compact",
+      "gc",
       "index-latest",
       "list",
+      "mark",
       "search",
       "show",
       "stats",
