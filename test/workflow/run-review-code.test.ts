@@ -511,6 +511,34 @@ describe("renderLocalDryRun", () => {
     });
   });
 
+  it("includes the memory retrieval preview in a non-echo dry run", () => {
+    withCleanGitRepo((cwd) => {
+      writeMemoryRetrievalConfig(cwd, true);
+      writeChangedAuthFile(cwd);
+      writeMemoryState(cwd, [validMemoryFinding()]);
+
+      const markdown = renderLocalDryRun({ args: "tenant isolation", cwd: path.resolve(cwd) });
+
+      expect(markdown).toContain("Memory retrieval preview");
+      expect(markdown).toContain("slice: slice-1");
+      expect(markdown).toContain("reviewer: security");
+      expect(markdown).toContain("--- MEMORY CONTEXT FOR security ON slice-1 START ---");
+    });
+  });
+
+  it("excludes the memory retrieval preview when --no-memory is used", () => {
+    withCleanGitRepo((cwd) => {
+      writeMemoryRetrievalConfig(cwd, true);
+      writeChangedAuthFile(cwd);
+      writeMemoryState(cwd, [validMemoryFinding()]);
+
+      const markdown = renderLocalDryRun({ args: "--no-memory tenant isolation", cwd: path.resolve(cwd) });
+
+      expect(markdown).not.toContain("Memory retrieval preview");
+      expect(markdown).not.toContain("--- MEMORY CONTEXT FOR");
+    });
+  });
+
   it("prints a clear no-state message when --with-memory has no materialized state", () => {
     withCleanGitRepo((cwd) => {
       writeMemoryRetrievalConfig(cwd, false);

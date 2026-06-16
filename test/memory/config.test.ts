@@ -150,6 +150,65 @@ describe("MemoryConfigSchema", () => {
     expect(config.retrieval.maxContextItems).toBe(6);
     expect(config.retrieval.maxContextChars).toBe(8000);
   });
+
+  it("should accept new config keys", () => {
+    const config = MemoryConfigSchema.parse({
+      compaction: {
+        minRawSegments: 100,
+        minRawSegmentBytes: 2097152,
+        maxCompactDurationMs: 5000,
+      },
+      retention: {
+        maxFindings: 5000,
+        rawSegmentKeepDays: 30,
+        tmpFileMaxAgeHours: 48,
+      },
+    });
+
+    expect(config.compaction.minRawSegments).toBe(100);
+    expect(config.compaction.minRawSegmentBytes).toBe(2097152);
+    expect(config.compaction.maxCompactDurationMs).toBe(5000);
+    expect(config.retention.maxFindings).toBe(5000);
+    expect(config.retention.rawSegmentKeepDays).toBe(30);
+    expect(config.retention.tmpFileMaxAgeHours).toBe(48);
+  });
+
+  it("should default new config fields correctly", () => {
+    const config = MemoryConfigSchema.parse({});
+
+    expect(config.compaction.enabled).toBe(true);
+    expect(config.compaction.minRawSegments).toBe(50);
+    expect(config.compaction.minRawSegmentBytes).toBe(1048576);
+    expect(config.compaction.maxCompactDurationMs).toBe(3000);
+    expect(config.compaction.autoCompactAfterReview).toBe(true);
+    expect(config.retention.maxEventsPerFinding).toBe(100);
+    expect(config.retention.maxFindings).toBe(5000);
+    expect(config.retention.maxAgeDays).toBe(365);
+    expect(config.retention.rawSegmentKeepDays).toBe(30);
+    expect(config.retention.tmpFileMaxAgeHours).toBe(24);
+    expect(config.retention.maxRawSegments).toBe(200);
+    expect(config.retention.keepConfirmed).toBe(true);
+    expect(config.retention.keepHighSeverity).toBe(true);
+  });
+
+  it("should accept deprecated alias maxSegmentsBeforeCompaction", () => {
+    const config = MemoryConfigSchema.parse({
+      compaction: { maxSegmentsBeforeCompaction: 75 },
+    });
+
+    expect(config.compaction.minRawSegments).toBe(75);
+  });
+
+  it("should prefer new key over deprecated alias", () => {
+    const config = MemoryConfigSchema.parse({
+      compaction: {
+        minRawSegments: 100,
+        maxSegmentsBeforeCompaction: 75,
+      },
+    });
+
+    expect(config.compaction.minRawSegments).toBe(100);
+  });
 });
 
 describe("OmreConfigSchema memory integration", () => {

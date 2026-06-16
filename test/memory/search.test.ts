@@ -286,6 +286,22 @@ describe("searchMemory", () => {
     expect(lowerThresholdResult.hits[0]?.keywordScore).toBe(0.5);
   });
 
+  it("honors an explicit similarityThreshold over the default", () => {
+    const findings = [
+      validFinding({
+        id: "mem_0000000000000013",
+        searchable: { redactedText: "tenant isolation", tokens: ["tenant", "isolation", "cache"] },
+      }),
+    ];
+
+    const highThresholdResult = searchMemory({ query: "tenant isolation", findings, similarityThreshold: 0.9 });
+    expect(highThresholdResult.hits).toHaveLength(0);
+
+    const lowThresholdResult = searchMemory({ query: "tenant isolation", findings, similarityThreshold: 0.1 });
+    expect(lowThresholdResult.hits.map((hit) => hit.finding.id)).toEqual(["mem_0000000000000013"]);
+    expect(lowThresholdResult.hits[0]?.keywordScore).toBe(2 / 3);
+  });
+
   it("computes set Jaccard scores and unique matchedTokens by query token order", () => {
     const result = searchMemory({
       query: "isolation tenant tenant cache",

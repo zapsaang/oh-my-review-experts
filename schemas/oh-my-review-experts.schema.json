@@ -457,9 +457,11 @@
       "additionalProperties": false,
       "default": {
         "compaction": {
+          "autoCompactAfterReview": true,
           "enabled": true,
-          "maxSegmentAgeHours": 168,
-          "maxSegmentsBeforeCompaction": 50
+          "maxCompactDurationMs": 3000,
+          "minRawSegmentBytes": 1048576,
+          "minRawSegments": 50
         },
         "dedupe": {
           "contentHashThreshold": 0.85,
@@ -486,9 +488,14 @@
           "redactProblem": false
         },
         "retention": {
-          "autoCompactAfterReview": true,
+          "keepConfirmed": true,
+          "keepHighSeverity": true,
+          "maxAgeDays": 365,
           "maxEventsPerFinding": 100,
-          "maxFindingsTotal": 10000
+          "maxFindings": 5000,
+          "maxRawSegments": 200,
+          "rawSegmentKeepDays": 30,
+          "tmpFileMaxAgeHours": 24
         },
         "retrieval": {
           "byReviewer": {},
@@ -511,22 +518,34 @@
         "compaction": {
           "additionalProperties": false,
           "default": {
+            "autoCompactAfterReview": true,
             "enabled": true,
-            "maxSegmentAgeHours": 168,
-            "maxSegmentsBeforeCompaction": 50
+            "maxCompactDurationMs": 3000,
+            "minRawSegmentBytes": 1048576,
+            "minRawSegments": 50
           },
           "properties": {
+            "autoCompactAfterReview": {
+              "default": true,
+              "type": "boolean"
+            },
             "enabled": {
               "default": true,
               "type": "boolean"
             },
-            "maxSegmentAgeHours": {
-              "default": 168,
-              "maximum": 8760,
+            "maxCompactDurationMs": {
+              "default": 3000,
+              "maximum": 3600000,
               "minimum": 1,
               "type": "integer"
             },
-            "maxSegmentsBeforeCompaction": {
+            "minRawSegmentBytes": {
+              "default": 1048576,
+              "maximum": 1073741824,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "minRawSegments": {
               "default": 50,
               "maximum": 10000,
               "minimum": 1,
@@ -644,14 +663,29 @@
         "retention": {
           "additionalProperties": false,
           "default": {
-            "autoCompactAfterReview": true,
+            "keepConfirmed": true,
+            "keepHighSeverity": true,
+            "maxAgeDays": 365,
             "maxEventsPerFinding": 100,
-            "maxFindingsTotal": 10000
+            "maxFindings": 5000,
+            "maxRawSegments": 200,
+            "rawSegmentKeepDays": 30,
+            "tmpFileMaxAgeHours": 24
           },
           "properties": {
-            "autoCompactAfterReview": {
+            "keepConfirmed": {
               "default": true,
               "type": "boolean"
+            },
+            "keepHighSeverity": {
+              "default": true,
+              "type": "boolean"
+            },
+            "maxAgeDays": {
+              "default": 365,
+              "maximum": 3650,
+              "minimum": 1,
+              "type": "integer"
             },
             "maxEventsPerFinding": {
               "default": 100,
@@ -659,9 +693,27 @@
               "minimum": 1,
               "type": "integer"
             },
-            "maxFindingsTotal": {
-              "default": 10000,
+            "maxFindings": {
+              "default": 5000,
               "maximum": 1000000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "maxRawSegments": {
+              "default": 200,
+              "maximum": 100000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "rawSegmentKeepDays": {
+              "default": 30,
+              "maximum": 3650,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "tmpFileMaxAgeHours": {
+              "default": 24,
+              "maximum": 8760,
               "minimum": 1,
               "type": "integer"
             }

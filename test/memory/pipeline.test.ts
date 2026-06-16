@@ -50,6 +50,7 @@ function memoryConfigWith(options: {
   directory?: string;
   retrieval?: Partial<MemoryConfig["retrieval"]>;
   compaction?: Partial<MemoryConfig["compaction"]>;
+  retention?: Partial<MemoryConfig["retention"]>;
 } = {}): MemoryConfig {
   const base = MemoryConfigSchema.parse({});
 
@@ -65,6 +66,10 @@ function memoryConfigWith(options: {
     compaction: {
       ...base.compaction,
       ...options.compaction,
+    },
+    retention: {
+      ...base.retention,
+      ...options.retention,
     },
   };
 }
@@ -365,8 +370,10 @@ describe("checkAutoCompactThreshold", () => {
     const repoRoot = makeTempRepo();
     const memoryConfig = memoryConfigWith({
       compaction: {
-        maxSegmentsBeforeCompaction: 5,
-        maxSegmentAgeHours: 24,
+        minRawSegments: 5,
+      },
+      retention: {
+        rawSegmentKeepDays: 1,
       },
     });
     writeSegment(repoRoot, memoryConfig, "recent.jsonl");
@@ -378,8 +385,10 @@ describe("checkAutoCompactThreshold", () => {
     const repoRoot = makeTempRepo();
     const memoryConfig = memoryConfigWith({
       compaction: {
-        maxSegmentsBeforeCompaction: 2,
-        maxSegmentAgeHours: 24,
+        minRawSegments: 2,
+      },
+      retention: {
+        rawSegmentKeepDays: 1,
       },
     });
     const segmentPath = writeSegment(repoRoot, memoryConfig, "one.jsonl");
@@ -389,7 +398,7 @@ describe("checkAutoCompactThreshold", () => {
     const result = checkAutoCompactThreshold(repoRoot, memoryConfig);
 
     expect(result.needsCompaction).toBe(true);
-    expect(result.reason).toBe("segments=3 > maxSegmentsBeforeCompaction=2");
+    expect(result.reason).toBe("segments=3 > minRawSegments=2");
     expect(fs.existsSync(segmentPath)).toBe(true);
   });
 
@@ -397,17 +406,19 @@ describe("checkAutoCompactThreshold", () => {
     const repoRoot = makeTempRepo();
     const memoryConfig = memoryConfigWith({
       compaction: {
-        maxSegmentsBeforeCompaction: 5,
-        maxSegmentAgeHours: 1,
+        minRawSegments: 5,
+      },
+      retention: {
+        rawSegmentKeepDays: 1,
       },
     });
-    writeSegment(repoRoot, memoryConfig, "old.jsonl", 3);
+    writeSegment(repoRoot, memoryConfig, "old.jsonl", 25);
 
     const result = checkAutoCompactThreshold(repoRoot, memoryConfig);
 
     expect(result.needsCompaction).toBe(true);
-    expect(result.reason).toContain("oldestSegmentAgeHours=");
-    expect(result.reason).toContain(" > maxSegmentAgeHours=1");
+    expect(result.reason).toContain("oldestSegmentAgeDays=");
+    expect(result.reason).toContain(" > rawSegmentKeepDays=1");
   });
 });
 

@@ -3,18 +3,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { ensureMemoryDirs, resolveMemoryPaths, type MemoryPaths } from "../../src/memory/paths.js";
-import type {
-  MemoryEvent,
-  MemoryFinding,
-  MemoryManifest,
-  RelatedIndex,
-} from "../../src/memory/schema.js";
+import { MemoryManifestSchema, type MemoryEvent, type MemoryFinding, type MemoryManifest, type RelatedIndex } from "../../src/memory/schema.js";
 import {
   readMaterializedState,
   rebuildMaterializedStateFromEvents,
+  scanEventFiles,
   writeMaterializedState,
   type MaterializedState,
 } from "../../src/memory/store.js";
+import { writeSegment } from "./_helpers.js";
 
 const findingId = "mem_abcdef1234567890";
 const relatedFindingId = "mem_1234567890abcdef";
@@ -98,6 +95,7 @@ function validManifest(overrides: Partial<MemoryManifest> = {}): MemoryManifest 
     includedEventFiles: ["events/segments/20260528.jsonl"],
     compactedInputSegments: ["events/compacted/20260528.jsonl"],
     gcSummary: {
+      lastGcAt: undefined,
       deletedRawSegments: 0,
       deletedTmpFiles: 0,
       deletedQuarantineFiles: 0,
@@ -382,6 +380,65 @@ describe("materialized memory store", () => {
     expect(state.relatedIndex.byFindingId).toEqual({
       [first.id]: [relation],
     });
+  });
+
+  it("should produce manifest compatible with new schema", () => {
+    const state = rebuildMaterializedStateFromEvents([]);
+
+    expect(() => MemoryManifestSchema.parse(state.manifest)).not.toThrow();
+    expect(state.manifest.includedEventFiles).toEqual([]);
+    expect(state.manifest.compactedInputSegments).toEqual([]);
+    expect(state.manifest.quarantine).toEqual([]);
+  });
+
+  it("populates manifest.includedEventFiles from event files on disk when writing", () => {
+    const segmentPath = writeSegment(paths, [discoveredEvent()], "run-20260528");
+
+    const state = validState({ manifest: validManifest({ includedEventFiles: [] }) });
+    writeMaterializedState(paths, state);
+
+    const read = readMaterializedState(paths);
+    expect(read).not.toBeNull();
+
+    const included = read!.manifest.includedEventFiles;
+    expect(Array.isArray(included)).toBe(true);
+    expect(included.length).toBe(1);
+
+    const entry = included[0] as Extract<typeof included[number], { kind: string }>;
+    expect(entry.path).toBe(path.relative(paths.root, segmentPath));
+    expect(entry.kind).toBe("raw");
+    expect(entry.sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(entry.eventCount).toBe(1);
+    expect(entry.minTimestamp).toBe(timestamp);
+    expect(entry.maxTimestamp).toBe(timestamp);
+  });
+
+  it("classifies compacted segments and sorts scan results by minTimestamp ascending", () => {
+    const later = "2026-06-01T00:00:00.000Z";
+    const rawPath = writeSegment(paths, [discoveredEvent({ at: later })], "run-raw");
+    const compactedPath = writeSegment(
+      paths,
+      [discoveredEvent({ eventId: "evt_compacted", at: timestamp })],
+      "run-compacted",
+      { kind: "compacted" },
+    );
+
+    const scanned = scanEventFiles(paths);
+    expect(scanned).toHaveLength(2);
+    expect(scanned[0]!.path).toBe(path.relative(paths.root, compactedPath));
+    expect(scanned[0]!.kind).toBe("compacted");
+    expect(scanned[1]!.path).toBe(path.relative(paths.root, rawPath));
+    expect(scanned[1]!.kind).toBe("raw");
+  });
+
+  it("keeps rebuildMaterializedStateFromEvents pure with no filesystem writes", () => {
+    const writeSpy = vi.spyOn(fs, "writeFileSync");
+    const renameSpy = vi.spyOn(fs, "renameSync");
+
+    rebuildMaterializedStateFromEvents([discoveredEvent()]);
+
+    expect(writeSpy).not.toHaveBeenCalled();
+    expect(renameSpy).not.toHaveBeenCalled();
   });
 
   describe("legacy status compatibility", () => {

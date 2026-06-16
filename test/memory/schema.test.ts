@@ -366,6 +366,100 @@ describe("MemoryManifestSchema", () => {
 
     expect(parsed).toEqual(manifest);
   });
+
+  it("should parse old manifest with string arrays", () => {
+    const manifest = {
+      schemaVersion: 1,
+      eventSchemaVersion: 1,
+      viewSchemaVersion: 1,
+      lastRebuiltAt: timestamp,
+      materializedHash: "0".repeat(16),
+      relatedIndexHash: "1".repeat(16),
+      includedEventFiles: ["events/2026-05-28.jsonl"],
+      compactedInputSegments: ["segments/2026-05-28.jsonl"],
+      gcSummary: {
+        deletedRawSegments: 0,
+        deletedTmpFiles: 0,
+        deletedQuarantineFiles: 0,
+      },
+      quarantine: ["quarantine/bad-segment.jsonl"],
+    };
+
+    const parsed: MemoryManifest = MemoryManifestSchema.parse(manifest);
+
+    expect(parsed).toEqual(manifest);
+  });
+
+  it("should parse new manifest with object arrays", () => {
+    const manifest = {
+      schemaVersion: 1,
+      eventSchemaVersion: 1,
+      viewSchemaVersion: 1,
+      lastRebuiltAt: timestamp,
+      materializedHash: "0".repeat(16),
+      relatedIndexHash: "1".repeat(16),
+      includedEventFiles: [
+        {
+          path: "events/2026-05-28.jsonl",
+          kind: "raw" as const,
+          sha256: "abcd1234abcd1234",
+          eventCount: 5,
+          minTimestamp: timestamp,
+          maxTimestamp: timestamp,
+        },
+      ],
+      compactedInputSegments: [
+        {
+          rawPath: "raw/2026-05-28.jsonl",
+          rawSha256: "abcd1234abcd1234",
+          compactedPath: "compacted/2026-05-28.jsonl",
+          compactedSha256: "efgh5678efgh5678",
+          compactedAt: timestamp,
+        },
+      ],
+      gcSummary: {
+        lastGcAt: timestamp,
+        deletedRawSegments: 0,
+        deletedTmpFiles: 0,
+        deletedQuarantineFiles: 0,
+      },
+      quarantine: [
+        {
+          path: "quarantine/bad-segment.jsonl",
+          metaPath: "quarantine/bad-segment.meta.jsonl",
+          reason: "parse-error" as const,
+          movedAt: timestamp,
+        },
+      ],
+    };
+
+    const parsed: MemoryManifest = MemoryManifestSchema.parse(manifest);
+
+    expect(parsed).toEqual(manifest);
+  });
+
+  it("should parse empty manifest arrays", () => {
+    const manifest = {
+      schemaVersion: 1,
+      eventSchemaVersion: 1,
+      viewSchemaVersion: 1,
+      lastRebuiltAt: timestamp,
+      materializedHash: "0".repeat(16),
+      relatedIndexHash: "1".repeat(16),
+      includedEventFiles: [],
+      compactedInputSegments: [],
+      gcSummary: {
+        deletedRawSegments: 0,
+        deletedTmpFiles: 0,
+        deletedQuarantineFiles: 0,
+      },
+      quarantine: [],
+    };
+
+    const parsed: MemoryManifest = MemoryManifestSchema.parse(manifest);
+
+    expect(parsed).toEqual(manifest);
+  });
 });
 
 describe("MemoryVersionSchema", () => {

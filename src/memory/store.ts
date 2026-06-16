@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import { createHash } from "node:crypto";
 import {
   MemoryFindingSchema,
@@ -9,8 +10,10 @@ import {
   type MemoryEvent,
   type MemoryManifest,
   type RelatedIndex,
+  type EventFileInfo,
 } from "./schema.js";
 import type { MemoryPaths } from "./paths.js";
+import { sha256File } from "./ids.js";
 import { writeFileAtomicOverwrite } from "../tools/fs-utils.js";
 
 export const CURRENT_MEMORY_EVENT_SCHEMA_VERSION = 1;
@@ -70,6 +73,9 @@ export function writeMaterializedState(
   const canonicalFindings = state.findings.map((finding) => MemoryFindingSchema.parse(finding));
   state.findings = canonicalFindings;
 
+  state.manifest.includedEventFiles = scanEventFiles(paths);
+  state.manifest.compactedInputSegments = state.manifest.compactedInputSegments ?? [];
+
   // Write memory.jsonl FIRST
   const memoryContent = canonicalFindings
     .map((finding) => JSON.stringify(finding))
@@ -83,6 +89,61 @@ export function writeMaterializedState(
   // Write manifest.json LAST (commit point)
   const manifestContent = JSON.stringify(state.manifest);
   writeFileAtomicOverwrite(paths.manifestFile, manifestContent);
+}
+
+/**
+ * Scan the raw and compacted event directories and return one EventFileInfo
+ * entry per `.jsonl` file, sorted by minTimestamp ascending. This is the
+ * authoritative descriptor for `manifest.includedEventFiles`.
+ */
+export function scanEventFiles(paths: MemoryPaths): EventFileInfo[] {
+  const dirs: Array<{ dir: string; kind: EventFileInfo["kind"] }> = [
+    { dir: paths.segmentsDir, kind: "raw" },
+    { dir: paths.compactedDir, kind: "compacted" },
+  ];
+
+  const infos: EventFileInfo[] = [];
+
+  for (const { dir, kind } of dirs) {
+    if (!fs.existsSync(dir)) continue;
+
+    const files = fs.readdirSync(dir).filter((file) => file.endsWith(".jsonl"));
+    for (const file of files) {
+      const filePath = path.join(dir, file);
+      const content = fs.readFileSync(filePath, "utf8");
+      const lines = content.split("\n").filter((line) => line.trim() !== "");
+
+      const timestamps: string[] = [];
+      let eventCount = 0;
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line) as Record<string, unknown>;
+          eventCount++;
+          if (typeof parsed.at === "string") {
+            timestamps.push(parsed.at);
+          }
+        } catch {
+          // Non-JSON line (e.g. padding); ignore for counting.
+        }
+      }
+
+      const fallback = fs.statSync(filePath).mtime.toISOString();
+      const minTimestamp = timestamps.length > 0 ? timestamps[0]! : fallback;
+      const maxTimestamp = timestamps.length > 0 ? timestamps[timestamps.length - 1]! : fallback;
+
+      infos.push({
+        path: path.relative(paths.root, filePath),
+        kind,
+        sha256: sha256File(filePath),
+        eventCount,
+        minTimestamp,
+        maxTimestamp,
+      });
+    }
+  }
+
+  infos.sort((a, b) => a.minTimestamp.localeCompare(b.minTimestamp));
+  return infos;
 }
 
 export function rebuildMaterializedStateFromEvents(events: MemoryEvent[]): MaterializedState {
@@ -173,6 +234,7 @@ export function rebuildMaterializedStateFromEvents(events: MemoryEvent[]): Mater
     includedEventFiles: [],
     compactedInputSegments: [],
     gcSummary: {
+      lastGcAt: undefined,
       deletedRawSegments: 0,
       deletedTmpFiles: 0,
       deletedQuarantineFiles: 0,

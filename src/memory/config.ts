@@ -53,23 +53,48 @@ export const MemoryConfigSchema = z.object({
     tokenWeight: 0.6,
     semanticWeight: 0.4,
   })),
-  compaction: z.object({
-    enabled: z.boolean().default(true),
-    maxSegmentsBeforeCompaction: z.number().int().min(1).max(10000).default(50),
-    maxSegmentAgeHours: z.number().int().min(1).max(8760).default(168),
-  }).default(() => structuredClone({
-    enabled: true,
-    maxSegmentsBeforeCompaction: 50,
-    maxSegmentAgeHours: 168,
-  })),
+  compaction: z.preprocess(
+    (val) => {
+      if (val && typeof val === "object" && !Array.isArray(val)) {
+        const obj = val as Record<string, unknown>;
+        if ("maxSegmentsBeforeCompaction" in obj && !("minRawSegments" in obj)) {
+          return { ...obj, minRawSegments: obj.maxSegmentsBeforeCompaction };
+        }
+      }
+      return val;
+    },
+    z.object({
+      enabled: z.boolean().default(true),
+      minRawSegments: z.number().int().min(1).max(10000).default(50),
+      minRawSegmentBytes: z.number().int().min(1).max(1073741824).default(1048576),
+      maxCompactDurationMs: z.number().int().min(1).max(3600000).default(3000),
+      autoCompactAfterReview: z.boolean().default(true),
+    }).default(() => structuredClone({
+      enabled: true,
+      minRawSegments: 50,
+      minRawSegmentBytes: 1048576,
+      maxCompactDurationMs: 3000,
+      autoCompactAfterReview: true,
+    })),
+  ),
   retention: z.object({
     maxEventsPerFinding: z.number().int().min(1).max(100000).default(100),
-    maxFindingsTotal: z.number().int().min(1).max(1000000).default(10000),
-    autoCompactAfterReview: z.boolean().default(true),
+    maxFindings: z.number().int().min(1).max(1000000).default(5000),
+    maxAgeDays: z.number().int().min(1).max(3650).default(365),
+    rawSegmentKeepDays: z.number().int().min(1).max(3650).default(30),
+    tmpFileMaxAgeHours: z.number().int().min(1).max(8760).default(24),
+    maxRawSegments: z.number().int().min(1).max(100000).default(200),
+    keepConfirmed: z.boolean().default(true),
+    keepHighSeverity: z.boolean().default(true),
   }).default(() => structuredClone({
     maxEventsPerFinding: 100,
-    maxFindingsTotal: 10000,
-    autoCompactAfterReview: true,
+    maxFindings: 5000,
+    maxAgeDays: 365,
+    rawSegmentKeepDays: 30,
+    tmpFileMaxAgeHours: 24,
+    maxRawSegments: 200,
+    keepConfirmed: true,
+    keepHighSeverity: true,
   })),
   privacy: z.object({
     redactEvidence: z.boolean().default(true),

@@ -131,6 +131,30 @@ const RelatedRelationSchema = z.object({
   relationType: z.string(),
 });
 
+export const EventFileInfoSchema = z.object({
+  path: z.string(),
+  kind: z.enum(["raw", "compacted"]),
+  sha256: z.string(),
+  eventCount: z.number().int(),
+  minTimestamp: z.string().datetime(),
+  maxTimestamp: z.string().datetime(),
+});
+
+export const CompactedSegmentSchema = z.object({
+  rawPath: z.string(),
+  rawSha256: z.string(),
+  compactedPath: z.string(),
+  compactedSha256: z.string(),
+  compactedAt: z.string().datetime(),
+});
+
+export const QuarantineEntrySchema = z.object({
+  path: z.string(),
+  metaPath: z.string(),
+  reason: z.enum(["parse-error", "checksum-mismatch", "schema-error", "empty-file"]),
+  movedAt: z.string().datetime(),
+});
+
 export const RelatedIndexSchema = z.object({
   schemaVersion: z.literal(1),
   generatedAt: z.string().datetime(),
@@ -145,14 +169,15 @@ export const MemoryManifestSchema = z.object({
   lastRebuiltAt: z.string().datetime(),
   materializedHash: z.string().min(16),
   relatedIndexHash: z.string().min(16),
-  includedEventFiles: z.array(z.string()),
-  compactedInputSegments: z.array(z.string()),
+  includedEventFiles: z.union([z.array(z.string()), z.array(EventFileInfoSchema)]),
+  compactedInputSegments: z.union([z.array(z.string()), z.array(CompactedSegmentSchema)]),
   gcSummary: z.object({
+    lastGcAt: z.string().datetime().optional(),
     deletedRawSegments: z.number(),
     deletedTmpFiles: z.number(),
     deletedQuarantineFiles: z.number(),
   }),
-  quarantine: z.array(z.string()),
+  quarantine: z.union([z.array(z.string()), z.array(QuarantineEntrySchema)]),
 });
 
 export const MemoryVersionSchema = z.object({
@@ -163,6 +188,9 @@ export const MemoryVersionSchema = z.object({
 
 export type MemoryFinding = z.infer<typeof MemoryFindingSchema>;
 export type MemoryEvent = z.infer<typeof MemoryEventSchema>;
+export type EventFileInfo = z.infer<typeof EventFileInfoSchema>;
+export type CompactedSegment = z.infer<typeof CompactedSegmentSchema>;
+export type QuarantineEntry = z.infer<typeof QuarantineEntrySchema>;
 export type RelatedIndex = z.infer<typeof RelatedIndexSchema>;
 export type MemoryManifest = z.infer<typeof MemoryManifestSchema>;
 export type MemoryVersion = z.infer<typeof MemoryVersionSchema>;

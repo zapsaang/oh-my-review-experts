@@ -107,21 +107,22 @@ export function checkAutoCompactThreshold(cwd: string, memoryConfig: MemoryConfi
 
   const segmentStats = readSegmentStats(cwd, memoryConfig);
   const segmentCount = segmentStats.length;
-  if (segmentCount > memoryConfig.compaction.maxSegmentsBeforeCompaction) {
+  if (segmentCount > memoryConfig.compaction.minRawSegments) {
     return {
       needsCompaction: true,
-      reason: `segments=${segmentCount} > maxSegmentsBeforeCompaction=${memoryConfig.compaction.maxSegmentsBeforeCompaction}`,
+      reason: `segments=${segmentCount} > minRawSegments=${memoryConfig.compaction.minRawSegments}`,
     };
   }
 
   const oldestMtime = oldestMtimeMs(segmentStats);
   if (oldestMtime !== undefined) {
     const ageHours = (Date.now() - oldestMtime) / HOURS_IN_MS;
-    if (ageHours > memoryConfig.compaction.maxSegmentAgeHours) {
-      return {
-        needsCompaction: true,
-        reason: `oldestSegmentAgeHours=${formatAgeHours(ageHours)} > maxSegmentAgeHours=${memoryConfig.compaction.maxSegmentAgeHours}`,
-      };
+    const maxSegmentAgeHours = memoryConfig.retention.rawSegmentKeepDays * 24;
+    if (ageHours > maxSegmentAgeHours) {
+        return {
+          needsCompaction: true,
+          reason: `oldestSegmentAgeDays=${(ageHours / 24).toFixed(1)} > rawSegmentKeepDays=${memoryConfig.retention.rawSegmentKeepDays}`,
+        };
     }
   }
 
