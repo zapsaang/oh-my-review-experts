@@ -549,6 +549,31 @@ describe("renderLocalDryRun", () => {
       expect(markdown).not.toContain("MEMORY CONTEXT FOR");
     });
   });
+
+  it("includes memory state materialized note when memory state exists", () => {
+    withCleanGitRepo((cwd) => {
+      writeMemoryRetrievalConfig(cwd, true);
+      writeChangedAuthFile(cwd);
+      writeMemoryState(cwd, [validMemoryFinding()]);
+
+      const markdown = renderLocalDryRun({ args: "tenant isolation", cwd: path.resolve(cwd) });
+
+      expect(markdown).toContain("Memory state: materialized");
+      expect(markdown).toContain("Memory retrieval preview");
+    });
+  });
+
+  it("includes memory state not found note when no memory state", () => {
+    withCleanGitRepo((cwd) => {
+      writeMemoryRetrievalConfig(cwd, true);
+      writeChangedAuthFile(cwd);
+
+      const markdown = renderLocalDryRun({ args: "tenant isolation", cwd: path.resolve(cwd) });
+
+      expect(markdown).toContain("Memory state: not found");
+      expect(markdown).toContain("Memory retrieval preview");
+    });
+  });
 });
 
 describe("[P2] formatScopeDetail — prompt scope readability", () => {

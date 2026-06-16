@@ -428,4 +428,60 @@ describe("finalizeReview [Fix 2-B RED]", () => {
       fs.rmSync(cwd, { recursive: true, force: true });
     }
   });
+
+  it("logs a warning when auto-compact threshold is exceeded", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-auto-compact-warning";
+      writeHandoffFile(cwd, runId, "handoff-1.md");
+
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      const mod = await loadFinalizeReviewWithMemoryMocks({
+        checkAutoCompactThreshold: () => ({
+          needsCompaction: true,
+          reason: "segments=5 > minRawSegments=3",
+        }),
+      });
+
+      const result = mod.finalizeReview({ runId, cwd });
+
+      expect(mod.checkAutoCompactThresholdMock).toHaveBeenCalledTimes(1);
+      expect(logSpy).toHaveBeenCalledTimes(1);
+      expect(logSpy).toHaveBeenCalledWith(
+        "Review memory threshold exceeded (segments=5 > minRawSegments=3). Run `omre memory compact` to merge segments."
+      );
+      expect(result.written.some((filePath) => filePath.endsWith("latest.json"))).toBe(true);
+
+      logSpy.mockRestore();
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("does not log a warning when auto-compact threshold is not exceeded", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-auto-compact-no-warning";
+      writeHandoffFile(cwd, runId, "handoff-1.md");
+
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      const mod = await loadFinalizeReviewWithMemoryMocks({
+        checkAutoCompactThreshold: () => ({ needsCompaction: false }),
+      });
+
+      const result = mod.finalizeReview({ runId, cwd });
+
+      expect(mod.checkAutoCompactThresholdMock).toHaveBeenCalledTimes(1);
+      expect(logSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Review memory threshold exceeded")
+      );
+      expect(result.written.some((filePath) => filePath.endsWith("latest.json"))).toBe(true);
+
+      logSpy.mockRestore();
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
 });

@@ -544,8 +544,9 @@ export function renderLocalDryRun(input: ReviewCodeInput = {}): string {
   const memorySections = canPreviewMemory
     ? collectReviewMemorySections(cwd, config, plan, summary, userArgsText, memoryFlags)
     : { attempted: false, sections: [], truncated: false } satisfies ReviewMemorySectionCollection;
+  const hasMemoryState = hasMaterializedMemoryState(cwd, config);
   const memoryPreview = canPreviewMemory
-    ? renderMemoryDryRunPreview(memorySections, hasMaterializedMemoryState(cwd, config))
+    ? renderMemoryDryRunPreview(memorySections, hasMemoryState)
     : "";
 
   const output = ["# Review Code Dry Run", ""];
@@ -558,6 +559,7 @@ export function renderLocalDryRun(input: ReviewCodeInput = {}): string {
   if (memoryPreview.length > 0) {
     output.push("", memoryPreview);
   }
+  output.push("", `Memory state: ${hasMemoryState ? "materialized" : "not found"} (run \`omre memory check\` for diagnostics)`);
 
   return `${output.join("\n")}\n`;
 }

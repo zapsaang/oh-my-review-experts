@@ -460,7 +460,10 @@ export function finalizeReview(input: FinalizeReviewInput): FinalizeReviewResult
       }
     }
 
-    checkAutoCompactThreshold(input.cwd, config.memory);
+    const compactCheck = checkAutoCompactThreshold(input.cwd, config.memory);
+    if (compactCheck.needsCompaction) {
+      console.log(`Review memory threshold exceeded (${compactCheck.reason}). Run \`omre memory compact\` to merge segments.`);
+    }
   }
 
   return {
