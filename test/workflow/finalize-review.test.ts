@@ -485,3 +485,283 @@ describe("finalizeReview [Fix 2-B RED]", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// RED tests — regression rendering across markdown marker, markdown section,
+// and JSON aggregate surfaces. Fail until Tasks 2-4 implement the renderer.
+// ---------------------------------------------------------------------------
+
+describe("finalizeReview — regression rendering", () => {
+  const REGRESSION_REASON =
+    "Re-introduces the SQL injection previously fixed and recorded in memory";
+
+  function buildRegressionFinding(
+    overrides: Record<string, unknown> = {}
+  ): Record<string, unknown> {
+    return {
+      id: "sec-1",
+      severity: "critical",
+      file: "src/auth.ts",
+      line: 42,
+      title: "Hardcoded secret",
+      description: "API key is hardcoded in source",
+      evidence: "const API_KEY = 'sk-...'",
+      confidence: "high",
+      classification: "injection",
+      isRegression: true,
+      memoryRefs: ["mem_abc123"],
+      regressionReason: REGRESSION_REASON,
+      ...overrides,
+    };
+  }
+
+  it("renders an inline historical-regression marker in markdown for a regression finding", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-reg-md-marker";
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        findings: [buildRegressionFinding()],
+      });
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd });
+
+      const latestMd = fs.readFileSync(
+        path.join(cwd, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      expect(latestMd).toContain("🔴 **Historical Regression**");
+      expect(latestMd).toContain(REGRESSION_REASON);
+      expect(latestMd).toContain("mem_abc123");
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("renders a Historical Regressions markdown section ordered after Findings and before Summary", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-reg-md-section";
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        findings: [buildRegressionFinding()],
+      });
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd });
+
+      const latestMd = fs.readFileSync(
+        path.join(cwd, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      expect(latestMd).toContain("## Historical Regressions");
+      expect(latestMd.indexOf("## Historical Regressions")).toBeLessThan(
+        latestMd.indexOf("## Summary")
+      );
+      expect(latestMd.indexOf("## Findings")).toBeLessThan(
+        latestMd.indexOf("## Historical Regressions")
+      );
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("omits all regression markdown when no findings are regressions", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-reg-md-zero";
+      writeHandoffFile(cwd, runId, "handoff-1.md");
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd });
+
+      const latestMd = fs.readFileSync(
+        path.join(cwd, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      expect(latestMd).not.toContain("## Historical Regressions");
+      expect(latestMd).not.toContain("🔴");
+      const nonBlankLines = latestMd
+        .split("\n")
+        .filter((l) => l.trim().length > 0);
+      expect(nonBlankLines.length).toBeGreaterThanOrEqual(40);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("emits a JSON regression aggregate with full slim key set for a regression finding", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-reg-json";
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        findings: [buildRegressionFinding()],
+      });
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd });
+
+      const json = JSON.parse(
+        fs.readFileSync(path.join(cwd, ".omre", "reports", "latest.json"), "utf8")
+      );
+      expect(json.summary.regression_count).toBe(1);
+      expect(Array.isArray(json.regressions)).toBe(true);
+      const reg = json.regressions[0];
+      expect(reg.finding_id).toBe("sec-1");
+      expect(typeof reg.slice_id).toBe("string");
+      expect(typeof reg.title).toBe("string");
+      expect(typeof reg.severity).toBe("string");
+      expect(typeof reg.file).toBe("string");
+      expect(["string", "number"]).toContain(typeof reg.line);
+      expect(reg.memory_refs[0]).toBe("mem_abc123");
+      expect(reg.regression_reason).toBe(REGRESSION_REASON);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("emits a zero-regression JSON aggregate when no findings are regressions", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-reg-json-zero";
+      writeHandoffFile(cwd, runId, "handoff-1.md");
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd });
+
+      const json = JSON.parse(
+        fs.readFileSync(path.join(cwd, ".omre", "reports", "latest.json"), "utf8")
+      );
+      expect(json.summary.regression_count).toBe(0);
+      expect(json.regressions).toEqual([]);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("orders regressions deterministically by (slice_id, severityRank, id) and is byte-identical across runs", async () => {
+    const cwd1 = createTempProject();
+    const cwd2 = createTempProject();
+    try {
+      const runId = "run-reg-determinism";
+      const seed = (cwd: string): void => {
+        writeHandoffFile(cwd, runId, "handoff-slice2.md", {
+          slice_id: "slice-2",
+          findings: [
+            buildRegressionFinding({
+              id: "reg-b",
+              severity: "low",
+              memoryRefs: ["mem_b"],
+            }),
+          ],
+        });
+        writeHandoffFile(cwd, runId, "handoff-slice1.md", {
+          slice_id: "slice-1",
+          findings: [
+            buildRegressionFinding({
+              id: "reg-a",
+              severity: "critical",
+              memoryRefs: ["mem_a"],
+            }),
+          ],
+        });
+      };
+      seed(cwd1);
+      seed(cwd2);
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd: cwd1 });
+      finalizeReview({ runId, cwd: cwd2 });
+
+      const json1Str = fs.readFileSync(
+        path.join(cwd1, ".omre", "reports", "latest.json"),
+        "utf8"
+      );
+      const json2Str = fs.readFileSync(
+        path.join(cwd2, ".omre", "reports", "latest.json"),
+        "utf8"
+      );
+      const json1 = JSON.parse(json1Str);
+      // slice-1 sorts before slice-2; reg-a (slice-1) precedes reg-b (slice-2).
+      expect(
+        json1.regressions.map((r: { finding_id: string }) => r.finding_id)
+      ).toEqual(["reg-a", "reg-b"]);
+      expect(json1Str).toBe(json2Str);
+    } finally {
+      fs.rmSync(cwd1, { recursive: true, force: true });
+      fs.rmSync(cwd2, { recursive: true, force: true });
+    }
+  });
+
+  it("treats a non-boolean isRegression value as not-a-regression (strict === true)", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-reg-nonboolean";
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        findings: [buildRegressionFinding({ isRegression: "true" })],
+      });
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd });
+
+      const json = JSON.parse(
+        fs.readFileSync(path.join(cwd, ".omre", "reports", "latest.json"), "utf8")
+      );
+      expect(json.summary.regression_count).toBe(0);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("renders a regression with an absent regressionReason as a stable null shape", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-reg-no-reason";
+      const finding = buildRegressionFinding({ memoryRefs: ["mem_x"] });
+      delete finding.regressionReason;
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        findings: [finding],
+      });
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd });
+
+      const latestMd = fs.readFileSync(
+        path.join(cwd, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      expect(latestMd).toContain("🔴 **Historical Regression**");
+      expect(latestMd).not.toContain("undefined");
+
+      const json = JSON.parse(
+        fs.readFileSync(path.join(cwd, ".omre", "reports", "latest.json"), "utf8")
+      );
+      expect(json.regressions.length).toBe(1);
+      expect(json.regressions[0].regression_reason).toBeNull();
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("renders a regression marker with empty memoryRefs without a dangling refs artifact", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-reg-empty-refs";
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        findings: [buildRegressionFinding({ memoryRefs: [] })],
+      });
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd });
+
+      const latestMd = fs.readFileSync(
+        path.join(cwd, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      expect(latestMd).toContain("🔴 **Historical Regression**");
+      expect(latestMd).not.toContain("Memory refs: \n");
+      expect(latestMd).not.toContain("()");
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+});
