@@ -246,6 +246,20 @@ function renderFindingMarkdown(
 
   lines.push(`#### ${title}`);
   lines.push("");
+  if (finding.isRegression === true) {
+    // regressionReason is already redacted upstream (handoff.ts:68); do NOT re-redact here.
+    const reason = asString(finding.regressionReason, "");
+    const refs = Array.isArray(finding.memoryRefs) ? finding.memoryRefs : [];
+    let markerLine = "> 🔴 **Historical Regression**";
+    if (reason.length > 0) {
+      markerLine += ` — ${reason}`;
+    }
+    lines.push(markerLine);
+    if (refs.length > 0) {
+      lines.push(`> Memory refs: ${refs.join(", ")}`);
+    }
+    lines.push("> ");
+  }
   lines.push(`- ID: ${id}`);
   lines.push(`- Slice: ${sliceId}`);
   lines.push(`- Severity: ${severity}`);
@@ -348,6 +362,40 @@ function renderMarkdownReport(merged: MergedResult, runId: string): string {
   }
   lines.push("");
 
+  const regressions: Record<string, unknown>[] = merged.slices.flatMap((slice) =>
+    slice.findings
+      .filter((f) => f.isRegression === true)
+      .map((f) => ({ ...f, slice_id: slice.slice_id }) as Record<string, unknown>)
+  ).sort((a, b) => {
+    const sliceDiff = (a.slice_id as string).localeCompare(b.slice_id as string);
+    if (sliceDiff !== 0) return sliceDiff;
+    const sevDiff = (severityRank[a.severity as SeverityLevel] ?? 4) - (severityRank[b.severity as SeverityLevel] ?? 4);
+    if (sevDiff !== 0) return sevDiff;
+    return parseFindingId(a).localeCompare(parseFindingId(b));
+  });
+
+  if (regressions.length > 0) {
+    lines.push("## Historical Regressions");
+    lines.push("");
+    for (const reg of regressions) {
+      const id = parseFindingId(reg) || "unknown";
+      const title = asString(reg.title, "(no title)");
+      const severity = asString(reg.severity, "unknown");
+      const file = asString(reg.file, "N/A");
+      const line = typeof reg.line === "number" ? String(reg.line) : asString(reg.line, "N/A");
+      const reason = asString(reg.regressionReason, "");
+      const refs = Array.isArray(reg.memoryRefs) ? reg.memoryRefs : [];
+      lines.push(`- **${title}** (${id}) — ${severity} — ${file}:${line}`);
+      if (reason.length > 0) {
+        lines.push(`  - Reason: ${reason}`);
+      }
+      if (refs.length > 0) {
+        lines.push(`  - Memory refs: ${refs.join(", ")}`);
+      }
+    }
+    lines.push("");
+  }
+
   lines.push("## Summary");
   lines.push("");
   lines.push("This report was assembled deterministically from reviewer handoff files.");
@@ -376,6 +424,17 @@ function renderMarkdownReport(merged: MergedResult, runId: string): string {
 function buildReportJson(merged: MergedResult, runId: string): Record<string, unknown> {
   const totalFindings = merged.slices.reduce((acc, s) => acc + s.findings.length, 0);
   const status = merged.degradedSlices.length === 0 ? "completed" : "degraded";
+  const regressions: Record<string, unknown>[] = merged.slices.flatMap((slice) =>
+    slice.findings
+      .filter((f) => f.isRegression === true)
+      .map((f) => ({ ...f, slice_id: slice.slice_id }) as Record<string, unknown>)
+  ).sort((a, b) => {
+    const sliceDiff = (a.slice_id as string).localeCompare(b.slice_id as string);
+    if (sliceDiff !== 0) return sliceDiff;
+    const sevDiff = (severityRank[a.severity as SeverityLevel] ?? 4) - (severityRank[b.severity as SeverityLevel] ?? 4);
+    if (sevDiff !== 0) return sevDiff;
+    return parseFindingId(a).localeCompare(parseFindingId(b));
+  });
   return {
     run_id: runId,
     status,
@@ -387,9 +446,20 @@ function buildReportJson(merged: MergedResult, runId: string): Record<string, un
       total_slices: merged.slices.length,
       total_findings: totalFindings,
       handoffs_consumed: merged.handoffs.length,
+      regression_count: regressions.length,
     },
     degraded_slices: merged.degradedSlices,
     missing_dimensions_global: merged.missingDimensionsGlobal,
+    regressions: regressions.map((reg) => ({
+      finding_id: parseFindingId(reg) || "unknown",
+      slice_id: reg.slice_id as string,
+      title: asString(reg.title, "(no title)"),
+      severity: asString(reg.severity, "unknown"),
+      file: asString(reg.file, "N/A"),
+      line: typeof reg.line === "number" ? String(reg.line) : asString(reg.line, "N/A"),
+      memory_refs: Array.isArray(reg.memoryRefs) ? reg.memoryRefs : [],
+      regression_reason: typeof reg.regressionReason === "string" ? reg.regressionReason : null,
+    })),
   };
 }
 
