@@ -569,7 +569,14 @@ describe("finalizeReview — regression rendering", () => {
     const cwd = createTempProject();
     try {
       const runId = "run-reg-md-zero";
-      writeHandoffFile(cwd, runId, "handoff-1.md");
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        agent: "omre-reviewer-security",
+        dimension: "security",
+      });
+      writeHandoffFile(cwd, runId, "handoff-2.md", {
+        agent: "omre-reviewer-quality",
+        dimension: "quality",
+      });
 
       const { finalizeReview } = await loadFinalizeReview();
       finalizeReview({ runId, cwd });
@@ -583,7 +590,7 @@ describe("finalizeReview — regression rendering", () => {
       const nonBlankLines = latestMd
         .split("\n")
         .filter((l) => l.trim().length > 0);
-      expect(nonBlankLines.length).toBeGreaterThanOrEqual(40);
+      expect(nonBlankLines.length).toBeGreaterThanOrEqual(50);
     } finally {
       fs.rmSync(cwd, { recursive: true, force: true });
     }
@@ -716,8 +723,7 @@ describe("finalizeReview — regression rendering", () => {
     const cwd = createTempProject();
     try {
       const runId = "run-reg-no-reason";
-      const finding = buildRegressionFinding({ memoryRefs: ["mem_x"] });
-      delete finding.regressionReason;
+      const { regressionReason: _omit, ...finding } = buildRegressionFinding({ memoryRefs: ["mem_x"] });
       writeHandoffFile(cwd, runId, "handoff-1.md", {
         findings: [finding],
       });

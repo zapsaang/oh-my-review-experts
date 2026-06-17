@@ -85,6 +85,24 @@ function parseFindingId(finding: Record<string, unknown>): string {
   return typeof id === "string" ? id : "";
 }
 
+// The map assertion and comparator casts narrow values out of
+// Record<string, unknown> and are required for typecheck; do not remove them.
+function collectRegressions(merged: MergedResult): Record<string, unknown>[] {
+  return merged.slices
+    .flatMap((slice) =>
+      slice.findings
+        .filter((f) => f.isRegression === true)
+        .map((f) => ({ ...f, slice_id: slice.slice_id }) as Record<string, unknown>)
+    )
+    .sort((a, b) => {
+      const sliceDiff = (a.slice_id as string).localeCompare(b.slice_id as string);
+      if (sliceDiff !== 0) return sliceDiff;
+      const sevDiff = (severityRank[a.severity as SeverityLevel] ?? 4) - (severityRank[b.severity as SeverityLevel] ?? 4);
+      if (sevDiff !== 0) return sevDiff;
+      return parseFindingId(a).localeCompare(parseFindingId(b));
+    });
+}
+
 function parseHandoffFile(filePath: string, filename: string): ParsedHandoff {
   let content: string;
   try {
@@ -362,17 +380,7 @@ function renderMarkdownReport(merged: MergedResult, runId: string): string {
   }
   lines.push("");
 
-  const regressions: Record<string, unknown>[] = merged.slices.flatMap((slice) =>
-    slice.findings
-      .filter((f) => f.isRegression === true)
-      .map((f) => ({ ...f, slice_id: slice.slice_id }) as Record<string, unknown>)
-  ).sort((a, b) => {
-    const sliceDiff = (a.slice_id as string).localeCompare(b.slice_id as string);
-    if (sliceDiff !== 0) return sliceDiff;
-    const sevDiff = (severityRank[a.severity as SeverityLevel] ?? 4) - (severityRank[b.severity as SeverityLevel] ?? 4);
-    if (sevDiff !== 0) return sevDiff;
-    return parseFindingId(a).localeCompare(parseFindingId(b));
-  });
+  const regressions = collectRegressions(merged);
 
   if (regressions.length > 0) {
     lines.push("## Historical Regressions");
@@ -424,17 +432,7 @@ function renderMarkdownReport(merged: MergedResult, runId: string): string {
 function buildReportJson(merged: MergedResult, runId: string): Record<string, unknown> {
   const totalFindings = merged.slices.reduce((acc, s) => acc + s.findings.length, 0);
   const status = merged.degradedSlices.length === 0 ? "completed" : "degraded";
-  const regressions: Record<string, unknown>[] = merged.slices.flatMap((slice) =>
-    slice.findings
-      .filter((f) => f.isRegression === true)
-      .map((f) => ({ ...f, slice_id: slice.slice_id }) as Record<string, unknown>)
-  ).sort((a, b) => {
-    const sliceDiff = (a.slice_id as string).localeCompare(b.slice_id as string);
-    if (sliceDiff !== 0) return sliceDiff;
-    const sevDiff = (severityRank[a.severity as SeverityLevel] ?? 4) - (severityRank[b.severity as SeverityLevel] ?? 4);
-    if (sevDiff !== 0) return sevDiff;
-    return parseFindingId(a).localeCompare(parseFindingId(b));
-  });
+  const regressions = collectRegressions(merged);
   return {
     run_id: runId,
     status,
