@@ -1,22 +1,63 @@
 # Oh My Review Experts
 
-> A panel of five senior reviewers, embedded into OpenCode, ready the moment you type `/review-code`.
+> Five focused reviewers, one slash command, zero agent folders in your repo.
 
 [![npm](https://img.shields.io/npm/v/oh-my-review-experts.svg)](https://www.npmjs.com/package/oh-my-review-experts)
 [![OpenCode](https://img.shields.io/badge/OpenCode-1.14%2B-blue)](https://github.com/sst/opencode)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Oh My Review Experts (`omre`) turns a single slash command into a multi-agent code review pipeline: slicing a diff into coherent chunks, dispatching specialist reviewers in parallel, arbitrating their findings, and persisting a full audit trail to disk — without littering your repo with agent markdown files.
+`omre` turns `/review-code` in OpenCode into a multi-agent review pipeline. The expert panel lives inside the plugin, so you install once, add one line to `opencode.json`, and your repo stays clean. No agent markdown, no command files copied in.
 
----
+## Why you'd want this
 
-## Why this exists
+Reviewing a large diff well is five different jobs: spec compliance, code quality, security, performance, concurrency. Most AI review setups either squash them into one mushy prompt or make you hand-curate a folder of agent definitions.
 
-Reviewing a large diff well is *five different jobs*: spec compliance, code quality, security, performance, and concurrency. Most "AI review" setups either collapse them into one mushy prompt, or make you hand-curate a folder full of agent definitions.
+`omre` takes the third path. Install once, type `/review-code`, get a structured report with findings, evidence, and an audit trail on disk.
 
-`omre` picks the third option: **the expert panel lives inside the plugin**. You install once, add one line to `opencode.json`, and `/review-code` just works. Your repo stays clean.
+## Quick start
 
----
+Install globally and enable:
+
+```bash
+npm install -g oh-my-review-experts
+omre install --global
+```
+
+Or scope to one project:
+
+```bash
+cd your-project
+npx oh-my-review-experts install --project
+```
+
+Then run in OpenCode:
+
+```text
+/review-code
+```
+
+With focus:
+
+```text
+/review-code focus on disk format compatibility and concurrency hazards
+```
+
+With an explicit scope:
+
+```text
+/review-code branch:main
+/review-code commit:abc1234
+/review-code path:src/auth
+/review-code staged
+```
+
+Preview the assembled prompt without calling any model:
+
+```text
+/review-code --echo-prompt
+```
+
+That's it. `omre install` only writes the plugin entry to `opencode.json` and an optional config file. It does not copy agents or commands into your repo.
 
 ## What you get
 
@@ -30,127 +71,71 @@ Reviewing a large diff well is *five different jobs*: spec compliance, code qual
 | `performance` | Hot-path allocations, N+1, bad complexity |
 | `concurrency` | Races, deadlocks, ordering hazards, cancellation bugs |
 
-**A slicing engine that respects your repo.** `omre` classifies changed files into eight categories — `business-module`, `shared-library`, `api-contract`, `migration`, `dependency-change`, `infra-change`, `test-only`, `docs-only` — groups them by module, then picks the right reviewer subset for each slice. Docs-only slices skip the whole review. Migration slices route to spec + performance + concurrency. You can override the matrix in config.
+**A slicing engine that picks the right reviewers per chunk.** Changed files are classified into eight categories (`business-module`, `shared-library`, `api-contract`, `migration`, `dependency-change`, `infra-change`, `test-only`, `docs-only`), grouped by module, then dispatched to a reviewer subset. Docs-only slices skip review. Migration slices route to spec + performance + concurrency. Override the matrix in config.
 
-**Cost guardrails you can trust.** Every run produces an estimated task count up front. If it exceeds `maxEstimatedTasks`, the workflow switches to compact mode. If it exceeds `hardStopThreshold`, it halts and asks. No accidental thousand-dollar reviews.
+**Cost guardrails you can trust.** Every run prints an estimated task count up front. Cross `maxEstimatedTasks` and the workflow shifts to compact mode. Cross `hardStopThreshold` and it halts and asks. No accidental thousand-dollar reviews.
 
-**Partial rerun, not global retry.** When a reviewer fails or produces malformed output, `omre` re-runs only that task — not the whole pipeline.
+**Partial rerun, not global retry.** When a reviewer fails or returns malformed output, `omre` re-runs only that task. The rest of the pipeline keeps its results.
 
-**A handoff protocol, not chat theater.** Subagents write structured markdown to `.omre/handoffs/{runId}/`. The orchestrator reads files, not chat transcripts. Chat output is a receipt; the file is the source of truth. This keeps long reviews reproducible and debuggable.
+**A handoff protocol, not chat theater.** Subagents write structured markdown to `.omre/handoffs/{runId}/`. The orchestrator reads files, not chat transcripts. Chat output is a receipt. The file is the source of truth. Long reviews stay reproducible and debuggable.
 
-**Reports that stick around.** Final output lands in `.omre/reports/latest.md` and `latest.json`, with timestamped history under `.omre/reports/history/`. Each file is written atomically per write (temp-file + rename), so a single file is never half-written. Multi-file updates have no fsync and no cross-file transaction — see [Review Memory](#review-memory) for the full honesty list on the `.omre/memory/` store.
+**Reports that stick around.** Final output lands in `.omre/reports/latest.md` and `latest.json`, with timestamped snapshots under `.omre/reports/history/`.
 
-**Agent tiers that reflect real cost tradeoffs.** Each of the 11 subagents is classified by importance — `critical` (spec, security), `standard` (quality, performance, concurrency), `coordination` (slice planner, arbiters), or `utility` (validators, report writer). The `omre doctor` command surfaces every agent's tier alongside its runtime model and source (config override vs. default), so you know exactly which reviewers are running on which model.
+**Review Memory that learns.** After each run, findings are indexed into `.omre/memory/`. Future reviews surface relevant historical findings per slice and reviewer. A security finding marked `fixed` shows up again in a similar auth module, the security reviewer gets it as a regression candidate, and the final report links back to the original memory ID.
 
-**Security built in, not bolted on.** Path traversal guards on every file write. Prompt-injection regex filters on user arguments. Secret redaction on diffs before they reach any model. Command-name validation that rejects `__proto__` and friends. The plugin also registers a `permission.ask` hook that auto-denies write/edit access to `.omre/reports/` and `.omre/handoffs/` from external agents, preventing accidental corruption of review artifacts.
+**Security built in, not bolted on.** Path traversal guards on every write. Prompt-injection regex filters on user args. Secret redaction on diffs before they reach any model. A `permission.ask` hook auto-denies external write/edit access to `.omre/reports/` and `.omre/handoffs/`. None of this is togglable.
 
----
-
-## Quick start
-
-Install the plugin:
-
-```bash
-npm install -g oh-my-review-experts
-omre install --global
-```
-
-…or scope it to one project:
-
-```bash
-cd your-project
-npx oh-my-review-experts install --project
-```
-
-That's it. `omre install` only touches `opencode.json` (adds the plugin entry) and optionally drops a config file. It does **not** copy agents, commands, or skills into your repo.
-
-Open OpenCode and run:
-
-```text
-/review-code
-```
-
-With focus guidance:
-
-```text
-/review-code focus on disk format compatibility and concurrency hazards
-```
-
-With explicit scope:
-
-```text
-/review-code branch:main
-/review-code commit:abc1234
-/review-code path:src/auth
-/review-code staged
-```
-
-Preview the generated prompt without calling any model:
-
-```text
-/review-code --echo-prompt
-```
-
----
+> [!NOTE]
+> Honest durability limits. File writes are atomic per file (temp + rename), so a single file is never half-written. There is no `fsync` and no cross-file transaction, and `.omre/memory/` is single-process with last-writer-wins semantics. Run `omre memory compact` after a crash.
 
 ## Scope syntax
 
-`/review-code` accepts optional scope prefixes that control which changes are reviewed:
+`/review-code` accepts optional scope prefixes that control which changes get reviewed:
 
 | Input | Resolved scope | Equivalent git command |
-|-------|----------------|------------------------|
-| (empty) | working tree + staged + untracked | `git diff HEAD` + `git ls-files --others --exclude-standard` |
+|---|---|---|
+| *(empty)* | working tree + staged + untracked | `git diff HEAD` + `git ls-files --others --exclude-standard` |
 | `staged` / `--staged` / `--cached` | staged only | `git diff --cached` |
 | `commit:<ref>` | one commit | `git show <ref>` |
 | `branch:<name>` | branch vs HEAD | `git diff <name>...HEAD` |
 | `range:<from>..<to>` | commit range | `git diff <from>...<to>` |
 | `path:<paths>` | filtered by path (comma-separated) | `git diff HEAD -- <paths>` |
-| bare `<sha>` | resolves to commit if exists | same as `commit:` |
-| bare `<branch>` | resolves to branch if exists (else falls through) | same as `branch:` |
-| bare `<path>` | resolves to path if exists (else falls through) | same as `path:` |
+| bare `<sha>` | resolves to commit if it exists | same as `commit:` |
+| bare `<branch>` | resolves to branch if it exists | same as `branch:` |
+| bare `<path>` | resolves to path if it exists | same as `path:` |
 | anything else | guidance text (default scope still reviewed) | `git diff HEAD` |
 
-Ambiguous bare-form inputs (e.g., a name that is both branch and dir) require explicit prefix.
-
----
+Ambiguous bare inputs (a name that is both branch and directory) need an explicit prefix.
 
 ## How it works
 
-Plugin loaded[^0] → command.execute.before hook intercepts → … → report persisted.
-
-[^0]: Plugin boot: `config` hook registers `/review-code` command and 11 subagents (5 reviewers + 6 coordinators) into `config.agent`; the subagent registration is consumed by OpenCode's agent picker. No command markdown files written.
-
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ 1. User runs /review-code in OpenCode                       │
-│                                                             │
-│ 2. command.execute.before hook intercepts                   │
-│    ↓                                                        │
-│ 3. Git diff + changed files captured, secrets redacted      │
-│    ↓                                                        │
-│ 4. Slicing engine classifies & groups files into slices     │
-│    ↓                                                        │
-│ 5. Cost guardrail estimates tasks (spec×slice + quality×…)  │
-│    ↓                                                        │
-│ 6. Orchestrator dispatches reviewers per slice, in parallel │
-│    ↓                                                        │
-│ 7. Each reviewer writes a handoff file → .omre/handoffs/    │
-│    ↓                                                        │
-│ 8. Slice arbiter merges per-slice findings                  │
-│    ↓                                                        │
-│ 9. Global arbiter merges across slices + deduplicates       │
-│    ↓                                                        │
-│ 10. Report writer persists latest.md, latest.json, history/ │
-└─────────────────────────────────────────────────────────────┘
+1. /review-code runs in OpenCode
+   ↓
+2. command.execute.before hook intercepts
+   ↓
+3. Git diff captured, secrets redacted
+   ↓
+4. Slicing engine groups changed files
+   ↓
+5. Cost guardrail estimates task count
+   ↓
+6. Reviewers run in parallel, per slice
+   ↓
+7. Each reviewer writes a handoff file
+   ↓
+8. Slice arbiter merges per-slice findings
+   ↓
+9. Global arbiter merges across slices
+   ↓
+10. Report writer persists latest.md, latest.json, history/
 ```
 
-Commands are registered at runtime through the OpenCode `config` hook — there are **no command markdown files** to maintain. `omre install` writes exactly one line to `opencode.json`; everything else is resolved in-memory on boot.
-
----
+The plugin registers the command and all 11 subagents at boot through OpenCode's `config` hook. No command markdown files to maintain. `omre install` writes one line to `opencode.json`; everything else resolves in-memory on startup.
 
 ## Configuration
 
-Configuration is optional. If you never write a config file, defaults apply. When you do, `omre` walks a hierarchy and deep-merges — project overrides global.
+Configuration is optional. If you never write one, defaults apply. When you do, `omre` walks a hierarchy and deep-merges. Project wins over global.
 
 Load order (later wins):
 
@@ -163,9 +148,9 @@ Load order (later wins):
 
 ### Agent reference
 
-All 11 agents must be referenced by exact name when configuring them in the `agents` field:
+All 11 agents are configurable by exact name:
 
-| Agent name | Role |
+| Agent | Role |
 |---|---|
 | `omre-reviewer-spec` | Contract drift, breaking changes, missing requirements |
 | `omre-reviewer-quality` | Readability, maintainability, duplication, dead paths |
@@ -179,7 +164,7 @@ All 11 agents must be referenced by exact name when configuring them in the `age
 | `omre-global-arbiter` | Merges findings across slices |
 | `omre-report-writer` | Persists final report |
 
-### Full schema
+### Schema
 
 ```jsonc
 {
@@ -193,10 +178,8 @@ All 11 agents must be referenced by exact name when configuring them in the `age
     "scopeResolution": "auto"
   },
   "agents": {
-    // Add per-agent overrides here. Only specify agents you want to customize.
-    // All agents fall back to the default model if not listed.
-    // Example:
-    // "omre-reviewer-spec": { "model": "anthropic/claude-opus-4-7", "variant": "max", "temperature": 0.7 }
+    // Per-agent overrides. Unlisted agents fall back to the default model.
+    // "omre-reviewer-spec": { "model": "anthropic/claude-opus-4-7", "variant": "max", "temperature": 0.7, "top_p": 0.9 }
   },
   "slicing": {
     "enabled": true,
@@ -205,19 +188,14 @@ All 11 agents must be referenced by exact name when configuring them in the `age
     "skipTestOnlyHeavyReview": true,
     "forceWholeTargetAboveSlices": 12
   },
-  "partialRerun": {
-    "enabled": true,
-    "maxRetriesPerTask": 1
-  },
+  "partialRerun": { "enabled": true, "maxRetriesPerTask": 1 },
   "costGuardrail": {
     "enabled": true,
     "maxEstimatedTasks": 24,
     "compactModeThreshold": 20,
     "hardStopThreshold": 60
   },
-  "arbitration": {
-    "hierarchicalThreshold": 3
-  },
+  "arbitration": { "hierarchicalThreshold": 3 },
   "report": {
     "enabled": true,
     "directory": ".omre/reports",
@@ -225,10 +203,7 @@ All 11 agents must be referenced by exact name when configuring them in the `age
     "latestJson": "latest.json",
     "timestamped": true
   },
-  "handoff": {
-    "enabled": true,
-    "directory": ".omre/handoffs"
-  },
+  "handoff": { "enabled": true, "directory": ".omre/handoffs" },
   "reviewers": {
     "default": ["spec", "quality", "security", "performance", "concurrency"],
     "bySliceType": {
@@ -245,56 +220,45 @@ All 11 agents must be referenced by exact name when configuring them in the `age
 }
 ```
 
-### Model parameters
-
-Each agent entry supports optional `top_p` (snake_case, not camelCase):
-
-```jsonc
-{
-  "agents": {
-    "omre-reviewer-spec": { "model": "minimax-cn/MiniMax-M2.7", "top_p": 0.9 }
-  }
-}
-```
-
 ### Injection modes
 
-`command.injection` controls how `/review-code` is wired up:
+`command.injection` controls how `/review-code` is wired:
 
-- `"both"` *(default)* — Commands registered via the `config` hook, execution intercepted via `command.execute.before`. Recommended.
-- `"hook"` — Same as `"both"`.
-- `"disabled"` — No command registration or interception. Useful for temporarily muting the plugin.
-- `"tool"` — Disables slash commands; plugin tools (`omre_write_handoff`, `omre_write_report`, etc.) remain available via `hooks.tool`.
+- `"both"` (default): registered via the `config` hook and intercepted by `command.execute.before`. Recommended.
+- `"hook"`: same as `"both"`.
+- `"disabled"`: no registration or interception. Useful for muting the plugin temporarily.
+- `"tool"`: no slash command. Plugin tools stay available via `hooks.tool`.
 
-`scopeResolution: 'guidance-only'` reproduces pre-0.x behavior — args treated as opaque guidance text, scope is always `git diff HEAD`.
-
----
+`scopeResolution: "guidance-only"` reproduces the pre-0.x behavior. Args become opaque guidance text and scope is always `git diff HEAD`.
 
 ## CLI
 
 ```bash
-omre init [--force]        # scaffold .opencode/oh-my-review-experts.jsonc
-omre install --global      # enable plugin in ~/.config/opencode/opencode.json
-omre install --project     # enable plugin in ./opencode.json
+omre init [--force]              # scaffold .opencode/oh-my-review-experts.jsonc
+omre install --global            # enable plugin in ~/.config/opencode/opencode.json
+omre install --project           # enable plugin in ./opencode.json
 omre doctor [--clean-reports] [--strict]
-                           # validate config + plugin wiring + contracts (used in CI)
-                           # prints: config files, command/aliases, plugin registration,
-                           #         subagent permissions, agent runtime models (tier/source),
-                           #         contract self-check (prompt schemas + tool whitelists),
-                           #         report layout (stray artifact detection)
-                           # --clean-reports removes stray *-report.{md,json} artifacts
-                           # --strict exits non-zero on any warning
-                           # exit codes: 0 clean, 1 warning (with --strict), 2 contract failure
-omre dry-run               # build the prompt locally, no model calls
+                                 # validate config + wiring + contracts (used in CI)
+                                 # exit codes: 0 clean, 1 warning (with --strict), 2 contract failure
+omre dry-run                     # build the prompt locally, no model calls
+
+omre memory check                # diagnose memory health
+omre memory stats                # show aggregate counts
+omre memory search "tenant isolation"
+omre memory list --status open --reviewer security
+omre memory show mem_xxx
+omre memory mark mem_xxx --status fixed --reason "fixed in abc123"
+omre memory compact              # merge raw event segments
+omre memory gc                   # clean up old files
 ```
 
-`omre dry-run` is useful when debugging: it runs the full pipeline up to the point where a model would be invoked, then prints the assembled prompt and estimated plan.
+`omre doctor` prints config files, command and aliases, plugin registration, subagent permissions, agent runtime models (tier and source), the contract self-check (prompt schemas and tool whitelists), and report layout. `--clean-reports` removes stray `*-report.{md,json}` artifacts.
 
----
+`omre dry-run` runs the pipeline up to the point where a model would be invoked, then prints the assembled prompt and estimated plan.
 
 ## Reports and handoffs
 
-**Reports** land in `.omre/reports/`:
+Reports:
 
 ```
 .omre/reports/
@@ -304,126 +268,78 @@ omre dry-run               # build the prompt locally, no model calls
     └── 20260507-183012-123.md  # timestamped snapshots
 ```
 
-Written with `writeFileAtomicOverwrite` (temp + `wx` + rename) for `latest.*` and `O_EXCL` for history files. Per-file atomicity holds; no fsync is issued and there is no cross-file transaction — see [Review Memory](#review-memory) for the full honesty list on the `.omre/memory/` store.
-
-**Handoffs** land in `.omre/handoffs/{runId}/`:
+Handoffs:
 
 ```
 .omre/handoffs/20260507-183012-123/
 ├── 20260507-183045-001-omre-reviewer-security-auth.md
 ├── 20260507-183047-002-omre-reviewer-performance-queue.md
-└── …
+└── ...
 ```
 
-Each handoff carries: agent name, scope, files inspected, findings with evidence, risk level, suggested fixes, confidence, and open questions. The orchestrator reads these files to build the final report; subagent chat output is treated as a status receipt only.
+Each handoff carries the agent name, scope, files inspected, findings with evidence, risk level, suggested fixes, confidence, and open questions. The orchestrator reads these files to build the final report. Subagent chat output is a status receipt only.
 
-The plugin exposes seven tools for programmatic use:
+Seven tools are exposed for programmatic use:
 
-- `omre_build_review_code_prompt` — assemble the review prompt bundle for the current changes
-- `omre_dry_run` — render the plan without invoking any model
-- `omre_config` — load the merged OMRE configuration for the current project
-- `omre_write_handoff` — persist a reviewer's findings to `.omre/handoffs/{runId}/`
-- `omre_write_report` — persist the final report to `.omre/reports/`
-- `omre_validate_handoff` — validate a reviewer handoff (file first, chat-fence fallback)
-- `omre_finalize_review` — assemble and persist the final review report from handoff files under `.omre/handoffs/{runId}/`
-
----
-
-## Review Memory
-
-OMRE learns from previous review runs. After each review, findings are indexed into `.omre/memory/`. Future reviews retrieve relevant historical findings per slice and reviewer.
-
-Example:
-
-- A security finding marked as `fixed` appears again in a similar auth module.
-- The security reviewer receives it as a regression candidate.
-- The final report links the new finding to the historical memory ID.
-
-```bash
-omre memory check          # Diagnose memory health
-omre memory stats          # Show aggregate counts
-omre memory search "tenant isolation"  # Search historical findings
-omre memory list --status open --reviewer security
-omre memory show mem_xxx   # Show a specific finding
-omre memory mark mem_xxx --status fixed --reason "fixed in abc123"
-omre memory compact        # Merge raw event segments
-omre memory gc             # Clean up old files
-```
-
-`.omre/memory/` is recommended to be gitignored (it may contain internal code paths and evidence). This repo already ignores the parent `.omre/` directory.
-
-**Known limitations (v0.4).** The memory store is single-node and single-process:
-
-- **Concurrency is last-writer-wins.** No file locking, no advisory locks, no process coordination. Two `omre memory` commands running against the same store in parallel can clobber each other.
-- **No fsync durability guarantee.** Writes use `writeFileAtomicOverwrite` (temp + `wx` + rename) for per-file atomicity, but no `fsync`/`fdatasync` is issued, and there is no cross-file transaction. A crash mid-sequence can leave materialized views ahead of the manifest until the next `omre memory compact` or `omre memory index-latest` rebuild.
-
----
+- `omre_build_review_code_prompt`: assemble the review prompt bundle for the current changes
+- `omre_dry_run`: render the plan without invoking any model
+- `omre_config`: load the merged OMRE configuration for the current project
+- `omre_write_handoff`: persist a reviewer's findings
+- `omre_write_report`: persist the final report
+- `omre_validate_handoff`: validate a reviewer handoff
+- `omre_finalize_review`: assemble and persist the final review from handoff files
 
 ## Security
 
-`omre` ships with defense-in-depth for a review tool that reads your diffs, writes files, and calls external models:
+Always on, not togglable:
 
-- **Path traversal** — `assertSafePath()` and `assertSafeCwd()` reject `..`, absolute paths, and non-UTF-8 byte sequences. Applied at every file-write boundary.
-- **Prompt injection** — User arguments pass through `validateAndSanitizeArgs()` with a regex blacklist; long arguments are truncated at 4KB with a visible warning.
-- **Scope-arg sanitization** — `validateAndSanitizeArgs()` rejects shell metacharacters in path-shaped args, `..` segments, and leading `--` to prevent option-injection.
-- **Secret redaction** — `redactSecrets()` scrubs common credential patterns (API keys, tokens, private keys, connection strings) from diffs *before* they reach any model.
-- **Command injection** — Command names are validated against `SAFE_COMMAND_PATTERN` and a forbidden list (`__proto__`, `constructor`, `prototype`).
-- **Diff bounds** — Unified diff is capped at 180KB with a visible truncation marker.
-- **Atomic per-file writes** — `temp + rename` means a single file is never half-written. There is no `fsync` and no cross-file transaction, so a crash mid-sequence can leave in-memory state ahead of the manifest until the next rebuild. The `.omre/memory/` store has no concurrency lock — see [Review Memory](#review-memory).
-- **Permission hook** — The `permission.ask` hook auto-denies write/edit access to `.omre/reports/` and `.omre/handoffs/` from external agents, preventing accidental corruption of review artifacts.
-
-None of these are optional or togglable — they're always on.
-
----
+- **Path traversal guards** (`assertSafePath` / `assertSafeCwd`) on every write boundary. Rejects `..`, absolute paths, and non-UTF-8 byte sequences.
+- **Prompt-injection filter** on user args via a regex blacklist. Args are truncated at 4KB with a visible warning.
+- **Scope-arg sanitization** rejects shell metacharacters in path-shaped args, `..` segments, and leading `--`.
+- **Secret redaction** (`redactSecrets`) scrubs API keys, tokens, private keys, and connection strings from diffs before they reach any model.
+- **Command-name validation** rejects `__proto__`, `constructor`, `prototype`.
+- **Diff bounds**: unified diff capped at 180KB with a visible truncation marker.
+- **Permission hook**: a `permission.ask` hook auto-denies external write/edit access to `.omre/reports/` and `.omre/handoffs/`, preventing accidental corruption of review artifacts.
 
 ## Requirements
 
-- **OpenCode** 1.14 or newer
-- **Node** 20 or newer
+- OpenCode 1.14 or newer
+- Node 20 or newer
 - A git repo (the plugin reads changed files via `git diff`)
 
----
+## Under the hood
 
-## Packaging notes
+**Pure ESM, no CJS wrapper.** The package exposes only `exports.import` pointing at `dist/index.js`. OpenCode runs on Bun, and Bun imports a CJS function module in a way that breaks OpenCode's plugin loader. A CJS wrapper silently fails with `"Plugin export is not a function"`. ESM only, always.
 
-`oh-my-review-experts` is distributed as **pure ESM**. There is no CommonJS wrapper, no `dist/index.cjs`, and `package.json` exposes only `exports.import` pointing at `dist/index.js`.
+**Zero runtime footprint from the plugin SDK.** `@opencode-ai/plugin` is a devDependency imported via `import type`. The shipped bundle is roughly 1KB of code plus prompt strings.
 
-**Why?** OpenCode runs on Bun. When Bun imports a CJS module whose `module.exports` is a function, it surfaces the function's `name` and `length` as named ESM exports. OpenCode's `getLegacyPlugins()` iterates `Object.values(mod)` and rejects any non-function, non-`{server}` values with `"Plugin export is not a function"`. A CJS wrapper silently breaks plugin loading. ESM only, always.
+**Agent tiers.** Each of the 11 subagents is tagged by importance: `critical` (spec, security), `standard` (quality, performance, concurrency), `coordination` (planners, arbiters), or `utility` (validators, report writer). `omre doctor` surfaces tier, runtime model, and source (config override vs default) for every agent.
 
-`@opencode-ai/plugin` is a **devDependency** imported via `import type` — zero runtime footprint. The shipped bundle is ~1KB of code plus prompt strings.
-
----
+**Gitignore `.omre/memory/`.** It may contain internal code paths and evidence from previous runs. The parent `.omre/` directory is already ignored by this repo.
 
 ## Development
 
 ```bash
 npm install
 npm run dev              # tsx src/cli.ts
-npm run typecheck        # tsc --noEmit  (strict, no `as any`)
+npm run typecheck        # tsc --noEmit (strict, no `as any`)
 npm run test             # vitest run
 npm run generate-schema  # regenerate JSON schema from Zod types
-npm run build            # prebuild → tsup → postbuild (ESM + .d.ts + sourcemaps)
+npm run build            # prebuild -> tsup -> postbuild (ESM + .d.ts + sourcemaps)
 npm run doctor:strict    # same as `doctor --strict`
 node dist/cli.js doctor
 ```
 
-Local packaging:
+Local packaging and publishing:
 
 ```bash
 npm run pack:local
-```
-
-Publish (dry-run first):
-
-```bash
 npm run publish:dry-run
 npm run publish:both
 ```
 
-CI (Node 22, Ubuntu) runs: `npm ci && typecheck && test && build && doctor:strict`.
+CI (Node 22, Ubuntu) runs `npm ci && typecheck && test && build && doctor:strict`.
 
 ---
-
-## License
 
 MIT © zapsaang
