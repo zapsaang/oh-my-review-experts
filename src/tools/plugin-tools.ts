@@ -194,6 +194,7 @@ export const tools = {
     args: {
       runId: z.string().min(1),
       cwd: z.string().optional(),
+      withMemory: z.boolean().optional(),
     },
     async execute(input, context) {
       const { cwd, trusted } = resolveCwd(input.cwd, context.directory);
@@ -203,7 +204,7 @@ export const tools = {
         assertSafePath(resolvedCwd, trustedBase, "omre_finalize_review cwd");
       }
       try {
-        const result = finalizeReview({ runId: input.runId, cwd });
+        const result = finalizeReview({ runId: input.runId, cwd, withMemory: input.withMemory });
         return JSON.stringify({
           ok: true,
           written: result.written,

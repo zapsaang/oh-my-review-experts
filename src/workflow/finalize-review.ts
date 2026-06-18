@@ -7,6 +7,7 @@ import { parseHandoffJsonHeader } from "../tools/handoff.js";
 import { severityRank, type SeverityLevel } from "../shared/severity.js";
 import { runIndexLatest } from "../memory/indexing.js";
 import { checkAutoCompactThreshold } from "../memory/pipeline.js";
+import { readRunMeta } from "./run-meta.js";
 
 /**
  * Server-side report finalization for the review-code workflow.
@@ -23,6 +24,7 @@ import { checkAutoCompactThreshold } from "../memory/pipeline.js";
 export interface FinalizeReviewInput {
   runId: string;
   cwd: string;
+  withMemory?: boolean;
 }
 
 export interface FinalizeReviewResult {
@@ -64,6 +66,7 @@ interface MergedResult {
 const HANDOFF_FILENAME_PATTERN = /^[a-zA-Z0-9_\-\.]+\.md$/;
 // Matches notes phrases like "missing dimensions a, b" or "Degraded: missing dimensions concurrency, security".
 const MISSING_DIMENSIONS_NOTE = /missing dimensions?\s*[:\-]?\s*([a-zA-Z0-9_,\s\-]+)/i;
+const REGRESSION_MARKER = "🔴";
 
 function asString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
@@ -101,6 +104,57 @@ function collectRegressions(merged: MergedResult): Record<string, unknown>[] {
       if (sevDiff !== 0) return sevDiff;
       return parseFindingId(a).localeCompare(parseFindingId(b));
     });
+}
+
+function renderRegressionSection(merged: MergedResult, retrievalActive: boolean): string[] {
+  const lines: string[] = [];
+  const regressions = collectRegressions(merged);
+
+  if (regressions.length === 0 && !retrievalActive) {
+    return [
+      "## Historical Regressions",
+      "",
+      "_Review Memory retrieval was not active for this run. To detect whether any " +
+        "findings recur from previously-fixed issues, re-run with `--with-memory` or set " +
+        "`memory.retrieval.enabled: true` in your config._",
+      "",
+    ];
+  }
+
+  lines.push("## Historical Regressions");
+  lines.push("");
+
+  if (regressions.length > 0) {
+    if (!retrievalActive) {
+      lines.push("_Review Memory retrieval was not active for this run, but a reviewer reported potential regressions:_");
+      lines.push("");
+    } else {
+      lines.push(`**${regressions.length}** finding(s) recur from previously-fixed issues in Review Memory:`);
+      lines.push("");
+    }
+    for (const reg of regressions) {
+      const id = parseFindingId(reg) || "unknown";
+      const title = asString(reg.title, "(no title)");
+      const severity = asString(reg.severity, "unknown");
+      const file = asString(reg.file, "N/A");
+      const line = typeof reg.line === "number" ? String(reg.line) : asString(reg.line, "N/A");
+      const reason = asString(reg.regressionReason, "");
+      const refs = Array.isArray(reg.memoryRefs) ? reg.memoryRefs : [];
+      lines.push(`- ${REGRESSION_MARKER} **${title}** (${id}) — ${severity} — ${file}:${line}`);
+      if (reason.length > 0) {
+        lines.push(`  - Reason: ${reason}`);
+      }
+      if (refs.length > 0) {
+        lines.push(`  - Memory refs: ${refs.join(", ")}`);
+      }
+    }
+    lines.push("");
+  } else {
+    lines.push("No historical regressions detected. None of this run's findings match previously-fixed issues in Review Memory.");
+    lines.push("");
+  }
+
+  return lines;
 }
 
 function parseHandoffFile(filePath: string, filename: string): ParsedHandoff {
@@ -268,7 +322,7 @@ function renderFindingMarkdown(
     // regressionReason is already redacted upstream (handoff.ts:68); do NOT re-redact here.
     const reason = asString(finding.regressionReason, "");
     const refs = Array.isArray(finding.memoryRefs) ? finding.memoryRefs : [];
-    let markerLine = "> 🔴 **Historical Regression**";
+    let markerLine = `> ${REGRESSION_MARKER} **Historical Regression**`;
     if (reason.length > 0) {
       markerLine += ` — ${reason}`;
     }
@@ -295,7 +349,7 @@ function renderFindingMarkdown(
   return lines;
 }
 
-function renderMarkdownReport(merged: MergedResult, runId: string): string {
+function renderMarkdownReport(merged: MergedResult, runId: string, retrievalActive: boolean): string {
   const lines: string[] = [];
   lines.push("# Code Review Report");
   lines.push("");
@@ -380,28 +434,8 @@ function renderMarkdownReport(merged: MergedResult, runId: string): string {
   }
   lines.push("");
 
-  const regressions = collectRegressions(merged);
-
-  if (regressions.length > 0) {
-    lines.push("## Historical Regressions");
-    lines.push("");
-    for (const reg of regressions) {
-      const id = parseFindingId(reg) || "unknown";
-      const title = asString(reg.title, "(no title)");
-      const severity = asString(reg.severity, "unknown");
-      const file = asString(reg.file, "N/A");
-      const line = typeof reg.line === "number" ? String(reg.line) : asString(reg.line, "N/A");
-      const reason = asString(reg.regressionReason, "");
-      const refs = Array.isArray(reg.memoryRefs) ? reg.memoryRefs : [];
-      lines.push(`- **${title}** (${id}) — ${severity} — ${file}:${line}`);
-      if (reason.length > 0) {
-        lines.push(`  - Reason: ${reason}`);
-      }
-      if (refs.length > 0) {
-        lines.push(`  - Memory refs: ${refs.join(", ")}`);
-      }
-    }
-    lines.push("");
+  for (const l of renderRegressionSection(merged, retrievalActive)) {
+    lines.push(l);
   }
 
   lines.push("## Summary");
@@ -498,7 +532,11 @@ export function finalizeReview(input: FinalizeReviewInput): FinalizeReviewResult
   }
 
   const merged = mergeHandoffs(parsed);
-  const markdown = renderMarkdownReport(merged, input.runId);
+  const marker = readRunMeta(handoffDir);
+  const withMemoryResolved = input.withMemory ?? marker?.withMemory ?? false;
+  const noMemoryResolved = marker?.noMemory ?? false;
+  const retrievalActive = config.memory.enabled && (config.memory.retrieval.enabled || withMemoryResolved) && !noMemoryResolved;
+  const markdown = renderMarkdownReport(merged, input.runId, retrievalActive);
   const json = buildReportJson(merged, input.runId);
 
   const written = writeReport(

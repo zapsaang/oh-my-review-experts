@@ -1,6 +1,13 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import {
+  createTempProject,
+  writeProjectConfig,
+  writeHandoffFile,
+  writeRunMetaFile,
+  buildRegressionFinding,
+} from "../helpers/finalize-fixtures.js";
 
 // ---------------------------------------------------------------------------
 // Local interfaces for the missing src/workflow/finalize-review.ts module.
@@ -11,6 +18,7 @@ interface FinalizeReviewInput {
   runId: string;
   cwd: string;
   trusted?: boolean;
+  withMemory?: boolean;
 }
 
 interface DegradedSlice {
@@ -56,9 +64,8 @@ interface AutoCompactThresholdResult {
 async function loadFinalizeReview(): Promise<{
   finalizeReview(input: FinalizeReviewInput): FinalizeReviewResult;
 }> {
-  const segments = ["..", "..", "src", "workflow", "finalize-review.js"];
-  const modPath = segments.join("/");
-  const mod = await import(modPath);
+  const modUrl = new URL("../../src/workflow/finalize-review.js", import.meta.url);
+  const mod = await import(modUrl.href);
   return mod as unknown as {
     finalizeReview(input: FinalizeReviewInput): FinalizeReviewResult;
   };
@@ -106,36 +113,6 @@ afterEach(() => {
 // Fixture helpers
 // ---------------------------------------------------------------------------
 
-function createTempProject(): string {
-  const absoluteTmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-finalize-"));
-  const relativeTmpDir = path.relative(process.cwd(), absoluteTmpDir);
-  fs.mkdirSync(path.join(absoluteTmpDir, ".omre"), { recursive: true });
-  writeProjectConfig(absoluteTmpDir);
-  return relativeTmpDir;
-}
-
-function writeProjectConfig(cwd: string, overrides: Record<string, unknown> = {}): void {
-  fs.mkdirSync(path.join(cwd, ".omre"), { recursive: true });
-  fs.writeFileSync(
-    path.join(cwd, ".omre", "config.json"),
-    JSON.stringify({
-      report: {
-        enabled: true,
-        directory: ".omre/reports",
-        timestamped: true,
-        latestMarkdown: "latest.md",
-        latestJson: "latest.json",
-      },
-      handoff: {
-        enabled: true,
-        directory: ".omre/handoffs",
-      },
-      ...overrides,
-    }),
-    "utf8"
-  );
-}
-
 function buildIndexLatestResult(): IndexLatestResult {
   return {
     runId: "mock-run",
@@ -147,55 +124,6 @@ function buildIndexLatestResult(): IndexLatestResult {
     dryRun: false,
   };
 }
-
-function buildHandoffJsonHeader(
-  overrides: Record<string, unknown> = {}
-): string {
-  const base = {
-    schema_version: "1",
-    task_id: "task-123",
-    agent: "omre-reviewer-security",
-    dimension: "security",
-    status: "completed",
-    target: { kind: "working-tree", value: "src/auth.ts" },
-    slice_id: "slice-1",
-    findings: [
-      {
-        id: "sec-1",
-        severity: "critical",
-        file: "src/auth.ts",
-        line: 42,
-        title: "Hardcoded secret",
-        description: "API key is hardcoded in source",
-        evidence: "const API_KEY = 'sk-...'",
-        confidence: "high",
-        classification: "injection",
-      },
-    ],
-    meta: { total_findings: 1, notes: "" },
-    ...overrides,
-  };
-  return "```json\n" + JSON.stringify(base, null, 2) + "\n```";
-}
-
-function writeHandoffFile(
-  cwd: string,
-  runId: string,
-  filename: string,
-  overrides: Record<string, unknown> = {}
-): void {
-  const handoffDir = path.join(cwd, ".omre", "handoffs", runId);
-  fs.mkdirSync(handoffDir, { recursive: true });
-  const content =
-    buildHandoffJsonHeader(overrides) +
-    "\n\n# Review Handoff\n\nTest body content for deterministic rendering.\n";
-  fs.writeFileSync(path.join(handoffDir, filename), content, "utf8");
-}
-
-// ---------------------------------------------------------------------------
-// RED tests — each will fail at runtime because src/workflow/finalize-review.ts
-// does not exist yet (T7 implements it).
-// ---------------------------------------------------------------------------
 
 describe("finalizeReview [Fix 2-B RED]", () => {
   it("reads all handoff files in .omre/handoffs/{runId}/ and emits a markdown report >= 50 lines starting with '#'", async () => {
@@ -495,26 +423,6 @@ describe("finalizeReview — regression rendering", () => {
   const REGRESSION_REASON =
     "Re-introduces the SQL injection previously fixed and recorded in memory";
 
-  function buildRegressionFinding(
-    overrides: Record<string, unknown> = {}
-  ): Record<string, unknown> {
-    return {
-      id: "sec-1",
-      severity: "critical",
-      file: "src/auth.ts",
-      line: 42,
-      title: "Hardcoded secret",
-      description: "API key is hardcoded in source",
-      evidence: "const API_KEY = 'sk-...'",
-      confidence: "high",
-      classification: "injection",
-      isRegression: true,
-      memoryRefs: ["mem_abc123"],
-      regressionReason: REGRESSION_REASON,
-      ...overrides,
-    };
-  }
-
   it("renders an inline historical-regression marker in markdown for a regression finding", async () => {
     const cwd = createTempProject();
     try {
@@ -533,6 +441,40 @@ describe("finalizeReview — regression rendering", () => {
       expect(latestMd).toContain("🔴 **Historical Regression**");
       expect(latestMd).toContain(REGRESSION_REASON);
       expect(latestMd).toContain("mem_abc123");
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("uses the same marker emoji for the inline finding marker and the regression-section list item [Fix 2 marker consistency]", async () => {
+    // Given a report containing a regression finding rendered with retrieval off
+    // so both the inline blockquote marker and the section list item appear.
+    const cwd = createTempProject();
+    try {
+      const runId = "run-reg-marker-consistency";
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        findings: [buildRegressionFinding()],
+      });
+
+      // When the report is rendered
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd, withMemory: false });
+
+      const latestMd = fs.readFileSync(
+        path.join(cwd, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+
+      // Then both surfaces are present and share the exact same marker symbol.
+      const inlineMatch = latestMd.match(/^> (\S+) \*\*Historical Regression\*\*/m);
+      const sectionMatch = latestMd.match(/^- (\S+) \*\*Hardcoded secret\*\*/m);
+      expect(inlineMatch).not.toBeNull();
+      expect(sectionMatch).not.toBeNull();
+      const inlineMarker = inlineMatch?.[1];
+      const sectionMarker = sectionMatch?.[1];
+      expect(inlineMarker).toBe("🔴");
+      expect(sectionMarker).toBe("🔴");
+      expect(inlineMarker).toBe(sectionMarker);
     } finally {
       fs.rmSync(cwd, { recursive: true, force: true });
     }
@@ -565,7 +507,7 @@ describe("finalizeReview — regression rendering", () => {
     }
   });
 
-  it("omits all regression markdown when no findings are regressions", async () => {
+  it("renders disabled-retrieval hint when no findings are regressions and retrieval is off", async () => {
     const cwd = createTempProject();
     try {
       const runId = "run-reg-md-zero";
@@ -585,12 +527,102 @@ describe("finalizeReview — regression rendering", () => {
         path.join(cwd, ".omre", "reports", "latest.md"),
         "utf8"
       );
-      expect(latestMd).not.toContain("## Historical Regressions");
+      expect(latestMd).toContain("## Historical Regressions");
+      expect(latestMd).toContain("Review Memory retrieval was not active");
+      expect(latestMd).toContain("--with-memory");
+      expect(latestMd).toContain("memory.retrieval.enabled");
       expect(latestMd).not.toContain("🔴");
-      const nonBlankLines = latestMd
-        .split("\n")
-        .filter((l) => l.trim().length > 0);
-      expect(nonBlankLines.length).toBeGreaterThanOrEqual(50);
+      expect(latestMd).not.toContain("No historical regressions detected");
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("renders active-empty state when retrieval is on and no regressions", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-reg-md-active-empty";
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        agent: "omre-reviewer-security",
+        dimension: "security",
+      });
+      writeHandoffFile(cwd, runId, "handoff-2.md", {
+        agent: "omre-reviewer-quality",
+        dimension: "quality",
+      });
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd, withMemory: true });
+
+      const latestMd = fs.readFileSync(
+        path.join(cwd, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      expect(latestMd).toContain("## Historical Regressions");
+      expect(latestMd).toContain("No historical regressions detected");
+      expect(latestMd).toContain("None of this run's findings match previously-fixed issues");
+      expect(latestMd).not.toContain("for the changed files");
+      expect(latestMd.indexOf("## Findings")).toBeLessThan(
+        latestMd.indexOf("## Historical Regressions")
+      );
+      expect(latestMd.indexOf("## Historical Regressions")).toBeLessThan(
+        latestMd.indexOf("## Summary")
+      );
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("renders disabled-retrieval hint when retrieval is off and no regressions", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-reg-md-disabled";
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        agent: "omre-reviewer-security",
+        dimension: "security",
+      });
+      writeHandoffFile(cwd, runId, "handoff-2.md", {
+        agent: "omre-reviewer-quality",
+        dimension: "quality",
+      });
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd, withMemory: false });
+
+      const latestMd = fs.readFileSync(
+        path.join(cwd, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      expect(latestMd).toContain("## Historical Regressions");
+      expect(latestMd).toContain("Review Memory retrieval was not active");
+      expect(latestMd).toContain("--with-memory");
+      expect(latestMd).toContain("memory.retrieval.enabled");
+      expect(latestMd).not.toContain("No historical regressions detected");
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("still renders full regression list when retrieval is off but regressions exist", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-reg-md-override";
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        findings: [buildRegressionFinding()],
+      });
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd, withMemory: false });
+
+      const latestMd = fs.readFileSync(
+        path.join(cwd, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      expect(latestMd).toContain("## Historical Regressions");
+      expect(latestMd).toContain("Review Memory retrieval was not active");
+      expect(latestMd).toContain("but a reviewer reported potential regressions");
+      expect(latestMd).toContain("- 🔴 **");
+      expect(latestMd).toContain("🔴");
     } finally {
       fs.rmSync(cwd, { recursive: true, force: true });
     }
@@ -766,6 +798,180 @@ describe("finalizeReview — regression rendering", () => {
       expect(latestMd).toContain("🔴 **Historical Regression**");
       expect(latestMd).not.toContain("Memory refs: \n");
       expect(latestMd).not.toContain("()");
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("reads marker and renders active-empty state without input flag", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-marker-active-empty";
+      writeRunMetaFile(cwd, runId, { withMemory: true, noMemory: false });
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        agent: "omre-reviewer-security",
+        dimension: "security",
+      });
+      writeHandoffFile(cwd, runId, "handoff-2.md", {
+        agent: "omre-reviewer-quality",
+        dimension: "quality",
+      });
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd });
+
+      const latestMd = fs.readFileSync(
+        path.join(cwd, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      expect(latestMd).toContain("## Historical Regressions");
+      expect(latestMd).toContain("No historical regressions detected");
+      expect(latestMd).toContain("None of this run's findings match previously-fixed issues");
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("reads marker and renders disabled hint without input flag", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-marker-disabled";
+      writeRunMetaFile(cwd, runId, { withMemory: false, noMemory: false });
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        agent: "omre-reviewer-security",
+        dimension: "security",
+      });
+      writeHandoffFile(cwd, runId, "handoff-2.md", {
+        agent: "omre-reviewer-quality",
+        dimension: "quality",
+      });
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd });
+
+      const latestMd = fs.readFileSync(
+        path.join(cwd, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      expect(latestMd).toContain("## Historical Regressions");
+      expect(latestMd).toContain("Review Memory retrieval was not active");
+      expect(latestMd).toContain("--with-memory");
+      expect(latestMd).toContain("memory.retrieval.enabled");
+      expect(latestMd).not.toContain("No historical regressions detected");
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("memory.enabled=false overrides marker withMemory=true", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-marker-memory-disabled-config";
+      writeProjectConfig(cwd, { memory: { enabled: false } });
+      writeRunMetaFile(cwd, runId, { withMemory: true, noMemory: false });
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        agent: "omre-reviewer-security",
+        dimension: "security",
+      });
+      writeHandoffFile(cwd, runId, "handoff-2.md", {
+        agent: "omre-reviewer-quality",
+        dimension: "quality",
+      });
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd });
+
+      const latestMd = fs.readFileSync(
+        path.join(cwd, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      expect(latestMd).toContain("## Historical Regressions");
+      expect(latestMd).toContain("Review Memory retrieval was not active");
+      expect(latestMd).toContain("--with-memory");
+      expect(latestMd).toContain("memory.retrieval.enabled");
+      expect(latestMd).not.toContain("No historical regressions detected");
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("noMemory=true overrides retrieval.enabled=true", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-marker-no-memory-precedence";
+      writeProjectConfig(cwd, {
+        memory: { enabled: true, retrieval: { enabled: true } },
+      });
+      writeRunMetaFile(cwd, runId, { withMemory: false, noMemory: true });
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        agent: "omre-reviewer-security",
+        dimension: "security",
+      });
+      writeHandoffFile(cwd, runId, "handoff-2.md", {
+        agent: "omre-reviewer-quality",
+        dimension: "quality",
+      });
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd });
+
+      const latestMd = fs.readFileSync(
+        path.join(cwd, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      expect(latestMd).toContain("## Historical Regressions");
+      expect(latestMd).toContain("Review Memory retrieval was not active");
+      expect(latestMd).toContain("--with-memory");
+      expect(latestMd).toContain("memory.retrieval.enabled");
+      expect(latestMd).not.toContain("No historical regressions detected");
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("does not render boundary hint when retrieval is active and regressions exist", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-reg-active-no-boundary";
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        findings: [buildRegressionFinding()],
+      });
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd, withMemory: true });
+
+      const latestMd = fs.readFileSync(
+        path.join(cwd, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      expect(latestMd).toContain("## Historical Regressions");
+      expect(latestMd).toContain("**1** finding(s) recur from previously-fixed issues in Review Memory");
+      expect(latestMd).not.toContain("but a reviewer reported potential regressions");
+      expect(latestMd).not.toContain("Review Memory retrieval was not active");
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("renders the same 🔴 marker in both inline finding and regression section", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-reg-consistent-marker";
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        findings: [buildRegressionFinding()],
+      });
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd, withMemory: true });
+
+      const latestMd = fs.readFileSync(
+        path.join(cwd, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      // Inline marker: > 🔴 **Historical Regression**
+      expect(latestMd).toContain("🔴 **Historical Regression**");
+      // Section marker: - 🔴 **Finding title**
+      expect(latestMd).toContain("- 🔴 **Hardcoded secret**");
     } finally {
       fs.rmSync(cwd, { recursive: true, force: true });
     }

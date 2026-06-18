@@ -6,6 +6,10 @@ import { Effect } from "effect";
 import { z } from "zod";
 import { tools } from "../../src/tools/plugin-tools.js";
 import { UnifiedFindingSchema } from "../../src/agents/schemas.js";
+import {
+  createTempProject,
+  writeHandoffFile,
+} from "../helpers/finalize-fixtures.js";
 
 function mockContext(directory: string): ToolContext {
   return {
@@ -957,82 +961,16 @@ function getTool(name: string): ToolLike {
 const omreFinalizeReviewArgs = {
   runId: z.string().min(1),
   cwd: z.string().optional(),
+  withMemory: z.boolean().optional(),
 };
 
 function parseFinalizeArgs(raw: unknown): z.infer<z.ZodObject<typeof omreFinalizeReviewArgs>> {
   return parseToolArgs({ args: omreFinalizeReviewArgs }, raw);
 }
 
-function createTempProjectForFinalize(): string {
-  const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-finalize-"));
-  fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
-  fs.writeFileSync(
-    path.join(tmpDir, ".omre", "config.json"),
-    JSON.stringify({
-      report: {
-        enabled: true,
-        directory: ".omre/reports",
-        timestamped: true,
-        latestMarkdown: "latest.md",
-        latestJson: "latest.json",
-      },
-      handoff: {
-        enabled: true,
-        directory: ".omre/handoffs",
-      },
-    }),
-    "utf8"
-  );
-  return tmpDir;
-}
-
-function buildHandoffJsonHeader(
-  overrides: Record<string, unknown> = {}
-): string {
-  const base = {
-    schema_version: "1",
-    task_id: "task-123",
-    agent: "omre-reviewer-security",
-    dimension: "security",
-    status: "completed",
-    target: { kind: "working-tree", value: "src/auth.ts" },
-    slice_id: "slice-1",
-    findings: [
-      {
-        id: "sec-1",
-        severity: "critical",
-        file: "src/auth.ts",
-        line: 42,
-        title: "Hardcoded secret",
-        description: "API key is hardcoded in source",
-        evidence: "const API_KEY = 'sk-...'",
-        confidence: "high",
-        classification: "injection",
-      },
-    ],
-    meta: { total_findings: 1, notes: "" },
-    ...overrides,
-  };
-  return "```json\n" + JSON.stringify(base, null, 2) + "\n```";
-}
-
-function writeHandoffFile(
-  cwd: string,
-  runId: string,
-  filename: string,
-  overrides: Record<string, unknown> = {}
-): void {
-  const handoffDir = path.join(cwd, ".omre", "handoffs", runId);
-  fs.mkdirSync(handoffDir, { recursive: true });
-  const content =
-    buildHandoffJsonHeader(overrides) +
-    "\n\n# Review Handoff\n\nTest body content for deterministic rendering.\n";
-  fs.writeFileSync(path.join(handoffDir, filename), content, "utf8");
-}
-
 describe("omre_finalize_review [Fix 2-B RED]", () => {
   it("returns { ok: true, written, handoffsConsumed, ... } on success", async () => {
-    const tmpDir = createTempProjectForFinalize();
+    const tmpDir = createTempProject();
     try {
       const runId = "run-20260519-tool-ok";
       writeHandoffFile(tmpDir, runId, "handoff-1.md");
@@ -1054,7 +992,7 @@ describe("omre_finalize_review [Fix 2-B RED]", () => {
   });
 
   it("returns { ok: false, errors } when handoff dir does not exist", async () => {
-    const tmpDir = createTempProjectForFinalize();
+    const tmpDir = createTempProject();
     try {
       const runId = "run-20260519-tool-missing";
 
@@ -1077,5 +1015,60 @@ describe("omre_finalize_review [Fix 2-B RED]", () => {
     await expect(
       tool.execute(input, mockContext(process.cwd()))
     ).rejects.toThrow("Path traversal");
+  });
+
+  it("passes withMemory=true through to render the active regression section", async () => {
+    const tmpDir = createTempProject();
+    try {
+      const runId = "run-20260519-tool-withmemory";
+      writeHandoffFile(tmpDir, runId, "handoff-1.md");
+
+      const tool = getTool("omre_finalize_review");
+      const input = parseFinalizeArgs({ runId, cwd: tmpDir, withMemory: true });
+      expect(input.withMemory).toBe(true);
+      const result = await tool.execute(input, mockContext(tmpDir));
+      const parsed = JSON.parse(result as string);
+      expect(parsed.ok).toBe(true);
+
+      const latestMd = fs.readFileSync(
+        path.join(tmpDir, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      expect(latestMd).not.toContain("Review Memory retrieval was not active");
+      expect(latestMd).toContain("None of this run's findings match previously-fixed issues");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("omits withMemory and defers to run-meta marker (no ?? false override)", async () => {
+    const tmpDir = createTempProject();
+    try {
+      const runId = "run-20260519-tool-marker";
+      writeHandoffFile(tmpDir, runId, "handoff-1.md");
+      const handoffDir = path.join(tmpDir, ".omre", "handoffs", runId);
+      fs.writeFileSync(
+        path.join(handoffDir, ".run-meta.json"),
+        JSON.stringify({ withMemory: true, noMemory: false }),
+        "utf8"
+      );
+
+      const tool = getTool("omre_finalize_review");
+      const input = parseFinalizeArgs({ runId, cwd: tmpDir });
+      expect(input.withMemory).toBeUndefined();
+      const result = await tool.execute(input, mockContext(tmpDir));
+      expect(JSON.parse(result as string).ok).toBe(true);
+
+      const latestMd = fs.readFileSync(
+        path.join(tmpDir, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      // If the tool collapsed undefined to false, the marker fallback would be
+      // bypassed and the disabled prompt would appear. It must not.
+      expect(latestMd).not.toContain("Review Memory retrieval was not active");
+      expect(latestMd).toContain("None of this run's findings match previously-fixed issues");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
