@@ -713,12 +713,12 @@ describe("memory gc CLI", () => {
 });
 
 describe("memory CLI registration", () => {
-  it("registers all 9 memory subcommands", () => {
+  it("registers all 11 memory subcommands", () => {
     const program = new Command();
     registerMemoryCli(program);
     const memory = program.commands.find((c) => c.name() === "memory");
     expect(memory).toBeDefined();
-    expect(memory?.commands).toHaveLength(9);
+    expect(memory?.commands).toHaveLength(11);
     const names = memory?.commands.map((c) => c.name());
     expect(names).toEqual(
       expect.arrayContaining([
@@ -731,6 +731,8 @@ describe("memory CLI registration", () => {
         "mark",
         "compact",
         "gc",
+        "suggestions",
+        "apply-suggestions",
       ]),
     );
   });
@@ -905,5 +907,399 @@ describe("memory stats - regression count", () => {
 
     const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
     expect(output).toContain("regression candidates: 1");
+  });
+});
+
+describe("memory suggestions", () => {
+  afterEach(() => {
+    process.chdir(originalCwd);
+    vi.restoreAllMocks();
+    for (const dir of tempDirs.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("lists a high-confidence (file-deleted) suggestion", () => {
+    const paths = makeTempMemoryRepo();
+    const finding = writeFinding({
+      id: "mem_high000000000000",
+      fingerprint: "fp_high000000000000",
+      contentHash: "ch_high000000000000",
+      locations: [{ path: "gone.ts", line: 1 }],
+    });
+    const state = seedManifest(paths);
+    state.findings.push(finding);
+    writeMaterializedState(paths, state);
+    const repoRoot = path.dirname(path.dirname(paths.root));
+    // Do NOT create gone.ts — triggers file-deleted confidence
+    process.chdir(repoRoot);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "suggestions"]);
+
+    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(output).toContain("mem_high000000000000");
+    expect(output).toContain("high");
+    expect(output).toContain("file-deleted");
+    expect(output).toContain(finding.title);
+  });
+
+  it("lists a medium-confidence (time-decay) suggestion", () => {
+    const paths = makeTempMemoryRepo();
+    const repoRoot = path.dirname(path.dirname(paths.root));
+    fs.writeFileSync(path.join(repoRoot, "real.ts"), "x");
+    const finding = writeFinding({
+      id: "mem_med0000000000000",
+      fingerprint: "fp_med0000000000000",
+      contentHash: "ch_med0000000000000",
+      locations: [{ path: "real.ts", line: 1 }],
+      occurrence: {
+        firstSeenAt: "2020-01-01T00:00:00.000Z",
+        lastSeenAt: "2020-01-01T00:00:00.000Z",
+        count: 1,
+        runIds: ["run-old"],
+      },
+    });
+    const state = seedManifest(paths);
+    state.findings.push(finding);
+    writeMaterializedState(paths, state);
+    process.chdir(repoRoot);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "suggestions"]);
+
+    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(output).toContain("medium");
+    expect(output).toContain("time-decay");
+  });
+
+  it("prints 'no suggestions' when no stale candidates", () => {
+    const paths = makeTempMemoryRepo();
+    const repoRoot = path.dirname(path.dirname(paths.root));
+    fs.writeFileSync(path.join(repoRoot, "fresh.ts"), "x");
+    const finding = writeFinding({
+      id: "mem_fresh00000000000",
+      fingerprint: "fp_fresh00000000000",
+      contentHash: "ch_fresh00000000000",
+      locations: [{ path: "fresh.ts", line: 1 }],
+      occurrence: {
+        firstSeenAt: new Date().toISOString(),
+        lastSeenAt: new Date().toISOString(),
+        count: 1,
+        runIds: ["run-fresh"],
+      },
+    });
+    const state = seedManifest(paths);
+    state.findings.push(finding);
+    writeMaterializedState(paths, state);
+    process.chdir(repoRoot);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "suggestions"]);
+
+    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(output).toContain("no suggestions");
+  });
+
+  it("prints 'suggestions disabled' when memory.suggestions.enabled === false", () => {
+    const paths = makeTempMemoryRepo();
+    const repoRoot = path.dirname(path.dirname(paths.root));
+    const finding = writeFinding({
+      id: "mem_disabled00000000",
+      fingerprint: "fp_disabled00000000",
+      contentHash: "ch_disabled00000000",
+      locations: [{ path: "gone.ts", line: 1 }],
+    });
+    const state = seedManifest(paths);
+    state.findings.push(finding);
+    writeMaterializedState(paths, state);
+    writeConfig(repoRoot, { enabled: true, suggestions: { enabled: false } });
+    process.chdir(repoRoot);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "suggestions"]);
+
+    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(output).toContain("suggestions disabled");
+    expect(output).not.toContain("mem_disabled00000000");
+  });
+
+  it("returns gracefully when loadMaterializedMemory yields null", () => {
+    const repoRoot = makeTempRepo();
+    writeConfig(repoRoot, { enabled: false });
+    process.chdir(repoRoot);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+
+    expect(() => program.parse(["node", "omre", "memory", "suggestions"])).not.toThrow();
+
+    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(output).toContain("memory disabled");
+  });
+});
+
+describe("memory apply-suggestions", () => {
+  afterEach(() => {
+    process.chdir(originalCwd);
+    vi.restoreAllMocks();
+    for (const dir of tempDirs.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  function seedHighAndMediumViaEvents(paths: MemoryPaths): string {
+    const repoRoot = path.dirname(path.dirname(paths.root));
+    fs.writeFileSync(path.join(repoRoot, "real.ts"), "x");
+
+    const highFinding = writeFinding({
+      id: "mem_high000000000000",
+      fingerprint: "fp_high000000000000",
+      contentHash: "ch_high000000000000",
+      locations: [{ path: "gone.ts", line: 1 }],
+      occurrence: {
+        firstSeenAt: "2020-01-01T00:00:00.000Z",
+        lastSeenAt: "2020-01-01T00:00:00.000Z",
+        count: 1,
+        runIds: ["run-old"],
+      },
+    });
+    const medFinding = writeFinding({
+      id: "mem_med0000000000000",
+      fingerprint: "fp_med0000000000000",
+      contentHash: "ch_med0000000000000",
+      locations: [{ path: "real.ts", line: 1 }],
+      occurrence: {
+        firstSeenAt: "2020-01-01T00:00:00.000Z",
+        lastSeenAt: "2020-01-01T00:00:00.000Z",
+        count: 1,
+        runIds: ["run-old"],
+      },
+    });
+
+    const event1 = {
+      type: "finding.discovered" as const,
+      eventId: "evt_high000000000001",
+      at: "2020-01-01T00:00:00.000Z",
+      finding: highFinding,
+    };
+    const event2 = {
+      type: "finding.discovered" as const,
+      eventId: "evt_med0000000000001",
+      at: "2020-01-01T00:00:00.000Z",
+      finding: medFinding,
+    };
+    writeSegment(paths, [event1, event2], "run-seed");
+
+    const { events } = readAllEventSegments(paths);
+    const state = rebuildMaterializedStateFromEvents(events);
+    writeMaterializedState(paths, state);
+
+    return repoRoot;
+  }
+
+  it("--dry-run prints planned marks for high-confidence only and does NOT mutate state", () => {
+    const paths = makeTempMemoryRepo();
+    const repoRoot = seedHighAndMediumViaEvents(paths);
+    process.chdir(repoRoot);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "apply-suggestions", "--dry-run"]);
+
+    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(output).toContain("mem_high000000000000");
+    expect(output).not.toContain("mem_med0000000000000");
+
+    const stateAfter = readMaterializedState(paths);
+    const highAfter = stateAfter?.findings.find((f) => f.id === "mem_high000000000000");
+    expect(highAfter?.status).toBe("open");
+  });
+
+  it("applies high-confidence only (real run)", () => {
+    const paths = makeTempMemoryRepo();
+    const repoRoot = seedHighAndMediumViaEvents(paths);
+    process.chdir(repoRoot);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "apply-suggestions"]);
+
+    const stateAfter = readMaterializedState(paths);
+    const highAfter = stateAfter?.findings.find((f) => f.id === "mem_high000000000000");
+    const medAfter = stateAfter?.findings.find((f) => f.id === "mem_med0000000000000");
+    expect(highAfter?.status).toBe("stale");
+    expect(medAfter?.status).toBe("open");
+  });
+
+  it("honors memory.suggestions.enabled === false", () => {
+    const paths = makeTempMemoryRepo();
+    const repoRoot = seedHighAndMediumViaEvents(paths);
+    writeConfig(repoRoot, { enabled: true, suggestions: { enabled: false } });
+    process.chdir(repoRoot);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "apply-suggestions"]);
+
+    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(output).toContain("suggestions disabled");
+
+    const stateAfter = readMaterializedState(paths);
+    const highAfter = stateAfter?.findings.find((f) => f.id === "mem_high000000000000");
+    expect(highAfter?.status).toBe("open");
+  });
+
+  it("prints 'nothing to apply' when there are zero high-confidence suggestions", () => {
+    const paths = makeTempMemoryRepo();
+    const repoRoot = path.dirname(path.dirname(paths.root));
+    fs.writeFileSync(path.join(repoRoot, "real.ts"), "x");
+
+    const medFinding = writeFinding({
+      id: "mem_med0000000000000",
+      fingerprint: "fp_med0000000000000",
+      contentHash: "ch_med0000000000000",
+      locations: [{ path: "real.ts", line: 1 }],
+      occurrence: {
+        firstSeenAt: "2020-01-01T00:00:00.000Z",
+        lastSeenAt: "2020-01-01T00:00:00.000Z",
+        count: 1,
+        runIds: ["run-old"],
+      },
+    });
+    const event = {
+      type: "finding.discovered" as const,
+      eventId: "evt_med0000000000001",
+      at: "2020-01-01T00:00:00.000Z",
+      finding: medFinding,
+    };
+    writeSegment(paths, [event], "run-seed-med");
+    const { events } = readAllEventSegments(paths);
+    const state = rebuildMaterializedStateFromEvents(events);
+    writeMaterializedState(paths, state);
+
+    process.chdir(repoRoot);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called");
+    }) as never);
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "apply-suggestions"]);
+
+    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(output).toContain("no high-confidence suggestions to apply");
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
+  });
+
+  it("partial-failure exit code", async () => {
+    vi.resetModules();
+
+    const { makeTempRepo: makeTempMemoryRepoFresh, writeSegment: writeSegmentFresh, writeFinding: writeFindingFresh } = await import("./_helpers.js");
+    const { readAllEventSegments: readAllEventSegmentsFresh } = await import("../../src/memory/events.js");
+    const { rebuildMaterializedStateFromEvents: rebuildFresh, writeMaterializedState: writeFresh, readMaterializedState: readFresh } = await import("../../src/memory/store.js");
+
+    const paths = makeTempMemoryRepoFresh();
+    const repoRoot = path.dirname(path.dirname(paths.root));
+    tempDirs.push(repoRoot);
+
+    const high1 = writeFindingFresh({
+      id: "mem_high000000000000",
+      fingerprint: "fp_high000000000000",
+      contentHash: "ch_high000000000000",
+      locations: [{ path: "gone1.ts", line: 1 }],
+      occurrence: {
+        firstSeenAt: "2020-01-01T00:00:00.000Z",
+        lastSeenAt: "2020-01-01T00:00:00.000Z",
+        count: 1,
+        runIds: ["run-old"],
+      },
+    });
+    const high2 = writeFindingFresh({
+      id: "mem_high000000000001",
+      fingerprint: "fp_high000000000001",
+      contentHash: "ch_high000000000001",
+      locations: [{ path: "gone2.ts", line: 1 }],
+      occurrence: {
+        firstSeenAt: "2020-01-01T00:00:00.000Z",
+        lastSeenAt: "2020-01-01T00:00:00.000Z",
+        count: 1,
+        runIds: ["run-old"],
+      },
+    });
+
+    const event1 = {
+      type: "finding.discovered" as const,
+      eventId: "evt_high000000000001",
+      at: "2020-01-01T00:00:00.000Z",
+      finding: high1,
+    };
+    const event2 = {
+      type: "finding.discovered" as const,
+      eventId: "evt_high000000000002",
+      at: "2020-01-01T00:00:00.000Z",
+      finding: high2,
+    };
+    writeSegmentFresh(paths, [event1, event2], "run-seed-partial");
+    const { events } = readAllEventSegmentsFresh(paths);
+    const state = rebuildFresh(events);
+    writeFresh(paths, state);
+
+    vi.doMock("../../src/memory/mark.js", () => ({
+      runMemoryMark: vi.fn((o: { findingId: string; status: string; reason?: string; cwd?: string }) => {
+        if (o.findingId === "mem_high000000000001") {
+          throw new Error("boom");
+        }
+        return {
+          success: true,
+          findingId: o.findingId,
+          previousStatus: "open",
+          newStatus: "stale",
+          eventId: "evt_mock000000000001",
+          segmentPath: "/mock/segment.jsonl",
+        };
+      }),
+    }));
+
+    const { createCliProgram: createCliProgramFresh } = await import("../../src/cli.js");
+
+    process.chdir(repoRoot);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+
+    const program = createCliProgramFresh();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+
+    try {
+      program.parse(["node", "omre", "memory", "apply-suggestions"]);
+    } catch {
+      // exitOverride or the process.exit mock throws a sentinel error
+    }
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
   });
 });
