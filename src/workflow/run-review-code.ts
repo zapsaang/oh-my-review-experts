@@ -1,10 +1,11 @@
+import fs from "node:fs";
 import path from "node:path";
 import { loadConfig } from "../config/load-config.js";
 import type { OmreConfig, ReviewDimensionType } from "../config/schema.js";
 import { getChangedFiles, getDiffSummary, getUnifiedDiff } from "../tools/git.js";
 import { writeReport } from "../tools/report.js";
 import { redactSecrets } from "../tools/secret-scanner.js";
-import { formatTimestamp } from "../tools/fs-utils.js";
+import { formatTimestamp, assertSafePath } from "../tools/fs-utils.js";
 import { estimatePlan } from "./slicing.js";
 import { buildHandoffRuntime, buildReportWriterInputRule, buildSubagentCatalog, REVIEW_MEMORY_CONTRACT } from "../agents/prompts.js";
 import type { MemoryContextPack } from "../memory/context-pack.js";
@@ -14,6 +15,7 @@ import { readMaterializedState } from "../memory/store.js";
 import { parseReviewScope, ScopeResolutionError, AmbiguousScopeError } from "./scope-resolver.js";
 import type { EstimatedPlan } from "./types.js";
 import type { ReviewScope } from "./scope-resolver.js";
+import { writeRunMeta } from "./run-meta.js";
 
 export interface ReviewCodeInput {
   args?: string;
@@ -287,6 +289,11 @@ ${prompt}
 `;
     return { prompt: echoPrompt, estimatedTasks: 0, files, runId };
   }
+
+  const handoffDirPath = path.resolve(cwd, handoffDir, runId);
+  assertSafePath(handoffDirPath, path.resolve(cwd), "handoffDirPath");
+  fs.mkdirSync(handoffDirPath, { recursive: true });
+  writeRunMeta(handoffDirPath, { withMemory: memoryFlags.isWithMemory, noMemory: memoryFlags.isNoMemory });
 
   return { prompt, estimatedTasks: plan.estimatedTasks, files, runId };
 }

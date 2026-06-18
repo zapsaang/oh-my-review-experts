@@ -399,6 +399,40 @@ describe("buildReviewCodePrompt", () => {
       expect(bundle.prompt).not.toContain("MEMORY CONTEXT FOR");
     });
   });
+
+  it("writes the run-meta marker with withMemory=true, noMemory=false when --with-memory is set", () => {
+    withCleanGitRepo((cwd) => {
+      clearLoadConfigCache();
+      const bundle = buildReviewCodePrompt({ args: "", cwd: path.resolve(cwd), isWithMemory: true });
+
+      const markerPath = path.join(path.resolve(cwd), ".omre", "handoffs", bundle.runId, ".run-meta.json");
+      expect(fs.existsSync(markerPath)).toBe(true);
+      const marker = JSON.parse(fs.readFileSync(markerPath, "utf8")) as { withMemory: boolean; noMemory: boolean };
+      expect(marker).toEqual({ withMemory: true, noMemory: false });
+    });
+  });
+
+  it("writes the run-meta marker with withMemory=false, noMemory=true when isNoMemory is true", () => {
+    withCleanGitRepo((cwd) => {
+      clearLoadConfigCache();
+      const bundle = buildReviewCodePrompt({ args: "", cwd: path.resolve(cwd), isNoMemory: true });
+
+      const markerPath = path.join(path.resolve(cwd), ".omre", "handoffs", bundle.runId, ".run-meta.json");
+      expect(fs.existsSync(markerPath)).toBe(true);
+      const marker = JSON.parse(fs.readFileSync(markerPath, "utf8")) as { withMemory: boolean; noMemory: boolean };
+      expect(marker).toEqual({ withMemory: false, noMemory: true });
+    });
+  });
+
+  it("does not write marker in echo mode", () => {
+    withCleanGitRepo((cwd) => {
+      clearLoadConfigCache();
+      const bundle = buildReviewCodePrompt({ args: "--echo-prompt", cwd: path.resolve(cwd), isWithMemory: true });
+
+      const markerPath = path.join(path.resolve(cwd), ".omre", "handoffs", bundle.runId, ".run-meta.json");
+      expect(fs.existsSync(markerPath)).toBe(false);
+    });
+  });
 });
 
 describe("stripMemoryFlags", () => {
