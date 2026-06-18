@@ -511,6 +511,11 @@
         "similarity": {
           "semanticWeight": 0.4,
           "tokenWeight": 0.6
+        },
+        "suggestions": {
+          "enabled": true,
+          "skipImportSource": true,
+          "timeDecayDays": 90
         }
       },
       "description": "Review Memory v0.4 settings.",
@@ -822,6 +827,31 @@
               "maximum": 1,
               "minimum": 0,
               "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "suggestions": {
+          "additionalProperties": false,
+          "default": {
+            "enabled": true,
+            "skipImportSource": true,
+            "timeDecayDays": 90
+          },
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "skipImportSource": {
+              "default": true,
+              "type": "boolean"
+            },
+            "timeDecayDays": {
+              "default": 90,
+              "maximum": 3650,
+              "minimum": 1,
+              "type": "integer"
             }
           },
           "type": "object"
