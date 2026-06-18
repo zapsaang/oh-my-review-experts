@@ -105,9 +105,10 @@ export const MemoryConfigSchema = z.object({
     redactProblem: false,
     allowedTokensInSearchable: [],
   })),
-  // Formalizes suggestion defaults. NOT yet wired into generateSuggestions
-  // (src/memory/suggestions.ts) — a future PR will read these. Kept in sync
-  // with that function's parameter defaults (timeDecayDays=90, skipImport=true).
+  // Suggestion defaults consumed by the CLI suggestions commands
+  // (src/memory/cli.ts), which read these values and pass them to
+  // generateSuggestions() via SuggestionOptions. Kept in sync with that
+  // function's parameter defaults (timeDecayDays=90, skipImportSource=true).
   suggestions: z.object({
     enabled: z.boolean().default(true),
     timeDecayDays: z.number().int().min(1).max(3650).default(90),
