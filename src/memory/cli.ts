@@ -2,6 +2,7 @@ import { runMemoryCheck, renderCheckResult } from "./check.js";
 import { runMemoryMark } from "./mark.js";
 import { runMemoryCompact } from "./compact.js";
 import { runMemoryGc } from "./gc.js";
+import { generateSuggestions } from "./suggestions.js";
 import type { Command } from "commander";
 import { loadConfig } from "../config/load-config.js";
 import { runIndexLatest, type IndexLatestOptions, type IndexLatestResult } from "./indexing.js";
@@ -160,6 +161,24 @@ export function registerMemoryCli(program: Command): void {
         console.log("gc summary updated");
       });
     });
+
+  memory.command("suggestions")
+    .description("List stale-finding suggestions with confidence and reason")
+    .action(() => {
+      runMemoryCliAction("memory suggestions", () => runMemorySuggestions());
+    });
+
+  memory.command("apply-suggestions")
+    .description("Apply high-confidence stale-finding suggestions")
+    .option("--dry-run", "show what would be marked without writing", false)
+    .action(async (opts: { dryRun?: boolean }) => {
+      try {
+        await runMemoryApplySuggestions({ dryRun: !!opts.dryRun });
+      } catch (err) {
+        console.error(`memory apply-suggestions failed: ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+      }
+    });
 }
 
 function runMemoryCliAction(commandName: string, action: () => void): void {
@@ -289,6 +308,85 @@ function runMemoryStats(options: MemoryReadCliOptions = {}): void {
     (f) => f.status === "fixed" && f.occurrence.runIds.length > 1,
   ).length;
   output.log(`regression candidates: ${regressionCandidates}`);
+}
+
+function runMemorySuggestions(): void {
+  const repoRoot = process.cwd();
+  const loaded = loadMaterializedMemory({});
+  if (loaded === null) {
+    return;
+  }
+
+  if (loaded.memoryConfig.suggestions.enabled === false) {
+    console.log("suggestions disabled by config");
+    return;
+  }
+
+  const result = generateSuggestions(loaded.state.findings, {
+    repoRoot,
+    timeDecayDays: loaded.memoryConfig.suggestions.timeDecayDays,
+    skipImportSourceForFileDeletion: loaded.memoryConfig.suggestions.skipImportSource,
+  });
+
+  if (result.suggestions.length === 0) {
+    console.log("no suggestions");
+    return;
+  }
+
+  const byId = new Map(loaded.state.findings.map(f => [f.id, f]));
+  for (const s of result.suggestions) {
+    const title = byId.get(s.findingId)?.title?.slice(0, 80) ?? "(unknown)";
+    console.log(`${s.findingId} | ${s.confidence} | ${s.triggeredBy} | ${title} | ${s.reason}`);
+  }
+}
+
+function runMemoryApplySuggestions({ dryRun }: { dryRun: boolean }): void {
+  const repoRoot = process.cwd();
+  const loaded = loadMaterializedMemory({});
+  if (loaded === null) {
+    return;
+  }
+
+  if (loaded.memoryConfig.suggestions.enabled === false) {
+    console.log("suggestions disabled by config");
+    return;
+  }
+
+  const result = generateSuggestions(loaded.state.findings, {
+    repoRoot,
+    timeDecayDays: loaded.memoryConfig.suggestions.timeDecayDays,
+    skipImportSourceForFileDeletion: loaded.memoryConfig.suggestions.skipImportSource,
+  });
+
+  const high = result.suggestions.filter(s => s.confidence === "high");
+  if (high.length === 0) {
+    console.log("no high-confidence suggestions to apply");
+    return;
+  }
+
+  if (dryRun) {
+    const byId = new Map(loaded.state.findings.map(f => [f.id, f]));
+    for (const s of high) {
+      const title = byId.get(s.findingId)?.title?.slice(0, 80) ?? "";
+      console.log(`[dry-run] ${s.findingId} → stale${title ? ` (${title})` : ""}`);
+    }
+    return;
+  }
+
+  let failures = 0;
+  for (const s of high) {
+    try {
+      runMemoryMark({ findingId: s.findingId, status: "stale", reason: s.reason, cwd: process.cwd() });
+      console.log(`marked ${s.findingId} as stale`);
+    } catch (err) {
+      console.error(`failed to mark ${s.findingId}: ${err instanceof Error ? err.message : String(err)}`);
+      failures++;
+    }
+  }
+
+  if (failures > 0) {
+    process.exit(1);
+  }
 }
 
 function loadMaterializedMemory(options: MemoryReadCliOptions): LoadedMaterializedState | null {
