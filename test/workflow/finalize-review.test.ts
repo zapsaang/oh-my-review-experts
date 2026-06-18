@@ -976,4 +976,56 @@ describe("finalizeReview — regression rendering", () => {
       fs.rmSync(cwd, { recursive: true, force: true });
     }
   });
+
+  it("throws when handoff directory does not exist for the runId", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "nonexistent-run-id";
+
+      const { finalizeReview } = await loadFinalizeReview();
+      expect(() => finalizeReview({ runId, cwd })).toThrow(
+        `finalizeReview: handoff directory does not exist for runId "${runId}"`
+      );
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("throws when handoff path exists but is not a directory", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-not-a-dir";
+      const handoffDir = path.join(cwd, ".omre", "handoffs", runId);
+      fs.writeFileSync(handoffDir, "I am a file, not a directory", "utf8");
+
+      const { finalizeReview } = await loadFinalizeReview();
+      expect(() => finalizeReview({ runId, cwd })).toThrow(
+        `finalizeReview: handoff path is not a directory: ${handoffDir}`
+      );
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("renders 'No issues found' when handoff has no findings", async () => {
+    const cwd = createTempProject();
+    try {
+      const runId = "run-zero-findings";
+      writeHandoffFile(cwd, runId, "handoff-1.md", {
+        findings: [],
+      });
+
+      const { finalizeReview } = await loadFinalizeReview();
+      finalizeReview({ runId, cwd });
+
+      const latestMd = fs.readFileSync(
+        path.join(cwd, ".omre", "reports", "latest.md"),
+        "utf8"
+      );
+      expect(latestMd).toContain("No issues found in covered dimensions");
+      expect(latestMd).toContain("Reviewers completed without raising any actionable findings");
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  });
 });
