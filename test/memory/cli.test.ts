@@ -6,8 +6,8 @@ import { Command } from "commander";
 import { createCliProgram } from "../../src/cli.js";
 import { registerMemoryCli, runIndexLatest } from "../../src/memory/cli.js";
 import { readAllEventSegments } from "../../src/memory/events.js";
-import { resolveMemoryPaths } from "../../src/memory/paths.js";
-import { readMaterializedState, writeMaterializedState } from "../../src/memory/store.js";
+import { resolveMemoryPaths, type MemoryPaths } from "../../src/memory/paths.js";
+import { readMaterializedState, writeMaterializedState, rebuildMaterializedStateFromEvents } from "../../src/memory/store.js";
 import {
   makeTempRepo as makeTempMemoryRepo,
   seedManifest,
@@ -733,5 +733,177 @@ describe("memory CLI registration", () => {
         "gc",
       ]),
     );
+  });
+});
+
+describe("memory stats - regression count", () => {
+  const tempPaths: MemoryPaths[] = [];
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+    vi.restoreAllMocks();
+    tempDirs.splice(0).forEach((d) => fs.rmSync(d, { recursive: true, force: true }));
+    for (const paths of tempPaths.splice(0)) {
+      fs.rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+
+  it("counts fixed findings with multiple runIds as regression candidates", () => {
+    const paths = makeTempMemoryRepo();
+    tempPaths.push(paths);
+    const state = seedManifest(paths);
+    state.findings.push(
+      writeFinding({
+        id: "mem_reg0000000000fixed",
+        status: "fixed",
+        occurrence: {
+          firstSeenAt: "2026-05-28T00:00:00.000Z",
+          lastSeenAt: "2026-05-28T00:00:00.000Z",
+          count: 2,
+          runIds: ["run-a", "run-b"],
+        },
+      }),
+    );
+    writeMaterializedState(paths, state);
+    process.chdir(path.dirname(path.dirname(paths.root)));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "stats"]);
+
+    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(output).toContain("regression candidates: 1");
+  });
+
+  it("excludes fixed findings seen in only one run", () => {
+    const paths = makeTempMemoryRepo();
+    tempPaths.push(paths);
+    const state = seedManifest(paths);
+    state.findings.push(
+      writeFinding({
+        id: "mem_fixedsingle00001",
+        status: "fixed",
+        occurrence: {
+          firstSeenAt: "2026-05-28T00:00:00.000Z",
+          lastSeenAt: "2026-05-28T00:00:00.000Z",
+          count: 1,
+          runIds: ["run-a"],
+        },
+      }),
+    );
+    writeMaterializedState(paths, state);
+    process.chdir(path.dirname(path.dirname(paths.root)));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "stats"]);
+
+    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(output).toContain("regression candidates: 0");
+  });
+
+  it("excludes non-fixed findings seen in multiple runs", () => {
+    const paths = makeTempMemoryRepo();
+    tempPaths.push(paths);
+    const state = seedManifest(paths);
+    state.findings.push(
+      writeFinding({
+        id: "mem_opentworuns00001",
+        status: "open",
+        occurrence: {
+          firstSeenAt: "2026-05-28T00:00:00.000Z",
+          lastSeenAt: "2026-05-28T00:00:00.000Z",
+          count: 2,
+          runIds: ["run-a", "run-b"],
+        },
+      }),
+    );
+    writeMaterializedState(paths, state);
+    process.chdir(path.dirname(path.dirname(paths.root)));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "stats"]);
+
+    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(output).toContain("regression candidates: 0");
+  });
+
+  it("shows 0 when there are no findings", () => {
+    const paths = makeTempMemoryRepo();
+    tempPaths.push(paths);
+    const state = seedManifest(paths);
+    writeMaterializedState(paths, state);
+    process.chdir(path.dirname(path.dirname(paths.root)));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "stats"]);
+
+    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(output).toContain("regression candidates: 0");
+    expect(output).toContain("memory stats");
+  });
+
+  it("counts fixed findings via event reconstruction", () => {
+    const paths = makeTempMemoryRepo();
+    tempPaths.push(paths);
+
+    // Build state through event segments rather than direct materialized mutation.
+    const event1 = {
+      type: "finding.discovered" as const,
+      eventId: "evt_ev00000000000001",
+      at: "2026-05-28T00:00:00.000Z",
+      finding: writeFinding({
+        id: "mem_ev00000000000000",
+        status: "open",
+        occurrence: {
+          firstSeenAt: "2026-05-28T00:00:00.000Z",
+          lastSeenAt: "2026-05-28T00:00:00.000Z",
+          count: 1,
+          runIds: ["run-ev-1"],
+        },
+      }),
+    };
+    const event2 = {
+      type: "finding.seen_again" as const,
+      eventId: "evt_ev00000000000002",
+      at: "2026-05-28T00:00:00.000Z",
+      findingId: "mem_ev00000000000000",
+      runId: "run-ev-2",
+      sourcePath: "src/auth.ts",
+      matchedBy: "hash",
+    };
+    writeSegment(paths, [event1], "run-ev-1");
+    writeSegment(paths, [event2], "run-ev-2");
+
+    // Rebuild materialized state from event segments to verify the pipeline path.
+    const { events } = readAllEventSegments(paths);
+    const state = rebuildMaterializedStateFromEvents(events);
+    expect(state.findings).toHaveLength(1);
+    expect(state.findings[0].occurrence.runIds).toEqual(["run-ev-1", "run-ev-2"]);
+
+    // Mark fixed and persist.
+    state.findings[0].status = "fixed";
+    writeMaterializedState(paths, state);
+
+    process.chdir(path.dirname(path.dirname(paths.root)));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "stats"]);
+
+    const output = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(output).toContain("regression candidates: 1");
   });
 });

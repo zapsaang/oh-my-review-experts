@@ -279,6 +279,16 @@ function runMemoryStats(options: MemoryReadCliOptions = {}): void {
   for (const reviewer of Array.from(reviewerCounts.keys()).sort()) {
     output.log(`  ${reviewer}: ${reviewerCounts.get(reviewer) ?? 0}`);
   }
+
+  // Heuristic: a "regression candidate" is a fixed finding seen across multiple
+  // runs. This OVER-counts (multiple runIds != a true regression) and is only an
+  // approximation. The precise count reads finding.regressed events
+  // (readAllEventSegments + filter by event type, see schema.ts:114); deferred
+  // to a future PR — the heuristic is sufficient for stats visibility in v0.5.
+  const regressionCandidates = loaded.state.findings.filter(
+    (f) => f.status === "fixed" && f.occurrence.runIds.length > 1,
+  ).length;
+  output.log(`regression candidates: ${regressionCandidates}`);
 }
 
 function loadMaterializedMemory(options: MemoryReadCliOptions): LoadedMaterializedState | null {

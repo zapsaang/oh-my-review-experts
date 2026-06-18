@@ -211,6 +211,36 @@ describe("MemoryConfigSchema", () => {
   });
 });
 
+describe("MemoryConfigSchema - suggestions", () => {
+  it("defaults suggestions.enabled to true", () => {
+    expect(MemoryConfigSchema.parse({}).suggestions.enabled).toBe(true);
+  });
+
+  it("defaults suggestions.timeDecayDays to 90", () => {
+    expect(MemoryConfigSchema.parse({}).suggestions.timeDecayDays).toBe(90);
+  });
+
+  it("defaults suggestions.skipImportSource to true", () => {
+    expect(MemoryConfigSchema.parse({}).suggestions.skipImportSource).toBe(true);
+  });
+
+  it("loads config without suggestions section (backward compat)", () => {
+    const c = MemoryConfigSchema.parse({ enabled: false });
+    expect(c.suggestions).toEqual({ enabled: true, timeDecayDays: 90, skipImportSource: true });
+  });
+
+  it("validates timeDecayDays bounds (1..3650)", () => {
+    expect(() => MemoryConfigSchema.parse({ suggestions: { timeDecayDays: 0 } })).toThrow();
+    expect(() => MemoryConfigSchema.parse({ suggestions: { timeDecayDays: 3651 } })).toThrow();
+    expect(MemoryConfigSchema.parse({ suggestions: { timeDecayDays: 1 } }).suggestions.timeDecayDays).toBe(1);
+    expect(MemoryConfigSchema.parse({ suggestions: { timeDecayDays: 3650 } }).suggestions.timeDecayDays).toBe(3650);
+  });
+
+  it("fills defaults on partial suggestions override", () => {
+    expect(MemoryConfigSchema.parse({ suggestions: { enabled: false } }).suggestions).toEqual({ enabled: false, timeDecayDays: 90, skipImportSource: true });
+  });
+});
+
 describe("OmreConfigSchema memory integration", () => {
   it("injects default memory config", () => {
     const config = OmreConfigSchema.parse({});

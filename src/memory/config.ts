@@ -105,6 +105,18 @@ export const MemoryConfigSchema = z.object({
     redactProblem: false,
     allowedTokensInSearchable: [],
   })),
+  // Formalizes suggestion defaults. NOT yet wired into generateSuggestions
+  // (src/memory/suggestions.ts) — a future PR will read these. Kept in sync
+  // with that function's parameter defaults (timeDecayDays=90, skipImport=true).
+  suggestions: z.object({
+    enabled: z.boolean().default(true),
+    timeDecayDays: z.number().int().min(1).max(3650).default(90),
+    skipImportSource: z.boolean().default(true),
+  }).default(() => structuredClone({
+    enabled: true,
+    timeDecayDays: 90,
+    skipImportSource: true,
+  })),
 });
 
 export type MemoryConfig = z.infer<typeof MemoryConfigSchema>;
