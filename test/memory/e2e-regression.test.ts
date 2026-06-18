@@ -8,6 +8,14 @@ import {
   writeHandoffFile,
   buildRegressionFinding,
 } from "../helpers/finalize-fixtures.js";
+import { resolveMemoryPaths, ensureMemoryDirs } from "../../src/memory/paths.js";
+import type { MemoryPaths } from "../../src/memory/paths.js";
+import { readAllEventSegments } from "../../src/memory/events.js";
+import { rebuildMaterializedStateFromEvents, writeMaterializedState } from "../../src/memory/store.js";
+import { runMemoryMark } from "../../src/memory/mark.js";
+import { finalizeReview } from "../../src/workflow/finalize-review.js";
+import type { MemoryFinding, MemoryEvent } from "../../src/memory/schema.js";
+import { seedManifest, writeSegment, writeFinding } from "./_helpers.js";
 
 interface FinalizeReviewInput {
   runId: string;
@@ -279,5 +287,130 @@ describe("e2e regression detection", () => {
     expect(latestMd).toContain("--with-memory");
     expect(latestMd).toContain("memory.retrieval.enabled");
     expect(latestMd).not.toContain("No historical regressions detected");
+  });
+
+  // ========== PR24: True End-to-End Cases ==========
+
+  function seedFixedMemoryFinding(
+    tmpDir: string,
+    overrides: Partial<MemoryFinding> = {}
+  ): { finding: MemoryFinding; paths: MemoryPaths } {
+    const paths = resolveMemoryPaths(tmpDir);
+    ensureMemoryDirs(paths);
+    seedManifest(paths);
+
+    const finding = writeFinding({
+      status: "open",
+      ...overrides,
+    });
+
+    const discoveryEvent: MemoryEvent = {
+      type: "finding.discovered",
+      eventId: "evt_test_00000001",
+      at: "2026-06-01T00:00:00.000Z",
+      finding,
+    };
+
+    writeSegment(paths, [discoveryEvent], "run-e2e-seed");
+
+    const { events } = readAllEventSegments(paths);
+    const state = rebuildMaterializedStateFromEvents(events);
+    writeMaterializedState(paths, state);
+
+    runMemoryMark({ findingId: finding.id, status: "fixed", cwd: tmpDir });
+
+    return { finding, paths };
+  }
+
+  it("renders regression section from real fixed memory finding (full chain)", () => {
+    const { finding } = seedFixedMemoryFinding(tmpDir, {
+      id: "mem_e2efixed123456789",
+      title: "Hardcoded secret in auth module",
+      locations: [{ path: "src/auth.ts", line: 42 }],
+    });
+
+    const runId = "run-e2e-regression-full";
+    writeHandoffFile(tmpDir, runId, "handoff-1.md", {
+      findings: [
+        buildRegressionFinding({
+          memoryRefs: [finding.id],
+          regressionReason: "Previously fixed finding has reappeared",
+        }),
+      ],
+    });
+
+    finalizeReview({ runId, cwd: tmpDir, withMemory: true });
+
+    const latestMd = fs.readFileSync(
+      path.join(tmpDir, ".omre", "reports", "latest.md"),
+      "utf8"
+    );
+    const latestJson = JSON.parse(
+      fs.readFileSync(
+        path.join(tmpDir, ".omre", "reports", "latest.json"),
+        "utf8"
+      )
+    );
+
+    expect(latestMd).toContain("## Historical Regressions");
+    expect(latestMd).toContain(finding.id);
+    expect(latestMd).toContain("**1** finding(s) recur");
+    expect(latestMd).toContain("Hardcoded secret");
+    expect(latestMd).toContain("🔴 **Historical Regression**");
+
+    expect(latestJson.summary.regression_count).toBe(1);
+    expect(latestJson.regressions).toHaveLength(1);
+    expect(latestJson.regressions[0].finding_id).toBe("sec-1");
+    expect(latestJson.regressions[0].memory_refs).toContain(finding.id);
+    expect(latestJson.regressions[0].regression_reason).toBe(
+      "Previously fixed finding has reappeared"
+    );
+  });
+
+  it("shows no regressions when retrieval active but no regression reported (full chain)", () => {
+    const { finding } = seedFixedMemoryFinding(tmpDir, {
+      id: "mem_e2enoregr123456789",
+      title: "Unused variable in utils",
+      locations: [{ path: "src/utils.ts", line: 10 }],
+    });
+
+    const runId = "run-e2e-no-regression";
+    writeHandoffFile(tmpDir, runId, "handoff-1.md", {
+      findings: [
+        {
+          id: "qlty-1",
+          severity: "low",
+          file: "src/utils.ts",
+          line: 10,
+          title: "Unused variable",
+          description: "Variable is declared but never used",
+          evidence: "const unused = 42;",
+          confidence: "high",
+          classification: "dead-code",
+          isRegression: false,
+        },
+      ],
+    });
+
+    finalizeReview({ runId, cwd: tmpDir, withMemory: true });
+
+    const latestMd = fs.readFileSync(
+      path.join(tmpDir, ".omre", "reports", "latest.md"),
+      "utf8"
+    );
+    const latestJson = JSON.parse(
+      fs.readFileSync(
+        path.join(tmpDir, ".omre", "reports", "latest.json"),
+        "utf8"
+      )
+    );
+
+    expect(latestMd).toContain("## Historical Regressions");
+    expect(latestMd).toContain("No historical regressions detected");
+    expect(latestMd).toContain("None of this run's findings match previously-fixed issues");
+    expect(latestMd).not.toContain(finding.id);
+
+    expect(latestJson.summary.regression_count).toBe(0);
+    expect(latestJson.regressions).toHaveLength(0);
   });
 });
