@@ -99,36 +99,21 @@ export function writeMaterializedState(
   state: MaterializedState,
 ): MaterializedState {
   const canonicalFindings = state.findings.map((finding) => MemoryFindingSchema.parse(finding));
-
   const diskManifest = {
     ...state.manifest,
     includedEventFiles: scanEventFiles(paths),
     compactedInputSegments: state.manifest.compactedInputSegments ?? [],
     materializedHash: hashFindings(canonicalFindings),
   };
-
   const diskRelatedIndex = structuredClone(state.relatedIndex);
-
   const diskState: MaterializedState = {
     findings: canonicalFindings,
     manifest: diskManifest,
     relatedIndex: diskRelatedIndex,
   };
-
-  // Write memory.jsonl FIRST
-  const memoryContent = canonicalFindings
-    .map((finding) => JSON.stringify(finding))
-    .join("\n") + "\n";
-  writeFileAtomicOverwrite(paths.memoryFile, memoryContent);
-
-  // Write related-index.json SECOND
-  const relatedContent = JSON.stringify(diskRelatedIndex);
-  writeFileAtomicOverwrite(paths.relatedIndexFile, relatedContent);
-
-  // Write manifest.json LAST (commit point)
-  const manifestContent = JSON.stringify(diskManifest);
-  writeFileAtomicOverwrite(paths.manifestFile, manifestContent, { fsync: true });
-
+  writeFileAtomicOverwrite(paths.memoryFile, canonicalFindings.map((finding) => JSON.stringify(finding)).join("\n") + "\n");
+  writeFileAtomicOverwrite(paths.relatedIndexFile, JSON.stringify(diskRelatedIndex));
+  writeFileAtomicOverwrite(paths.manifestFile, JSON.stringify(diskManifest), { fsync: true });
   return diskState;
 }
 
