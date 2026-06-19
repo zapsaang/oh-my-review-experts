@@ -37,11 +37,30 @@ export function writeFileAtomic(filePath: string, content: string, maxAttempts =
   );
 }
 
-export function writeFileAtomicOverwrite(filePath: string, content: string): void {
+export function writeFileAtomicOverwrite(
+  filePath: string,
+  content: string,
+  options?: { fsync?: boolean },
+): void {
   const tmpFile = makeTempPath(filePath);
   try {
     fs.writeFileSync(tmpFile, content, { flag: "wx", encoding: "utf8" });
+    if (options?.fsync) {
+      const fd = fs.openSync(tmpFile, "r");
+      fs.fsyncSync(fd);
+      fs.closeSync(fd);
+    }
     fs.renameSync(tmpFile, filePath);
+    if (options?.fsync) {
+      try {
+        const dirPath = path.dirname(filePath);
+        const dirFd = fs.openSync(dirPath, "r");
+        fs.fsyncSync(dirFd);
+        fs.closeSync(dirFd);
+      } catch {
+        // best-effort: platform may not support directory fsync (NTFS)
+      }
+    }
   } catch (err) {
     try { fs.unlinkSync(tmpFile); } catch { }
     throw err;
