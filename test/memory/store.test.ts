@@ -219,6 +219,23 @@ function hashAsRead(findings: MemoryFinding[]): string {
   return hashFindings(normalized);
 }
 
+function deepFreeze<T>(obj: T): T {
+  if (obj === null || typeof obj !== "object") {
+    return obj;
+  }
+  Object.freeze(obj);
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      deepFreeze(item);
+    }
+  } else {
+    for (const key of Object.keys(obj)) {
+      deepFreeze((obj as Record<string, unknown>)[key]);
+    }
+  }
+  return obj;
+}
+
 describe("materialized memory store", () => {
   let tmpDir: string;
   let paths: MemoryPaths;
@@ -270,6 +287,42 @@ describe("materialized memory store", () => {
     expect(renameTargets).toEqual([paths.memoryFile, paths.relatedIndexFile, paths.manifestFile]);
     expect(stateAfterRelatedWrite).toBeNull();
     expect(readMaterializedState(paths)).toEqual(state);
+  });
+
+  it("does not mutate the input state", () => {
+    const state = validState();
+    const snapshotBefore = JSON.parse(JSON.stringify(state));
+    const frozen = deepFreeze(state);
+    writeMaterializedState(paths, frozen);
+    expect(frozen).toEqual(snapshotBefore);
+  });
+
+  it("returns the state that was written to disk", () => {
+    const state = validState();
+      const written = writeMaterializedState(paths, state) as unknown as MaterializedState | undefined;
+    expect(written).toBeDefined();
+    expect(readMaterializedState(paths)).toEqual(written);
+  });
+
+  it("defensively recomputes hash and canonicalizes findings, without mutating input", () => {
+    const finding = validFinding({ tags: undefined });
+    const state = validState({
+      findings: [finding],
+      manifest: validManifest({ materializedHash: "wronghash1234567890" }),
+    });
+    const snapshotBefore = JSON.parse(JSON.stringify(state));
+
+    expect(() => {
+    const written = writeMaterializedState(paths, state) as unknown as MaterializedState | undefined;
+      expect(written).toBeDefined();
+      expect(written!.manifest.materializedHash).not.toBe("wronghash1234567890");
+      expect(written!.findings[0]!.tags).toEqual([]);
+      expect(readMaterializedState(paths)).toEqual(written);
+    }).not.toThrow();
+
+    expect(state.manifest.materializedHash).toBe("wronghash1234567890");
+    expect(state.findings[0]!.tags).toBeUndefined();
+    expect(state).toEqual(snapshotBefore);
   });
 
   it("rebuilds unique findings from finding.discovered events", () => {
