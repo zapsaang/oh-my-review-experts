@@ -1,12 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { hostname } from "node:os";
+import { randomBytes } from "node:crypto";
 import { assertSafePath } from "../tools/fs-utils.js";
 import type { MemoryPaths } from "./paths.js";
 
 export interface LockHandle {
   lockDir: string;
   acquiredAt: string;
+  ownerToken: string;
 }
 
 export interface AcquireLockOptions {
@@ -19,6 +21,7 @@ export interface LockOwnerInfo {
   pid: number;
   hostname: string;
   acquiredAt: string;
+  token: string;
 }
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -89,21 +92,35 @@ export function acquireMemoryLock(
 
   // Acquired — write owner metadata.
   const acquiredAt = new Date().toISOString();
+  const ownerToken = randomBytes(16).toString("hex");
   const ownerInfo: LockOwnerInfo = {
     pid: process.pid,
     hostname: hostname(),
     acquiredAt,
+    token: ownerToken,
   };
   const ownerPath = path.join(lockDir, "owner.json");
   fs.writeFileSync(ownerPath, JSON.stringify(ownerInfo), "utf8");
 
-  return { lockDir, acquiredAt };
+  return { lockDir, acquiredAt, ownerToken };
 }
 
 /**
  * Release the lock. Idempotent — does not throw if the lock dir is gone.
+ *
+ * Verifies ownership before deleting: reads owner.json and only removes the
+ * lock dir when the stored token matches handle.ownerToken. This prevents a
+ * stale handle from deleting a lock that another process has since re-acquired
+ * (stale-steal release race). If owner.json is missing we fall back to legacy
+ * behavior and delete (the dir is ours or already orphaned).
  */
 export function releaseMemoryLock(handle: LockHandle): void {
+  const owner = readOwnerSafe(handle.lockDir);
+  if (owner !== null && owner.token !== handle.ownerToken) {
+    // The lock dir we hold a handle for now belongs to a different owner —
+    // another process stole/re-acquired it. Do not delete it.
+    return;
+  }
   fs.rmSync(handle.lockDir, { recursive: true, force: true });
 }
 
@@ -132,9 +149,35 @@ function isEexist(err: unknown): boolean {
   );
 }
 
+function isEnoent(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as NodeJS.ErrnoException).code === "ENOENT"
+  );
+}
+
+/**
+ * Read owner.json, discriminating by error type. The null return is consumed by
+ * two callers with opposite intent — acquireMemoryLock treats null as "use mtime
+ * fallback" (safe) while releaseMemoryLock treats null as "delete the lock dir"
+ * (dangerous on a permission error). So we only return null when deletion is
+ * actually safe:
+ *   - ENOENT (owner.json missing): the dir is ours or orphaned → null.
+ *   - JSON parse failure (corrupt owner.json): conservative delete → null.
+ *   - EACCES / EPERM / any other fs error: rethrow so releaseMemoryLock never
+ *     silently deletes a lock it cannot prove is ours.
+ */
 function readOwnerSafe(lockDir: string): LockOwnerInfo | null {
+  let raw: string;
   try {
-    const raw = fs.readFileSync(path.join(lockDir, "owner.json"), "utf8");
+    raw = fs.readFileSync(path.join(lockDir, "owner.json"), "utf8");
+  } catch (err: unknown) {
+    if (isEnoent(err)) return null;
+    throw err;
+  }
+  try {
     return JSON.parse(raw) as LockOwnerInfo;
   } catch {
     return null;

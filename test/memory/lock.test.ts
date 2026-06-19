@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { createHash } from "node:crypto";
 import {
   acquireMemoryLock,
   releaseMemoryLock,
@@ -10,7 +9,7 @@ import {
   type LockOwnerInfo,
 } from "../../src/memory/lock.js";
 import { resolveMemoryPaths, ensureMemoryDirs, type MemoryPaths } from "../../src/memory/paths.js";
-import { readMaterializedState } from "../../src/memory/store.js";
+import { readMaterializedState, hashFindings } from "../../src/memory/store.js";
 import { writeFileAtomicOverwrite } from "../../src/tools/fs-utils.js";
 import type { MemoryFinding, MemoryManifest } from "../../src/memory/schema.js";
 
@@ -76,8 +75,7 @@ describe("memory lock", () => {
   }
 
   function computeHash(findings: MemoryFinding[]): string {
-    const content = findings.map((finding) => finding.id).join("\n");
-    return createHash("sha256").update(content).digest("hex").slice(0, 16);
+    return hashFindings(findings);
   }
 
   function makeManifest(overrides: Partial<MemoryManifest> = {}): MemoryManifest {
@@ -86,7 +84,7 @@ describe("memory lock", () => {
       eventSchemaVersion: 1,
       viewSchemaVersion: 1,
       lastRebuiltAt: "2026-05-28T00:00:00.000Z",
-      materializedHash: "mat1234567890abcdef",
+      materializedHash: "e3b0c44298fc1c14",
       relatedIndexHash: "rel1234567890abcdef",
       includedEventFiles: [],
       compactedInputSegments: [],
@@ -137,6 +135,7 @@ describe("memory lock", () => {
       pid: 999_999,
       hostname: "ghost-host",
       acquiredAt: oldAcquiredAt,
+      token: "staletoken00000000000000000000ff",
     };
     fs.writeFileSync(path.join(paths.lockFile, "owner.json"), JSON.stringify(staleOwner), "utf8");
 
@@ -159,6 +158,7 @@ describe("memory lock", () => {
       pid: 999_999,
       hostname: "ghost-host",
       acquiredAt: new Date(Date.now() - 120_000).toISOString(),
+      token: "staletoken00000000000000000000ff",
     };
     fs.writeFileSync(path.join(paths.lockFile, "owner.json"), JSON.stringify(staleOwner), "utf8");
 
@@ -321,5 +321,76 @@ describe("memory lock", () => {
     expect(fs.existsSync(handle.lockDir)).toBe(true);
     const owner = readOwner(handle.lockDir);
     expect(owner.pid).toBe(process.pid);
+  });
+
+  // #16
+  it("releaseMemoryLock does not delete a lock stolen by another process", () => {
+    const handle = acquireMemoryLock(paths);
+    expect(fs.existsSync(handle.lockDir)).toBe(true);
+
+    // Simulate a steal: the original lock dir is renamed away as stale, and a
+    // fresh lock dir is created at the same path with a different owner token —
+    // exactly what another process re-acquiring the lock would leave behind.
+    const staleDest = `${paths.lockFile}.stolen`;
+    fs.renameSync(handle.lockDir, staleDest);
+    fs.mkdirSync(paths.lockFile);
+    const thiefOwner: LockOwnerInfo = {
+      pid: process.pid + 1,
+      hostname: "thief-host",
+      acquiredAt: new Date().toISOString(),
+      token: "thieftoken0000000000000000000011",
+    };
+    fs.writeFileSync(
+      path.join(paths.lockFile, "owner.json"),
+      JSON.stringify(thiefOwner),
+      "utf8",
+    );
+
+    // The original handle's release must be a no-op against the new owner.
+    releaseMemoryLock(handle);
+
+    expect(fs.existsSync(paths.lockFile)).toBe(true);
+    expect(readOwner(paths.lockFile).token).toBe(thiefOwner.token);
+
+    fs.rmSync(staleDest, { recursive: true, force: true });
+  });
+
+  // #17
+  it("releaseMemoryLock deletes the lock when owner.json is missing", () => {
+    const handle = acquireMemoryLock(paths);
+    fs.rmSync(path.join(handle.lockDir, "owner.json"));
+
+    releaseMemoryLock(handle);
+
+    expect(fs.existsSync(paths.lockFile)).toBe(false);
+  });
+
+  // #18
+  it("releaseMemoryLock deletes the lock when owner.json is corrupt", () => {
+    const handle = acquireMemoryLock(paths);
+    fs.writeFileSync(path.join(handle.lockDir, "owner.json"), "{not json", "utf8");
+
+    releaseMemoryLock(handle);
+
+    expect(fs.existsSync(paths.lockFile)).toBe(false);
+  });
+
+  // #19
+  it("releaseMemoryLock does NOT delete when owner.json is unreadable (EACCES)", () => {
+    const handle = acquireMemoryLock(paths);
+    const ownerPath = path.join(handle.lockDir, "owner.json");
+
+    const realReadFileSync = fs.readFileSync.bind(fs);
+    vi.spyOn(fs, "readFileSync").mockImplementation((p, opts) => {
+      if (p.toString() === ownerPath) {
+        const err = new Error("EACCES") as NodeJS.ErrnoException;
+        err.code = "EACCES";
+        throw err;
+      }
+      return realReadFileSync(p, opts as BufferEncoding);
+    });
+
+    expect(() => releaseMemoryLock(handle)).toThrow();
+    expect(fs.existsSync(paths.lockFile)).toBe(true);
   });
 });
