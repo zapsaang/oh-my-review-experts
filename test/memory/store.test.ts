@@ -260,11 +260,11 @@ describe("materialized memory store", () => {
   it("round-trips findings, manifest, and related index from disk", () => {
     const state = validState();
 
-    writeMaterializedState(paths, state);
+    const written = writeMaterializedState(paths, state);
 
     const memoryLines = fs.readFileSync(paths.memoryFile, "utf8").trimEnd().split("\n");
     expect(memoryLines).toHaveLength(2);
-    expect(readMaterializedState(paths)).toEqual(state);
+    expect(readMaterializedState(paths)).toEqual(written);
   });
 
   it("writes memory and related index before manifest as the commit point", () => {
@@ -282,11 +282,11 @@ describe("materialized memory store", () => {
       }
     });
 
-    writeMaterializedState(paths, state);
+    const written = writeMaterializedState(paths, state);
 
     expect(renameTargets).toEqual([paths.memoryFile, paths.relatedIndexFile, paths.manifestFile]);
     expect(stateAfterRelatedWrite).toBeNull();
-    expect(readMaterializedState(paths)).toEqual(state);
+    expect(readMaterializedState(paths)).toEqual(written);
   });
 
   it("does not mutate the input state", () => {
@@ -299,7 +299,7 @@ describe("materialized memory store", () => {
 
   it("returns the state that was written to disk", () => {
     const state = validState();
-      const written = writeMaterializedState(paths, state) as unknown as MaterializedState | undefined;
+    const written = writeMaterializedState(paths, state);
     expect(written).toBeDefined();
     expect(readMaterializedState(paths)).toEqual(written);
   });
@@ -313,7 +313,7 @@ describe("materialized memory store", () => {
     const snapshotBefore = JSON.parse(JSON.stringify(state));
 
     expect(() => {
-    const written = writeMaterializedState(paths, state) as unknown as MaterializedState | undefined;
+      const written = writeMaterializedState(paths, state);
       expect(written).toBeDefined();
       expect(written!.manifest.materializedHash).not.toBe("wronghash1234567890");
       expect(written!.findings[0]!.tags).toEqual([]);

@@ -97,16 +97,23 @@ export function readMemoryManifest(paths: MemoryPaths): MemoryManifest | null {
 export function writeMaterializedState(
   paths: MemoryPaths,
   state: MaterializedState,
-): void {
+): MaterializedState {
   const canonicalFindings = state.findings.map((finding) => MemoryFindingSchema.parse(finding));
-  state.findings = canonicalFindings;
 
-  state.manifest.includedEventFiles = scanEventFiles(paths);
-  state.manifest.compactedInputSegments = state.manifest.compactedInputSegments ?? [];
-  // Defensive: always recompute the canonical hash on write so the persisted
-  // manifest can never drift from the findings it describes, even if the caller
-  // passed a stale or hand-built hash in `state.manifest`.
-  state.manifest.materializedHash = hashFindings(canonicalFindings);
+  const diskManifest = {
+    ...state.manifest,
+    includedEventFiles: scanEventFiles(paths),
+    compactedInputSegments: state.manifest.compactedInputSegments ?? [],
+    materializedHash: hashFindings(canonicalFindings),
+  };
+
+  const diskRelatedIndex = structuredClone(state.relatedIndex);
+
+  const diskState: MaterializedState = {
+    findings: canonicalFindings,
+    manifest: diskManifest,
+    relatedIndex: diskRelatedIndex,
+  };
 
   // Write memory.jsonl FIRST
   const memoryContent = canonicalFindings
@@ -115,12 +122,14 @@ export function writeMaterializedState(
   writeFileAtomicOverwrite(paths.memoryFile, memoryContent);
 
   // Write related-index.json SECOND
-  const relatedContent = JSON.stringify(state.relatedIndex);
+  const relatedContent = JSON.stringify(diskRelatedIndex);
   writeFileAtomicOverwrite(paths.relatedIndexFile, relatedContent);
 
   // Write manifest.json LAST (commit point)
-  const manifestContent = JSON.stringify(state.manifest);
+  const manifestContent = JSON.stringify(diskManifest);
   writeFileAtomicOverwrite(paths.manifestFile, manifestContent, { fsync: true });
+
+  return diskState;
 }
 
 /**
