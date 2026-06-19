@@ -15,9 +15,9 @@ export interface MemoryPaths {
   relatedIndexFile: string;
   manifestFile: string;
   tmpDir: string;
-  /** Reserved for Claim 2: concurrent write lock. */
+  /** Directory for repo-level memory write locks. */
   locksDir: string;
-  /** Reserved for Claim 2: concurrent write lock. */
+  /** Lock directory for concurrent write protection (mkdir-based advisory lock). */
   lockFile: string;
 }
 
