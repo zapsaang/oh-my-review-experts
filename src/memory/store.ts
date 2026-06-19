@@ -24,7 +24,21 @@ export interface MaterializedState {
   relatedIndex: RelatedIndex;
 }
 
+const MAX_READ_RETRIES = 1;
+const READ_RETRY_DELAY_MS = 25;
+
 export function readMaterializedState(paths: MemoryPaths): MaterializedState | null {
+  return readMaterializedStateImpl(paths, 0);
+}
+
+function sleepBeforeRetry(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function readMaterializedStateImpl(
+  paths: MemoryPaths,
+  retryCount: number,
+): MaterializedState | null {
   const manifest = readMemoryManifest(paths);
   if (manifest === null) {
     return null;
@@ -54,6 +68,20 @@ export function readMaterializedState(paths: MemoryPaths): MaterializedState | n
     relatedIndex = RelatedIndexSchema.parse(JSON.parse(relatedRaw));
   }
 
+  const computed = hashFindings(findings);
+  if (isValidComputedHash(manifest.materializedHash) && computed !== manifest.materializedHash) {
+    if (retryCount < MAX_READ_RETRIES) {
+      // FIX-4: a hash mismatch usually means we read memory.jsonl mid-write,
+      // between a writer's data write and its manifest commit. A brief backoff
+      // and re-read lets the writer finish. This retry path primarily benefits
+      // lock-free readers (trends/stats/search); lock-holding writers
+      // (mark/gc/compact) already have exclusive access and never race here.
+      sleepBeforeRetry(READ_RETRY_DELAY_MS);
+      return readMaterializedStateImpl(paths, retryCount + 1);
+    }
+    return null;
+  }
+
   return { findings, manifest, relatedIndex };
 }
 
@@ -75,6 +103,7 @@ export function writeMaterializedState(
 
   state.manifest.includedEventFiles = scanEventFiles(paths);
   state.manifest.compactedInputSegments = state.manifest.compactedInputSegments ?? [];
+  state.manifest.materializedHash = hashFindings(canonicalFindings);
 
   // Write memory.jsonl FIRST
   const memoryContent = canonicalFindings
@@ -88,7 +117,7 @@ export function writeMaterializedState(
 
   // Write manifest.json LAST (commit point)
   const manifestContent = JSON.stringify(state.manifest);
-  writeFileAtomicOverwrite(paths.manifestFile, manifestContent);
+  writeFileAtomicOverwrite(paths.manifestFile, manifestContent, { fsync: true });
 }
 
 /**
@@ -248,6 +277,13 @@ export function rebuildMaterializedStateFromEvents(events: MemoryEvent[]): Mater
 function hashFindings(findings: MemoryFinding[]): string {
   const content = findings.map((finding) => finding.id).join("\n");
   return createHash("sha256").update(content).digest("hex").slice(0, 16);
+}
+
+// Self-check only applies to canonical hashes (16 lowercase hex, as emitted by
+// hashFindings + writeMaterializedState). Legacy or hand-written manifests carry
+// non-canonical placeholders; treat those as unverifiable rather than corrupt.
+function isValidComputedHash(value: string): boolean {
+  return /^[a-f0-9]{16}$/.test(value);
 }
 
 function hashRelatedIndex(relatedIndex: RelatedIndex): string {
