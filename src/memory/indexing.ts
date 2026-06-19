@@ -7,6 +7,7 @@ import { compareMemoryEvents, createEventBatchContext, readAllEventSegments, wri
 import { extractStructuredFindings } from "./extractor/index.js";
 import type { RawFinding } from "./extractor/types.js";
 import { normalizeMemoryFinding, type NormalizeContext } from "./normalize.js";
+import { withMemoryLock } from "./lock.js";
 import { ensureMemoryDirs, resolveMemoryPaths, type MemoryPaths } from "./paths.js";
 import { redactRawFinding } from "./redaction.js";
 import type { MemoryFinding } from "./schema.js";
@@ -141,21 +142,24 @@ export function runIndexLatest(options: IndexLatestOptions = {}): IndexLatestRes
   assertCompatibleEventSchema(paths);
   ensureMemoryDirs(paths);
 
-  const segment = writeEventSegment(paths, dedupeResult.events.sort(compareMemoryEvents), runId);
-  const { events: allEvents, skipped } = readAllEventSegments(paths);
-  if (skipped > 0) {
-    output.log(`warning: skipped ${skipped} corrupted event lines during rebuild`);
-  }
-  const state = rebuildMaterializedStateFromEvents(allEvents);
-  writeMaterializedState(paths, state);
+  const written = withMemoryLock(paths, () => {
+    const segment = writeEventSegment(paths, dedupeResult.events.sort(compareMemoryEvents), runId);
+    const { events: allEvents, skipped } = readAllEventSegments(paths);
+    if (skipped > 0) {
+      output.log(`warning: skipped ${skipped} corrupted event lines during rebuild`);
+    }
+    const state = rebuildMaterializedStateFromEvents(allEvents);
+    writeMaterializedState(paths, state);
+    return { segment, state };
+  });
 
-  output.log(`event segment: ${segment.segmentPath}`);
-  output.log(`materialized findings: ${state.findings.length}`);
+  output.log(`event segment: ${written.segment.segmentPath}`);
+  output.log(`materialized findings: ${written.state.findings.length}`);
 
   return {
     ...result,
-    segmentPath: segment.segmentPath,
-    materializedFindings: state.findings.length,
+    segmentPath: written.segment.segmentPath,
+    materializedFindings: written.state.findings.length,
   };
 }
 

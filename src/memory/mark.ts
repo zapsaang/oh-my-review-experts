@@ -1,4 +1,5 @@
 import { createEventBatchContext, nextEventId, readAllEventSegments, writeEventSegment } from "./events.js";
+import { withMemoryLock } from "./lock.js";
 import { ensureMemoryDirs, resolveMemoryPaths } from "./paths.js";
 import { MemoryEventSchema, normalizeMemoryStatus } from "./schema.js";
 import {
@@ -50,46 +51,48 @@ export function runMemoryMark(options: MarkOptions): MarkResult {
   const paths = resolveMemoryPaths(options.cwd ?? process.cwd());
   ensureMemoryDirs(paths);
 
-  const state = readMaterializedState(paths);
-  if (state === null) {
-    throw new Error("no memory state found");
-  }
+  return withMemoryLock(paths, () => {
+    const state = readMaterializedState(paths);
+    if (state === null) {
+      throw new Error("no memory state found");
+    }
 
-  const finding = state.findings.find((candidate) => candidate.id === options.findingId);
-  if (finding === undefined) {
-    throw new Error(`finding not found: ${options.findingId}`);
-  }
+    const finding = state.findings.find((candidate) => candidate.id === options.findingId);
+    if (finding === undefined) {
+      throw new Error(`finding not found: ${options.findingId}`);
+    }
 
-  const previousStatus = finding.status;
-  const newStatus = normalizeMemoryStatus(options.status);
+    const previousStatus = finding.status;
+    const newStatus = normalizeMemoryStatus(options.status);
 
-  if (!isValidTransition(previousStatus, newStatus)) {
-    throw new Error(`invalid transition: ${previousStatus} → ${newStatus}`);
-  }
+    if (!isValidTransition(previousStatus, newStatus)) {
+      throw new Error(`invalid transition: ${previousStatus} → ${newStatus}`);
+    }
 
-  const batchCtx = createEventBatchContext(MARK_RUN_ID);
-  const event = MemoryEventSchema.parse({
-    type: "finding.status_changed",
-    eventId: nextEventId(batchCtx),
-    at: new Date().toISOString(),
-    findingId: options.findingId,
-    from: previousStatus,
-    to: newStatus,
-    markedBy: MARK_MARKED_BY,
+    const batchCtx = createEventBatchContext(MARK_RUN_ID);
+    const event = MemoryEventSchema.parse({
+      type: "finding.status_changed",
+      eventId: nextEventId(batchCtx),
+      at: new Date().toISOString(),
+      findingId: options.findingId,
+      from: previousStatus,
+      to: newStatus,
+      markedBy: MARK_MARKED_BY,
+    });
+
+    const segment = writeEventSegment(paths, [event], MARK_RUN_ID);
+
+    const { events } = readAllEventSegments(paths);
+    const rebuilt = rebuildMaterializedStateFromEvents(events);
+    writeMaterializedState(paths, rebuilt);
+
+    return {
+      success: true,
+      findingId: options.findingId,
+      previousStatus,
+      newStatus,
+      eventId: event.eventId,
+      segmentPath: segment.segmentPath,
+    };
   });
-
-  const segment = writeEventSegment(paths, [event], MARK_RUN_ID);
-
-  const { events } = readAllEventSegments(paths);
-  const rebuilt = rebuildMaterializedStateFromEvents(events);
-  writeMaterializedState(paths, rebuilt);
-
-  return {
-    success: true,
-    findingId: options.findingId,
-    previousStatus,
-    newStatus,
-    eventId: event.eventId,
-    segmentPath: segment.segmentPath,
-  };
 }

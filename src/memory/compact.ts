@@ -3,6 +3,7 @@ import path from "node:path";
 import { loadConfigUnsafe } from "../config/load-config.js";
 import { compareMemoryEvents } from "./events.js";
 import { sha256File } from "./ids.js";
+import { withMemoryLock } from "./lock.js";
 import { resolveMemoryPaths, type MemoryPaths } from "./paths.js";
 import { quarantineFile } from "./quarantine.js";
 import { MemoryEventSchema, type CompactedSegment, type MemoryEvent } from "./schema.js";
@@ -29,64 +30,67 @@ export function runMemoryCompact(options: CompactOptions = {}): CompactResult {
   const cwd = options.cwd ?? process.cwd();
   const config = loadConfigUnsafe(cwd).memory;
   const paths = resolveMemoryPaths(cwd, config.directory);
-  const maxDurationMs = config.compaction.maxCompactDurationMs;
 
-  const uncompacted = listUncompactedRawSegments(paths);
-  if (uncompacted.length === 0) {
-    return { success: true, compactedSegments: [], durationMs: Date.now() - start };
-  }
+  return withMemoryLock(paths, () => {
+    const maxDurationMs = config.compaction.maxCompactDurationMs;
 
-  if (options.dryRun) {
-    const planned = planDryRun(paths, uncompacted);
-    return { success: true, compactedSegments: planned, durationMs: Date.now() - start };
-  }
-
-  const merged: MemoryEvent[] = [];
-  const consumedRawPaths: string[] = [];
-
-  for (const segPath of uncompacted) {
-    if (Date.now() - start > maxDurationMs) {
-      break;
+    const uncompacted = listUncompactedRawSegments(paths);
+    if (uncompacted.length === 0) {
+      return { success: true, compactedSegments: [], durationMs: Date.now() - start };
     }
 
-    const segmentEvents = readSegmentEvents(paths, segPath);
-    if (segmentEvents === null) {
-      continue;
+    if (options.dryRun) {
+      const planned = planDryRun(paths, uncompacted);
+      return { success: true, compactedSegments: planned, durationMs: Date.now() - start };
     }
 
-    merged.push(...segmentEvents);
-    consumedRawPaths.push(segPath);
-  }
+    const merged: MemoryEvent[] = [];
+    const consumedRawPaths: string[] = [];
 
-  if (consumedRawPaths.length === 0) {
-    return { success: true, compactedSegments: [], durationMs: Date.now() - start };
-  }
+    for (const segPath of uncompacted) {
+      if (Date.now() - start > maxDurationMs) {
+        break;
+      }
 
-  const dedupedSorted = dedupeAndSort(merged);
-  const compactedAbs = writeCompactedFile(paths, dedupedSorted);
-  const compactedRel = path.relative(paths.root, compactedAbs);
-  const compactedSha256 = sha256File(compactedAbs);
-  const compactedAt = new Date().toISOString();
+      const segmentEvents = readSegmentEvents(paths, segPath);
+      if (segmentEvents === null) {
+        continue;
+      }
 
-  const newEntries: CompactedSegment[] = consumedRawPaths.map((rawAbs) => ({
-    rawPath: path.relative(paths.root, rawAbs),
-    rawSha256: sha256File(rawAbs),
-    compactedPath: compactedRel,
-    compactedSha256,
-    compactedAt,
-  }));
+      merged.push(...segmentEvents);
+      consumedRawPaths.push(segPath);
+    }
 
-  updateManifest(paths, newEntries);
+    if (consumedRawPaths.length === 0) {
+      return { success: true, compactedSegments: [], durationMs: Date.now() - start };
+    }
 
-  return {
-    success: true,
-    compactedSegments: [{
-      rawPaths: consumedRawPaths.map((rawAbs) => path.relative(paths.root, rawAbs)),
+    const dedupedSorted = dedupeAndSort(merged);
+    const compactedAbs = writeCompactedFile(paths, dedupedSorted);
+    const compactedRel = path.relative(paths.root, compactedAbs);
+    const compactedSha256 = sha256File(compactedAbs);
+    const compactedAt = new Date().toISOString();
+
+    const newEntries: CompactedSegment[] = consumedRawPaths.map((rawAbs) => ({
+      rawPath: path.relative(paths.root, rawAbs),
+      rawSha256: sha256File(rawAbs),
       compactedPath: compactedRel,
-      eventCount: dedupedSorted.length,
-    }],
-    durationMs: Date.now() - start,
-  };
+      compactedSha256,
+      compactedAt,
+    }));
+
+    updateManifest(paths, newEntries);
+
+    return {
+      success: true,
+      compactedSegments: [{
+        rawPaths: consumedRawPaths.map((rawAbs) => path.relative(paths.root, rawAbs)),
+        compactedPath: compactedRel,
+        eventCount: dedupedSorted.length,
+      }],
+      durationMs: Date.now() - start,
+    };
+  });
 }
 
 function listUncompactedRawSegments(paths: MemoryPaths): string[] {

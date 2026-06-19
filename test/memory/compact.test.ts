@@ -149,10 +149,13 @@ describe("runMemoryCompact", () => {
     writeSegment(paths, [makeEvent({ at: "2026-05-28T02:00:00.000Z" })], "run-2");
     writeSegment(paths, [makeEvent({ at: "2026-05-28T03:00:00.000Z" })], "run-3");
 
-    // Control the clock: start at 1000, allow one segment, then exceed the
-    // 3000ms default budget so the loop stops before the next file-read.
+    // Control the clock: start at 1000, absorb the lock's deadline read, allow
+    // one segment, then exceed the 3000ms default budget so the loop stops
+    // before the next file-read. Call order: start, acquireMemoryLock deadline,
+    // loop iter 1 check, loop iter 2 check (over budget).
     const nowSpy = vi.spyOn(Date, "now");
     nowSpy
+      .mockReturnValueOnce(1000)
       .mockReturnValueOnce(1000)
       .mockReturnValueOnce(1000)
       .mockReturnValue(1000 + 3001);

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { loadConfigUnsafe } from "../config/load-config.js";
+import { withMemoryLock } from "./lock.js";
 import { resolveMemoryPaths, type MemoryPaths } from "./paths.js";
 import { readMaterializedState, writeMaterializedState } from "./store.js";
 import { writeFileAtomicOverwrite, formatTimestamp } from "../tools/fs-utils.js";
@@ -55,157 +56,159 @@ export function runMemoryGc(options: GcOptions): GcResult {
   const paths = resolveMemoryPaths(cwd, config.memory.directory);
   const retention = config.memory.retention;
 
-  // Snapshot the manifest ONCE (C5). May be null if memory was never built.
-  const state = readMaterializedState(paths);
-  const manifest = state?.manifest ?? null;
+  return withMemoryLock(paths, () => {
+    // Snapshot the manifest ONCE (C5). May be null if memory was never built.
+    const state = readMaterializedState(paths);
+    const manifest = state?.manifest ?? null;
 
-  const now = Date.now();
-  const plan: DeletionPlan = {
-    tmpFiles: [],
-    emptySegments: [],
-    compactedRawSegments: [],
-    overflowRawSegments: [],
-    quarantineFiles: [],
-  };
+    const now = Date.now();
+    const plan: DeletionPlan = {
+      tmpFiles: [],
+      emptySegments: [],
+      compactedRawSegments: [],
+      overflowRawSegments: [],
+      quarantineFiles: [],
+    };
 
-  // Track every raw segment that is already accounted for by an earlier rule
-  // so each file is evaluated ONCE (first match wins).
-  const claimedSegments = new Set<string>();
+    // Track every raw segment that is already accounted for by an earlier rule
+    // so each file is evaluated ONCE (first match wins).
+    const claimedSegments = new Set<string>();
 
-  // --- Rule 1: tmp-expired ---
-  const tmpMaxAgeMs = retention.tmpFileMaxAgeHours * MS_PER_HOUR;
-  for (const filePath of listFiles(paths.tmpDir)) {
-    if (!isWithinRoot(filePath, paths)) continue;
-    const mtimeMs = safeMtimeMs(filePath);
-    if (mtimeMs === null) continue;
-    if (now - mtimeMs > tmpMaxAgeMs) {
-      plan.tmpFiles.push(filePath);
+    // --- Rule 1: tmp-expired ---
+    const tmpMaxAgeMs = retention.tmpFileMaxAgeHours * MS_PER_HOUR;
+    for (const filePath of listFiles(paths.tmpDir)) {
+      if (!isWithinRoot(filePath, paths)) continue;
+      const mtimeMs = safeMtimeMs(filePath);
+      if (mtimeMs === null) continue;
+      if (now - mtimeMs > tmpMaxAgeMs) {
+        plan.tmpFiles.push(filePath);
+      }
     }
-  }
 
-  // --- Rule 2: empty-segment ---
-  for (const filePath of listFiles(paths.segmentsDir)) {
-    if (!isWithinRoot(filePath, paths)) continue;
-    if (claimedSegments.has(filePath)) continue;
-    const size = safeSize(filePath);
-    if (size === 0) {
-      plan.emptySegments.push(filePath);
-      claimedSegments.add(filePath);
+    // --- Rule 2: empty-segment ---
+    for (const filePath of listFiles(paths.segmentsDir)) {
+      if (!isWithinRoot(filePath, paths)) continue;
+      if (claimedSegments.has(filePath)) continue;
+      const size = safeSize(filePath);
+      if (size === 0) {
+        plan.emptySegments.push(filePath);
+        claimedSegments.add(filePath);
+      }
     }
-  }
 
-  // --- Rule 3: compacted-raw-expired ---
-  // Raw segment referenced in manifest.compactedInputSegments AND older than
-  // retention.rawSegmentKeepDays. If compactedInputSegments is legacy string[],
-  // REFUSE this rule for safety and emit a warning.
-  const rawKeepMs = retention.rawSegmentKeepDays * MS_PER_DAY;
-  if (manifest !== null) {
-    const segments = manifest.compactedInputSegments;
-    if (isLegacyStringArray(segments)) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        "memory gc: compactedInputSegments is a legacy string[]; refusing compacted-raw-expired deletions for safety",
-      );
-    } else {
-      for (const entry of segments as CompactedSegment[]) {
-        const rawAbs = path.resolve(paths.root, entry.rawPath);
-        if (!isWithinRoot(rawAbs, paths)) continue;
-        if (claimedSegments.has(rawAbs)) continue;
-        if (!fs.existsSync(rawAbs)) continue;
-        const mtimeMs = safeMtimeMs(rawAbs);
-        if (mtimeMs === null) continue;
-        if (now - mtimeMs > rawKeepMs) {
-          plan.compactedRawSegments.push(rawAbs);
-          claimedSegments.add(rawAbs);
+    // --- Rule 3: compacted-raw-expired ---
+    // Raw segment referenced in manifest.compactedInputSegments AND older than
+    // retention.rawSegmentKeepDays. If compactedInputSegments is legacy string[],
+    // REFUSE this rule for safety and emit a warning.
+    const rawKeepMs = retention.rawSegmentKeepDays * MS_PER_DAY;
+    if (manifest !== null) {
+      const segments = manifest.compactedInputSegments;
+      if (isLegacyStringArray(segments)) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "memory gc: compactedInputSegments is a legacy string[]; refusing compacted-raw-expired deletions for safety",
+        );
+      } else {
+        for (const entry of segments as CompactedSegment[]) {
+          const rawAbs = path.resolve(paths.root, entry.rawPath);
+          if (!isWithinRoot(rawAbs, paths)) continue;
+          if (claimedSegments.has(rawAbs)) continue;
+          if (!fs.existsSync(rawAbs)) continue;
+          const mtimeMs = safeMtimeMs(rawAbs);
+          if (mtimeMs === null) continue;
+          if (now - mtimeMs > rawKeepMs) {
+            plan.compactedRawSegments.push(rawAbs);
+            claimedSegments.add(rawAbs);
+          }
         }
       }
     }
-  }
 
-  // --- Rule 4: raw-segment-overflow ---
-  // Keep the most recent `maxRawSegments`; delete the rest, oldest first.
-  // Compute the overflow set ONCE (C2).
-  const maxRawSegments = retention.maxRawSegments;
-  const rawByMtime = listRawSegmentsSortedByMtime(paths); // newest first
-  const overflow = rawByMtime.slice(maxRawSegments);
-  for (const filePath of overflow) {
-    if (!isWithinRoot(filePath, paths)) continue;
-    if (claimedSegments.has(filePath)) continue;
-    plan.overflowRawSegments.push(filePath);
-    claimedSegments.add(filePath);
-  }
-
-  // --- Quarantine cleanup ---
-  const quarantineOlderThanDays = options.quarantine?.olderThanDays;
-  if (quarantineOlderThanDays !== undefined) {
-    const quarantineMaxAgeMs = quarantineOlderThanDays * MS_PER_DAY;
-    for (const filePath of listFiles(paths.quarantineDir)) {
+    // --- Rule 4: raw-segment-overflow ---
+    // Keep the most recent `maxRawSegments`; delete the rest, oldest first.
+    // Compute the overflow set ONCE (C2).
+    const maxRawSegments = retention.maxRawSegments;
+    const rawByMtime = listRawSegmentsSortedByMtime(paths); // newest first
+    const overflow = rawByMtime.slice(maxRawSegments);
+    for (const filePath of overflow) {
       if (!isWithinRoot(filePath, paths)) continue;
-      // Skip sidecar meta files here; they are deleted alongside their data file.
-      if (filePath.endsWith(".meta.json")) continue;
-      const mtimeMs = safeMtimeMs(filePath);
-      if (mtimeMs === null) continue;
-      if (now - mtimeMs > quarantineMaxAgeMs) {
-        plan.quarantineFiles.push(filePath);
+      if (claimedSegments.has(filePath)) continue;
+      plan.overflowRawSegments.push(filePath);
+      claimedSegments.add(filePath);
+    }
+
+    // --- Quarantine cleanup ---
+    const quarantineOlderThanDays = options.quarantine?.olderThanDays;
+    if (quarantineOlderThanDays !== undefined) {
+      const quarantineMaxAgeMs = quarantineOlderThanDays * MS_PER_DAY;
+      for (const filePath of listFiles(paths.quarantineDir)) {
+        if (!isWithinRoot(filePath, paths)) continue;
+        // Skip sidecar meta files here; they are deleted alongside their data file.
+        if (filePath.endsWith(".meta.json")) continue;
+        const mtimeMs = safeMtimeMs(filePath);
+        if (mtimeMs === null) continue;
+        if (now - mtimeMs > quarantineMaxAgeMs) {
+          plan.quarantineFiles.push(filePath);
+        }
       }
     }
-  }
 
-  const deleted = {
-    tmpFiles: plan.tmpFiles.length,
-    emptySegments: plan.emptySegments.length,
-    compactedRawSegments: plan.compactedRawSegments.length,
-    overflowRawSegments: plan.overflowRawSegments.length,
-    quarantineFiles: plan.quarantineFiles.length,
-  };
-
-  // --- dryRun: return the plan WITHOUT deleting or writing ---
-  if (dryRun) {
-    return { success: true, deleted };
-  }
-
-  // --- Perform deletions (guarded once more at the boundary) ---
-  for (const filePath of plan.tmpFiles) safeUnlink(filePath, paths);
-  for (const filePath of plan.emptySegments) safeUnlink(filePath, paths);
-  for (const filePath of plan.compactedRawSegments) safeUnlink(filePath, paths);
-  for (const filePath of plan.overflowRawSegments) safeUnlink(filePath, paths);
-  for (const filePath of plan.quarantineFiles) {
-    safeUnlink(filePath, paths);
-    const metaPath = `${filePath}.meta.json`;
-    if (fs.existsSync(metaPath)) {
-      safeUnlink(metaPath, paths);
-    }
-  }
-
-  // --- Write gc log segment ---
-  const at = new Date().toISOString();
-  const gcLogPath = writeGcLog(paths, at, deleted);
-
-  // --- Update + write manifest LAST (commit point) ---
-  if (manifest !== null && state !== null) {
-    const deletedRawSegments =
-      deleted.emptySegments + deleted.compactedRawSegments + deleted.overflowRawSegments;
-
-    const updatedManifest: MemoryManifest = {
-      ...manifest,
-      gcSummary: {
-        lastGcAt: at,
-        deletedRawSegments: manifest.gcSummary.deletedRawSegments + deletedRawSegments,
-        deletedTmpFiles: manifest.gcSummary.deletedTmpFiles + deleted.tmpFiles,
-        deletedQuarantineFiles: manifest.gcSummary.deletedQuarantineFiles + deleted.quarantineFiles,
-      },
-      compactedInputSegments: cleanCompactedInputSegments(manifest, paths),
-      quarantine: cleanQuarantine(manifest, paths),
+    const deleted = {
+      tmpFiles: plan.tmpFiles.length,
+      emptySegments: plan.emptySegments.length,
+      compactedRawSegments: plan.compactedRawSegments.length,
+      overflowRawSegments: plan.overflowRawSegments.length,
+      quarantineFiles: plan.quarantineFiles.length,
     };
 
-    writeMaterializedState(paths, {
-      findings: state.findings,
-      manifest: updatedManifest,
-      relatedIndex: state.relatedIndex,
-    });
-  }
+    // --- dryRun: return the plan WITHOUT deleting or writing ---
+    if (dryRun) {
+      return { success: true, deleted };
+    }
 
-  return { success: true, deleted, gcLogPath };
+    // --- Perform deletions (guarded once more at the boundary) ---
+    for (const filePath of plan.tmpFiles) safeUnlink(filePath, paths);
+    for (const filePath of plan.emptySegments) safeUnlink(filePath, paths);
+    for (const filePath of plan.compactedRawSegments) safeUnlink(filePath, paths);
+    for (const filePath of plan.overflowRawSegments) safeUnlink(filePath, paths);
+    for (const filePath of plan.quarantineFiles) {
+      safeUnlink(filePath, paths);
+      const metaPath = `${filePath}.meta.json`;
+      if (fs.existsSync(metaPath)) {
+        safeUnlink(metaPath, paths);
+      }
+    }
+
+    // --- Write gc log segment ---
+    const at = new Date().toISOString();
+    const gcLogPath = writeGcLog(paths, at, deleted);
+
+    // --- Update + write manifest LAST (commit point) ---
+    if (manifest !== null && state !== null) {
+      const deletedRawSegments =
+        deleted.emptySegments + deleted.compactedRawSegments + deleted.overflowRawSegments;
+
+      const updatedManifest: MemoryManifest = {
+        ...manifest,
+        gcSummary: {
+          lastGcAt: at,
+          deletedRawSegments: manifest.gcSummary.deletedRawSegments + deletedRawSegments,
+          deletedTmpFiles: manifest.gcSummary.deletedTmpFiles + deleted.tmpFiles,
+          deletedQuarantineFiles: manifest.gcSummary.deletedQuarantineFiles + deleted.quarantineFiles,
+        },
+        compactedInputSegments: cleanCompactedInputSegments(manifest, paths),
+        quarantine: cleanQuarantine(manifest, paths),
+      };
+
+      writeMaterializedState(paths, {
+        findings: state.findings,
+        manifest: updatedManifest,
+        relatedIndex: state.relatedIndex,
+      });
+    }
+
+    return { success: true, deleted, gcLogPath };
+  });
 }
 
 /**
