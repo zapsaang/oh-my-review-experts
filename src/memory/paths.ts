@@ -15,9 +15,9 @@ export interface MemoryPaths {
   relatedIndexFile: string;
   manifestFile: string;
   tmpDir: string;
-  /** Reserved for Claim 2: concurrent write lock. Not yet implemented. */
+  /** Reserved for Claim 2: concurrent write lock. */
   locksDir: string;
-  /** Reserved for Claim 2: concurrent write lock. Not yet implemented. */
+  /** Reserved for Claim 2: concurrent write lock. */
   lockFile: string;
 }
 
