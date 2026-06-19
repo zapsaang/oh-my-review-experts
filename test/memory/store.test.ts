@@ -3,8 +3,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { ensureMemoryDirs, resolveMemoryPaths, type MemoryPaths } from "../../src/memory/paths.js";
-import { MemoryManifestSchema, type MemoryEvent, type MemoryFinding, type MemoryManifest, type RelatedIndex } from "../../src/memory/schema.js";
+import { MemoryManifestSchema, normalizeMemoryStatus, type MemoryEvent, type MemoryFinding, type MemoryManifest, type RelatedIndex } from "../../src/memory/schema.js";
 import {
+  hashFindings,
   readMaterializedState,
   rebuildMaterializedStateFromEvents,
   scanEventFiles,
@@ -90,7 +91,7 @@ function validManifest(overrides: Partial<MemoryManifest> = {}): MemoryManifest 
     eventSchemaVersion: 1,
     viewSchemaVersion: 1,
     lastRebuiltAt: timestamp,
-    materializedHash: "mat1234567890abcdef",
+    materializedHash: hashFindings([validFinding(), relatedFinding()]),
     relatedIndexHash: "rel1234567890abcdef",
     includedEventFiles: ["events/segments/20260528.jsonl"],
     compactedInputSegments: ["events/compacted/20260528.jsonl"],
@@ -208,6 +209,14 @@ function futureEvent() {
 function writeDataFilesWithoutManifest(paths: MemoryPaths, state: MaterializedState): void {
   fs.writeFileSync(paths.memoryFile, `${state.findings.map((finding) => JSON.stringify(finding)).join("\n")}\n`, "utf8");
   fs.writeFileSync(paths.relatedIndexFile, JSON.stringify(state.relatedIndex), "utf8");
+}
+
+function hashAsRead(findings: MemoryFinding[]): string {
+  const normalized = findings.map((finding) => ({
+    ...finding,
+    status: normalizeMemoryStatus(finding.status) as MemoryFinding["status"],
+  }));
+  return hashFindings(normalized);
 }
 
 describe("materialized memory store", () => {
@@ -447,7 +456,7 @@ describe("materialized memory store", () => {
       const finding = validFinding({ status: "acknowledged" });
       const state = validState({ findings: [finding] });
       writeDataFilesWithoutManifest(paths, state);
-      fs.writeFileSync(paths.manifestFile, JSON.stringify(validManifest()), "utf8");
+      fs.writeFileSync(paths.manifestFile, JSON.stringify(validManifest({ materializedHash: hashAsRead(state.findings) })), "utf8");
 
       const read = readMaterializedState(paths);
       expect(read).not.toBeNull();
@@ -459,7 +468,7 @@ describe("materialized memory store", () => {
       const finding = validFinding({ status: "false_positive" });
       const state = validState({ findings: [finding] });
       writeDataFilesWithoutManifest(paths, state);
-      fs.writeFileSync(paths.manifestFile, JSON.stringify(validManifest()), "utf8");
+      fs.writeFileSync(paths.manifestFile, JSON.stringify(validManifest({ materializedHash: hashAsRead(state.findings) })), "utf8");
 
       const read = readMaterializedState(paths);
       expect(read).not.toBeNull();
@@ -471,7 +480,7 @@ describe("materialized memory store", () => {
       const finding = validFinding({ status: "wont_fix" });
       const state = validState({ findings: [finding] });
       writeDataFilesWithoutManifest(paths, state);
-      fs.writeFileSync(paths.manifestFile, JSON.stringify(validManifest()), "utf8");
+      fs.writeFileSync(paths.manifestFile, JSON.stringify(validManifest({ materializedHash: hashAsRead(state.findings) })), "utf8");
 
       const read = readMaterializedState(paths);
       expect(read).not.toBeNull();
@@ -532,7 +541,7 @@ describe("materialized memory store", () => {
         findings: [legacyAcknowledged, legacyFalsePositive, legacyWontFix, canonicalOpen, canonicalFixed],
       });
       writeDataFilesWithoutManifest(paths, state);
-      fs.writeFileSync(paths.manifestFile, JSON.stringify(validManifest()), "utf8");
+      fs.writeFileSync(paths.manifestFile, JSON.stringify(validManifest({ materializedHash: hashAsRead(state.findings) })), "utf8");
 
       const read = readMaterializedState(paths);
       expect(read).not.toBeNull();

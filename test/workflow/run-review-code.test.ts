@@ -108,7 +108,7 @@ function validMemoryManifest(): MemoryManifest {
     eventSchemaVersion: 1,
     viewSchemaVersion: 1,
     lastRebuiltAt: memoryTimestamp,
-    materializedHash: "materializedhash1",
+    materializedHash: "e3b0c44298fc1c14",
     relatedIndexHash: "relatedindexhash1",
     includedEventFiles: [],
     compactedInputSegments: [],

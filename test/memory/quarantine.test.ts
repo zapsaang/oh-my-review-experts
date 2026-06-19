@@ -106,7 +106,7 @@ describe("appendQuarantineEntry", () => {
       eventSchemaVersion: 1,
       viewSchemaVersion: 1,
       lastRebuiltAt: "2026-05-28T00:00:00.000Z",
-      materializedHash: "mat1234567890abcdef",
+      materializedHash: "e3b0c44298fc1c14",
       relatedIndexHash: "rel1234567890abcdef",
       includedEventFiles: [],
       compactedInputSegments: [],

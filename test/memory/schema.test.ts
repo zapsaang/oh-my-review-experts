@@ -350,7 +350,7 @@ describe("MemoryManifestSchema", () => {
       eventSchemaVersion: 1,
       viewSchemaVersion: 1,
       lastRebuiltAt: timestamp,
-      materializedHash: "mat1234567890abcd",
+      materializedHash: "e3b0c44298fc1c14",
       relatedIndexHash: "rel1234567890abcd",
       includedEventFiles: ["events/2026-05-28.jsonl"],
       compactedInputSegments: ["segments/2026-05-28.jsonl"],

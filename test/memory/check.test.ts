@@ -99,7 +99,7 @@ describe("runMemoryCheck", () => {
         eventSchemaVersion: 1,
         viewSchemaVersion: 1,
         lastRebuiltAt: timestamp,
-        materializedHash: "mat1234567890abcdef",
+        materializedHash: "e3b0c44298fc1c14",
         relatedIndexHash: "rel1234567890abcdef",
         includedEventFiles: ["a.jsonl"],
         compactedInputSegments: [],

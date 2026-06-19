@@ -69,7 +69,7 @@ function readMaterializedStateImpl(
   }
 
   const computed = hashFindings(findings);
-  if (isValidComputedHash(manifest.materializedHash) && computed !== manifest.materializedHash) {
+  if (computed !== manifest.materializedHash) {
     if (retryCount < MAX_READ_RETRIES) {
       // FIX-4: a hash mismatch usually means we read memory.jsonl mid-write,
       // between a writer's data write and its manifest commit. A brief backoff
@@ -103,6 +103,9 @@ export function writeMaterializedState(
 
   state.manifest.includedEventFiles = scanEventFiles(paths);
   state.manifest.compactedInputSegments = state.manifest.compactedInputSegments ?? [];
+  // Defensive: always recompute the canonical hash on write so the persisted
+  // manifest can never drift from the findings it describes, even if the caller
+  // passed a stale or hand-built hash in `state.manifest`.
   state.manifest.materializedHash = hashFindings(canonicalFindings);
 
   // Write memory.jsonl FIRST
@@ -274,16 +277,20 @@ export function rebuildMaterializedStateFromEvents(events: MemoryEvent[]): Mater
   return { findings, manifest, relatedIndex };
 }
 
-function hashFindings(findings: MemoryFinding[]): string {
-  const content = findings.map((finding) => finding.id).join("\n");
+export function hashFindings(findings: MemoryFinding[]): string {
+  const content = [...findings]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((finding) =>
+      [
+        finding.id,
+        finding.fingerprint,
+        finding.status,
+        finding.severity,
+        finding.contentHash,
+      ].join("\x1f"),
+    )
+    .join("\n");
   return createHash("sha256").update(content).digest("hex").slice(0, 16);
-}
-
-// Self-check only applies to canonical hashes (16 lowercase hex, as emitted by
-// hashFindings + writeMaterializedState). Legacy or hand-written manifests carry
-// non-canonical placeholders; treat those as unverifiable rather than corrupt.
-function isValidComputedHash(value: string): boolean {
-  return /^[a-f0-9]{16}$/.test(value);
 }
 
 function hashRelatedIndex(relatedIndex: RelatedIndex): string {

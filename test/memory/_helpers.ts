@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import { ensureMemoryDirs, resolveMemoryPaths, type MemoryPaths } from "../../src/memory/paths.js";
 import type { MemoryEvent, MemoryFinding, MemoryManifest } from "../../src/memory/schema.js";
 import {
+  hashFindings,
   readMaterializedState,
   writeMaterializedState,
   type MaterializedState,
@@ -95,13 +96,14 @@ export function writeFinding(overrides: Partial<MemoryFinding> = {}): MemoryFind
 
 export function seedManifest(paths: MemoryPaths, partial: Partial<MemoryManifest> = {}): MaterializedState {
   const existing = readMaterializedState(paths);
+  const seededFindings = existing?.findings ?? [];
 
   const baseManifest: MemoryManifest = existing?.manifest ?? {
     schemaVersion: 1,
     eventSchemaVersion: 1,
     viewSchemaVersion: 1,
     lastRebuiltAt: DEFAULT_TIMESTAMP,
-    materializedHash: "mat1234567890abcdef",
+    materializedHash: hashFindings(seededFindings),
     relatedIndexHash: "rel1234567890abcdef",
     includedEventFiles: [],
     compactedInputSegments: [],
@@ -115,7 +117,7 @@ export function seedManifest(paths: MemoryPaths, partial: Partial<MemoryManifest
   };
 
   const state: MaterializedState = {
-    findings: existing?.findings ?? [],
+    findings: seededFindings,
     manifest: { ...baseManifest, ...partial },
     relatedIndex: existing?.relatedIndex ?? {
       schemaVersion: 1,
