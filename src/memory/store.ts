@@ -15,6 +15,7 @@ import {
 import type { MemoryPaths } from "./paths.js";
 import { sha256File } from "./ids.js";
 import { writeFileAtomicOverwrite } from "../tools/fs-utils.js";
+import { sleepSync } from "./lock.js";
 
 export const CURRENT_MEMORY_EVENT_SCHEMA_VERSION = 1;
 
@@ -29,10 +30,6 @@ const READ_RETRY_DELAY_MS = 25;
 
 export function readMaterializedState(paths: MemoryPaths): MaterializedState | null {
   return readMaterializedStateImpl(paths, 0);
-}
-
-function sleepBeforeRetry(ms: number): void {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 function readMaterializedStateImpl(
@@ -76,7 +73,7 @@ function readMaterializedStateImpl(
       // and re-read lets the writer finish. This retry path primarily benefits
       // lock-free readers (trends/stats/search); lock-holding writers
       // (mark/gc/compact) already have exclusive access and never race here.
-      sleepBeforeRetry(READ_RETRY_DELAY_MS);
+      sleepSync(READ_RETRY_DELAY_MS);
       return readMaterializedStateImpl(paths, retryCount + 1);
     }
     return null;

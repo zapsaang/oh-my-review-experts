@@ -7,7 +7,7 @@ import { withMemoryLock } from "./lock.js";
 import { resolveMemoryPaths, type MemoryPaths } from "./paths.js";
 import { quarantineFile } from "./quarantine.js";
 import { MemoryEventSchema, type CompactedSegment, type MemoryEvent } from "./schema.js";
-import { readMemoryManifest, writeMaterializedState, readMaterializedState } from "./store.js";
+import { readMemoryManifest, writeMaterializedState, readMaterializedState, type MaterializedState } from "./store.js";
 import { writeFileAtomicOverwrite } from "../tools/fs-utils.js";
 
 export interface CompactOptions {
@@ -195,8 +195,15 @@ function updateManifest(paths: MemoryPaths, newEntries: CompactedSegment[]): voi
   const isLegacy = existing.length > 0 && typeof existing[0] === "string";
   const base: CompactedSegment[] = isLegacy ? [] : (existing as CompactedSegment[]);
 
-  state.manifest.compactedInputSegments = [...base, ...newEntries];
-  writeMaterializedState(paths, state);
+  const updatedManifest = {
+    ...state.manifest,
+    compactedInputSegments: [...base, ...newEntries],
+  };
+  const updatedState: MaterializedState = {
+    ...state,
+    manifest: updatedManifest,
+  };
+  writeMaterializedState(paths, updatedState);
 }
 
 function planDryRun(

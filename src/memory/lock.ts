@@ -200,7 +200,7 @@ function isStaleByMtime(lockDir: string, staleMs: number): boolean {
   }
 }
 
-function sleepSync(ms: number): void {
+export function sleepSync(ms: number): void {
   // Truly block the current thread without burning CPU. Atomics.wait on a
   // SharedArrayBuffer that nobody notifies returns on timeout — equivalent to
   // a synchronous sleep.

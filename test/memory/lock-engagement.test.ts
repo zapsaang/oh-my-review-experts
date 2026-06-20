@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import * as lockModule from "../../src/memory/lock.js";
 import { writeEventSegment } from "../../src/memory/events.js";
 import { rebuildMaterializedStateFromEvents, writeMaterializedState } from "../../src/memory/store.js";
-import { runIndexLatest } from "../../src/memory/cli.js";
+import { runIndexLatest } from "../../src/memory/indexing.js";
 import { runMemoryMark } from "../../src/memory/mark.js";
 import { runMemoryGc } from "../../src/memory/gc.js";
 import { runMemoryCompact } from "../../src/memory/compact.js";
