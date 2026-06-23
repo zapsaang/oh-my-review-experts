@@ -4,10 +4,11 @@ import { readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync } from "nod
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { MemoryFindingSchema } from "../../src/memory/schema.js";
+import { MemoryFindingSchema, type MemoryFinding } from "../../src/memory/schema.js";
 import { searchMemory } from "../../src/memory/search.js";
 import { rankMemoryHits } from "../../src/memory/ranking.js";
 import { buildMemoryContextPack } from "../../src/memory/context-pack.js";
+import type { RankedMemoryHit } from "../../src/memory/ranking.js";
 import {
   loadFindings,
   loadScenarios,
@@ -22,52 +23,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const fixtureDir = join(__dirname, "../fixtures/recall-eval");
-const findings: import("../../src/memory/schema.js").MemoryFinding[] = JSON.parse(
+const findings: MemoryFinding[] = JSON.parse(
   readFileSync(join(fixtureDir, "findings.json"), "utf-8"),
 );
 const scenarios: EvalScenario[] = JSON.parse(
   readFileSync(join(fixtureDir, "scenarios.json"), "utf-8"),
 );
-
-function computePrecisionAtK(
-  ranked: import("../../src/memory/ranking.js").RankedMemoryHit[],
-  relevantIds: Set<string>,
-  k: number,
-): number {
-  const topK = ranked.slice(0, k);
-  if (topK.length === 0) return 0;
-  const relevantInTopK = topK.filter((h) => relevantIds.has(h.finding.id)).length;
-  return relevantInTopK / k;
-}
-
-function computeRecallAtK(
-  ranked: import("../../src/memory/ranking.js").RankedMemoryHit[],
-  relevantIds: Set<string>,
-  k: number,
-): number {
-  if (relevantIds.size === 0) return 0;
-  const topK = ranked.slice(0, k);
-  const relevantInTopK = topK.filter((h) => relevantIds.has(h.finding.id)).length;
-  return relevantInTopK / relevantIds.size;
-}
-
-function computeMrr(
-  ranked: import("../../src/memory/ranking.js").RankedMemoryHit[],
-  relevantIds: Set<string>,
-): number {
-  let answerRank = 0;
-  for (const hit of ranked) {
-    const relevant = relevantIds.has(hit.finding.id);
-    if (hit.regressionCandidate && !relevant) {
-      continue;
-    }
-    answerRank++;
-    if (relevant) {
-      return 1 / answerRank;
-    }
-  }
-  return 0;
-}
 
 function computeContextPackRecall(
   ranked: import("../../src/memory/ranking.js").RankedMemoryHit[],
@@ -108,36 +69,25 @@ describe("eval-recall fixtures", () => {
 describe("eval-recall metrics", () => {
   it("precision@k bounded: 0 <= p <= 1", () => {
     const scenario = scenarios.find((s) => s.id === "sc-01-high-relevance")!;
-    const result = searchMemory({
-      query: scenario.query,
-      reviewer: scenario.reviewer,
-      findings,
-      paths: scenario.slicePaths,
-      similarityThreshold: 0.0,
-    });
-    const ranked = rankMemoryHits({ hits: result.hits, reviewer: scenario.reviewer });
-    const relevantIds = new Set(scenario.relevantFindingIds);
-
     const metrics = evaluateScenario(scenario, findings, 0.0);
-    expect(metrics.precisionAt1).toBe(computePrecisionAtK(ranked, relevantIds, 1));
+    // Hardcoded expectation derived from fixture sc-01:
+    // - 1 relevant finding (mem_0000000000000001)
+    // - Top 1 hit is NOT relevant (mem_0000000000000005, score=0, pathRank=0)
+    // - Top 3 has 1 relevant out of 3
+    // - Top 6 has 1 relevant out of 6
+    expect(metrics.precisionAt1).toBe(0);
+    expect(metrics.precisionAt3).toBe(1 / 3);
+    expect(metrics.precisionAt6).toBe(1 / 6);
     expect(metrics.precisionAt1).toBeGreaterThanOrEqual(0);
     expect(metrics.precisionAt1).toBeLessThanOrEqual(1);
   });
 
   it("recall@k bounded: 0 <= r <= 1", () => {
     const scenario = scenarios.find((s) => s.id === "sc-01-high-relevance")!;
-    const result = searchMemory({
-      query: scenario.query,
-      reviewer: scenario.reviewer,
-      findings,
-      paths: scenario.slicePaths,
-      similarityThreshold: 0.0,
-    });
-    const ranked = rankMemoryHits({ hits: result.hits, reviewer: scenario.reviewer });
-    const relevantIds = new Set(scenario.relevantFindingIds);
-
     const metrics = evaluateScenario(scenario, findings, 0.0);
-    expect(metrics.recallAt1).toBe(computeRecallAtK(ranked, relevantIds, 1));
+    expect(metrics.recallAt1).toBe(0);
+    expect(metrics.recallAt3).toBe(1);
+    expect(metrics.recallAt6).toBe(1);
     expect(metrics.recallAt1).toBeGreaterThanOrEqual(0);
     expect(metrics.recallAt1).toBeLessThanOrEqual(1);
   });
@@ -275,8 +225,8 @@ describe("eval-recall production", () => {
   });
 
   it("makeFinding() rejects invalid overrides", () => {
-    expect(() => makeFinding({ id: "bad" } as Partial<import("../../src/memory/schema.js").MemoryFinding>)).toThrow();
-    expect(() => makeFinding({ status: "not-a-status" } as unknown as Partial<import("../../src/memory/schema.js").MemoryFinding>)).toThrow();
+    expect(() => makeFinding({ id: "bad" } as Partial<MemoryFinding>)).toThrow();
+    expect(() => makeFinding({ status: "not-a-status" } as unknown as Partial<MemoryFinding>)).toThrow();
   });
 
   it("loadScenarios() validates referential integrity", () => {

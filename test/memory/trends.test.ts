@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { safeDateParse, selectStatusRunId, computeTrends, type RunBoundary } from "../../src/memory/trends.js";
-import { MemoryEventSchema, type MemoryEvent, type MemoryFinding } from "../../src/memory/schema.js";
+import { MemoryEventSchema, MemoryFindingSchema, type MemoryEvent, type MemoryFinding } from "../../src/memory/schema.js";
 
 const findingId = "mem_abcdef1234567890";
 const secondFindingId = "mem_1234567890abcdef";
@@ -61,7 +61,7 @@ function validFinding(overrides: Partial<MemoryFinding> = {}): MemoryFinding {
     contentHash: "ch1234567890abcdef",
   } satisfies MemoryFinding;
 
-  return { ...finding, ...overrides };
+  return MemoryFindingSchema.parse({ ...finding, ...overrides });
 }
 
 function discoveredEvent(overrides: Partial<DiscoveredEvent> = {}): DiscoveredEvent {
