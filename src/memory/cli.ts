@@ -3,6 +3,7 @@ import { runMemoryMark } from "./mark.js";
 import { runMemoryCompact } from "./compact.js";
 import { runMemoryGc } from "./gc.js";
 import { generateSuggestions } from "./suggestions.js";
+import { readAllEventSegments } from "./events.js";
 import type { Command } from "commander";
 import { loadConfig } from "../config/load-config.js";
 import { runIndexLatest, type IndexLatestOptions, type IndexLatestResult } from "./indexing.js";
@@ -11,6 +12,7 @@ import { rankMemoryHits } from "./ranking.js";
 import { REVIEWER_PREFIX, canonicalReviewerName } from "./reviewer-name.js";
 import type { MemoryFinding } from "./schema.js";
 import { searchMemory } from "./search.js";
+import { computeTrends, type TrendsReport } from "./trends.js";
 import {
   type MaterializedState,
   readMaterializedState,
@@ -178,6 +180,13 @@ export function registerMemoryCli(program: Command): void {
         console.error(`memory apply-suggestions failed: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(1);
       }
+    });
+
+  memory.command("trends")
+    .description("Print review memory trends")
+    .option("--at-bucket <iso>", "Snapshot trends up to this ISO timestamp")
+    .action((opts: { atBucket?: string }) => {
+      runMemoryCliAction("memory trends", () => runMemoryTrends({ atBucket: opts.atBucket }));
     });
 }
 
@@ -386,6 +395,68 @@ function runMemoryApplySuggestions({ dryRun }: { dryRun: boolean }): void {
 
   if (failures > 0) {
     process.exit(1);
+  }
+}
+
+function runMemoryTrends(options: MemoryReadCliOptions & { atBucket?: string } = {}): void {
+  const output = options.output ?? console;
+  const cwd = options.cwd ?? process.cwd();
+  const config = loadConfig(cwd);
+
+  if (!config.memory.enabled) {
+    output.log("memory disabled by config");
+    return;
+  }
+
+  const paths = resolveMemoryPaths(cwd, config.memory.directory);
+  const { events, skipped } = readAllEventSegments(paths);
+  if (skipped > 0) {
+    output.log(`warning: skipped ${skipped} corrupted event lines while reading trends`);
+  }
+
+  const atBucket = options.atBucket ?? new Date().toISOString();
+  renderTrendsReport(computeTrends(events, { atBucket }), output);
+}
+
+function renderTrendsReport(report: TrendsReport, output: MemoryCliOutput = console): void {
+  output.log("memory trends");
+  output.log("module distribution:");
+  if (report.moduleDistribution.length === 0) {
+    output.log("  none");
+  } else {
+    for (const row of report.moduleDistribution) {
+      output.log(`  ${row.module}: ${row.count} (${row.percentage.toFixed(1)}%)`);
+    }
+  }
+
+  output.log("recurring regressions:");
+  if (report.recurringRegressions.length === 0) {
+    output.log("  none");
+  } else {
+    for (const row of report.recurringRegressions) {
+      const last = row.lastRegressionAt === undefined ? "never" : row.lastRegressionAt;
+      output.log(`  ${row.findingId} | ${summarizeText(row.title, 160)} | count=${row.regressionCount} | last=${last}`);
+    }
+  }
+
+  output.log("fix survival time:");
+  if (report.fixSurvivalTime.length === 0) {
+    output.log("  none");
+  } else {
+    for (const row of report.fixSurvivalTime) {
+      const regressed = row.regressedAt === undefined ? "none" : row.regressedAt;
+      output.log(`  ${row.findingId} | ${summarizeText(row.title, 160)} | fixed=${row.fixedAt} | regressed=${regressed} | survivedMs=${row.survivedMs}`);
+    }
+  }
+
+  output.log("per-run timeline:");
+  if (report.perRunTimeline.length === 0) {
+    output.log("  none");
+    return;
+  }
+
+  for (const row of report.perRunTimeline) {
+    output.log(`  ${row.runId} | introduced=${row.introduced} | seenAgain=${row.seenAgain} | statusChanged=${row.statusChanged} | regressed=${row.regressed} | totalActive=${row.totalActive}`);
   }
 }
 

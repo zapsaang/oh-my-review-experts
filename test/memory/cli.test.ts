@@ -712,13 +712,281 @@ describe("memory gc CLI", () => {
   });
 });
 
+describe("memory trends", () => {
+  const tempPaths: MemoryPaths[] = [];
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+    vi.restoreAllMocks();
+    for (const dir of tempDirs.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+    for (const paths of tempPaths.splice(0)) {
+      fs.rmSync(paths.root, { recursive: true, force: true });
+    }
+  });
+
+  it("registers the trends subcommand", () => {
+    const program = new Command();
+
+    registerMemoryCli(program);
+
+    const memory = program.commands.find((command) => command.name() === "memory");
+    expect(memory?.commands.map((command) => command.name())).toContain("trends");
+  });
+
+  it("shows help for memory trends including --at-bucket option", () => {
+    const program = createCliProgram();
+    program.exitOverride();
+    let out = "";
+    program.configureOutput({
+      writeOut: (str) => { out += str; },
+      writeErr: () => {},
+    });
+    expect(() => program.parse(["node", "omre", "memory", "trends", "--help"])).toThrow();
+    expect(out).toContain("trends");
+    expect(out).toContain("--at-bucket");
+    expect(out).toContain("Snapshot trends up to this ISO timestamp");
+  });
+
+  it("prints the trends report from memory event segments", () => {
+    const paths = makeTempMemoryRepo();
+    const repoRoot = path.dirname(path.dirname(paths.root));
+    const finding = writeFinding({
+      id: "mem_trends0000000000",
+      fingerprint: "fp_trends0000000000",
+      contentHash: "ch_trends0000000000",
+      title: "Auth login regression",
+      locations: [{ path: "src/auth/login.ts", line: 12 }],
+      origin: {
+        runId: "run-trends-1",
+        sourceType: "report",
+        sourcePath: ".omre/reports/latest.json",
+        createdAt: "2026-05-28T00:00:00.000Z",
+      },
+      occurrence: {
+        firstSeenAt: "2026-05-28T00:00:00.000Z",
+        lastSeenAt: "2026-05-28T00:00:00.000Z",
+        count: 1,
+        runIds: ["run-trends-1"],
+      },
+    });
+    const discovered = {
+      type: "finding.discovered" as const,
+      eventId: "evt_trends000000001",
+      at: "2026-05-28T00:00:00.000Z",
+      finding,
+    };
+    const fixed = {
+      type: "finding.status_changed" as const,
+      eventId: "evt_trends000000002",
+      at: "2026-05-29T00:00:00.000Z",
+      findingId: finding.id,
+      from: "open" as const,
+      to: "fixed" as const,
+      markedBy: "reviewer@example.com",
+    };
+    const regressed = {
+      type: "finding.regressed" as const,
+      eventId: "evt_trends000000003",
+      at: "2026-05-30T00:00:00.000Z",
+      findingId: finding.id,
+      fromStatus: "fixed" as const,
+      toStatus: "open" as const,
+      runId: "run-trends-2",
+    };
+    writeSegment(paths, [discovered, fixed, regressed], "run-trends-2");
+    process.chdir(repoRoot);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "trends"]);
+
+    const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(output).toContain("memory trends");
+    expect(output).toContain("module distribution:");
+    expect(output).toContain("auth: 1 (100.0%)");
+    expect(output).toContain("recurring regressions:");
+    expect(output).toContain("mem_trends0000000000 | Auth login regression | count=1");
+    expect(output).toContain("fix survival time:");
+    expect(output).toContain("fixed=2026-05-29T00:00:00.000Z | regressed=2026-05-30T00:00:00.000Z");
+    expect(output).toContain("per-run timeline:");
+    expect(output).toContain("run-trends-1 | introduced=1 | seenAgain=0 | statusChanged=1 | regressed=0 | totalActive=0");
+    expect(output).toContain("run-trends-2 | introduced=0 | seenAgain=0 | statusChanged=0 | regressed=1 | totalActive=1");
+  });
+
+  it("accepts --at-bucket to limit trends to a specific timestamp", () => {
+    const paths = makeTempMemoryRepo();
+    const repoRoot = path.dirname(path.dirname(paths.root));
+    const finding = writeFinding({
+      id: "mem_trends0000000001",
+      fingerprint: "fp_trends0000000001",
+      contentHash: "ch_trends0000000001",
+      title: "Auth login regression",
+      locations: [{ path: "src/auth/login.ts", line: 12 }],
+      origin: {
+        runId: "run-trends-1",
+        sourceType: "report",
+        sourcePath: ".omre/reports/latest.json",
+        createdAt: "2026-05-28T00:00:00.000Z",
+      },
+      occurrence: {
+        firstSeenAt: "2026-05-28T00:00:00.000Z",
+        lastSeenAt: "2026-05-28T00:00:00.000Z",
+        count: 1,
+        runIds: ["run-trends-1"],
+      },
+    });
+    const discovered = {
+      type: "finding.discovered" as const,
+      eventId: "evt_trends000000004",
+      at: "2026-05-28T00:00:00.000Z",
+      finding,
+    };
+    const fixed = {
+      type: "finding.status_changed" as const,
+      eventId: "evt_trends000000005",
+      at: "2026-05-29T00:00:00.000Z",
+      findingId: finding.id,
+      from: "open" as const,
+      to: "fixed" as const,
+      markedBy: "reviewer@example.com",
+    };
+    const regressed = {
+      type: "finding.regressed" as const,
+      eventId: "evt_trends000000006",
+      at: "2026-05-30T00:00:00.000Z",
+      findingId: finding.id,
+      fromStatus: "fixed" as const,
+      toStatus: "open" as const,
+      runId: "run-trends-2",
+    };
+    writeSegment(paths, [discovered, fixed, regressed], "run-trends-2");
+    process.chdir(repoRoot);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "trends", "--at-bucket", "2026-05-29T12:00:00.000Z"]);
+
+    const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(output).toContain("memory trends");
+    expect(output).toContain("module distribution:");
+    expect(output).toContain("auth: 1 (100.0%)");
+    expect(output).toContain("per-run timeline:");
+    expect(output).toContain("run-trends-1 | introduced=1 | seenAgain=0 | statusChanged=1 | regressed=0 | totalActive=0");
+  });
+
+  it("rejects invalid --at-bucket with a clear error", () => {
+    const paths = makeTempMemoryRepo();
+    tempPaths.push(paths);
+    const repoRoot = path.dirname(path.dirname(paths.root));
+    const finding = writeFinding({
+      id: "mem_invalid000000001",
+      fingerprint: "fp_invalid00000001",
+      contentHash: "ch_invalid00000001",
+      title: "Invalid atBucket test finding",
+      locations: [{ path: "src/test.ts", line: 1 }],
+      origin: {
+        runId: "run-invalid",
+        sourceType: "report",
+        sourcePath: ".omre/reports/latest.json",
+        createdAt: "2026-05-28T00:00:00.000Z",
+      },
+      occurrence: {
+        firstSeenAt: "2026-05-28T00:00:00.000Z",
+        lastSeenAt: "2026-05-28T00:00:00.000Z",
+        count: 1,
+        runIds: ["run-invalid"],
+      },
+    });
+    const event = {
+      type: "finding.discovered" as const,
+      eventId: "evt_invalid000001",
+      at: "2026-05-28T00:00:00.000Z",
+      finding,
+    };
+    writeSegment(paths, [event], "run-invalid");
+    process.chdir(repoRoot);
+
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called");
+    }) as never);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    expect(() => program.parse(["node", "omre", "memory", "trends", "--at-bucket", "not-a-date"])).toThrow();
+    expect(exitSpy).toHaveBeenCalledWith(1);
+
+    const errorOutput = errorSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(errorOutput).toContain("Invalid atBucket timestamp");
+  });
+
+  it("warns about skipped corrupted event lines when reading trends", () => {
+    const paths = makeTempMemoryRepo();
+    tempPaths.push(paths);
+    const repoRoot = path.dirname(path.dirname(paths.root));
+    const finding = writeFinding({
+      id: "mem_skipped000000001",
+      fingerprint: "fp_skipped000000001",
+      contentHash: "ch_skipped000000001",
+      title: "Skipped warning test",
+      locations: [{ path: "src/test.ts", line: 1 }],
+      origin: {
+        runId: "run-skipped",
+        sourceType: "report",
+        sourcePath: ".omre/reports/latest.json",
+        createdAt: "2026-05-28T00:00:00.000Z",
+      },
+      occurrence: {
+        firstSeenAt: "2026-05-28T00:00:00.000Z",
+        lastSeenAt: "2026-05-28T00:00:00.000Z",
+        count: 1,
+        runIds: ["run-skipped"],
+      },
+    });
+    const event = {
+      type: "finding.discovered" as const,
+      eventId: "evt_skipped000001",
+      at: "2026-05-28T00:00:00.000Z",
+      finding,
+    };
+    writeSegment(paths, [event], "run-skipped");
+
+    // Append a corrupted line to the segment file
+    const segmentFiles = fs.readdirSync(paths.segmentsDir);
+    const segmentFile = segmentFiles.find((f) => f.endsWith(".jsonl"));
+    if (segmentFile) {
+      fs.appendFileSync(path.join(paths.segmentsDir, segmentFile), "\n{not valid json\n", "utf8");
+    }
+
+    process.chdir(repoRoot);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const program = createCliProgram();
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {}, writeOut: () => {} });
+    program.parse(["node", "omre", "memory", "trends"]);
+
+    const output = logSpy.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(output).toContain("warning: skipped 1 corrupted event lines");
+    expect(output).toContain("memory trends");
+    expect(output).toContain("module distribution:");
+  });
+});
+
 describe("memory CLI registration", () => {
-  it("registers all 11 memory subcommands", () => {
+  it("registers all 12 memory subcommands", () => {
     const program = new Command();
     registerMemoryCli(program);
     const memory = program.commands.find((c) => c.name() === "memory");
     expect(memory).toBeDefined();
-    expect(memory?.commands).toHaveLength(11);
+    expect(memory?.commands).toHaveLength(12);
     const names = memory?.commands.map((c) => c.name());
     expect(names).toEqual(
       expect.arrayContaining([
@@ -733,6 +1001,7 @@ describe("memory CLI registration", () => {
         "gc",
         "suggestions",
         "apply-suggestions",
+        "trends",
       ]),
     );
   });

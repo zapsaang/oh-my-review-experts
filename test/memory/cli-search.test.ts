@@ -192,6 +192,7 @@ describe("memory search/list/show/stats CLI", () => {
       "show",
       "stats",
       "suggestions",
+      "trends",
     ]);
   });
 
