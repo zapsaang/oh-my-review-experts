@@ -43,6 +43,7 @@
     "dev": "tsx src/cli.ts",
     "typecheck": "tsc --noEmit",
     "check-schema": "tsx scripts/check-schema.ts",
+    "eval:recall": "tsx scripts/eval-recall.ts",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "preversion": "npm run typecheck && npm run test",

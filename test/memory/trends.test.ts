@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeTrends } from "../../src/memory/trends.js";
+import { safeDateParse, selectStatusRunId, computeTrends, type RunBoundary } from "../../src/memory/trends.js";
 import { MemoryEventSchema, type MemoryEvent, type MemoryFinding } from "../../src/memory/schema.js";
 
 const findingId = "mem_abcdef1234567890";
@@ -654,5 +654,76 @@ describe("computeTrends", () => {
     ], { atBucket: laterAt });
 
     expect(reportWithRelated).toEqual(reportWithoutRelated);
+  });
+});
+
+describe("safeDateParse", () => {
+  it("returns a numeric timestamp for a valid ISO string", () => {
+    const result = safeDateParse("2026-05-28T00:00:00.000Z");
+    expect(result).toBe(Date.parse("2026-05-28T00:00:00.000Z"));
+    expect(result).toBeTypeOf("number");
+  });
+
+  it("returns undefined for a completely invalid string", () => {
+    const result = safeDateParse("not-a-date");
+    expect(result).toBeUndefined();
+  });
+
+  it("returns undefined for a well-formed but invalid date (NaN)", () => {
+    const result = safeDateParse("");
+    expect(result).toBeUndefined();
+  });
+});
+
+describe("selectStatusRunId", () => {
+  it("returns the mark run id when boundaries are empty", () => {
+    const result = selectStatusRunId("2026-05-28T00:00:00.000Z", []);
+    expect(result).toBe("omre-mark");
+  });
+
+  it("returns the single boundary run id when the timestamp is after it", () => {
+    const boundaries: RunBoundary[] = [
+      { runId: "run-1", at: "2026-05-28T00:00:00.000Z", order: 0 },
+    ];
+    const result = selectStatusRunId("2026-05-29T00:00:00.000Z", boundaries);
+    expect(result).toBe("run-1");
+  });
+
+  it("returns the mark run id when the timestamp is before all boundaries", () => {
+    const boundaries: RunBoundary[] = [
+      { runId: "run-1", at: "2026-05-28T00:00:00.000Z", order: 0 },
+    ];
+    const result = selectStatusRunId("2026-05-27T00:00:00.000Z", boundaries);
+    expect(result).toBe("omre-mark");
+  });
+
+  it("returns the correct run id for multiple boundaries (earlier)", () => {
+    const boundaries: RunBoundary[] = [
+      { runId: "run-1", at: "2026-05-28T00:00:00.000Z", order: 0 },
+      { runId: "run-2", at: "2026-05-30T00:00:00.000Z", order: 1 },
+      { runId: "run-3", at: "2026-06-01T00:00:00.000Z", order: 2 },
+    ];
+    const result = selectStatusRunId("2026-05-29T00:00:00.000Z", boundaries);
+    expect(result).toBe("run-1");
+  });
+
+  it("returns the correct run id for multiple boundaries (later)", () => {
+    const boundaries: RunBoundary[] = [
+      { runId: "run-1", at: "2026-05-28T00:00:00.000Z", order: 0 },
+      { runId: "run-2", at: "2026-05-30T00:00:00.000Z", order: 1 },
+      { runId: "run-3", at: "2026-06-01T00:00:00.000Z", order: 2 },
+    ];
+    const result = selectStatusRunId("2026-05-31T00:00:00.000Z", boundaries);
+    expect(result).toBe("run-2");
+  });
+
+  it("returns the last run id when the timestamp is after all boundaries", () => {
+    const boundaries: RunBoundary[] = [
+      { runId: "run-1", at: "2026-05-28T00:00:00.000Z", order: 0 },
+      { runId: "run-2", at: "2026-05-30T00:00:00.000Z", order: 1 },
+      { runId: "run-3", at: "2026-06-01T00:00:00.000Z", order: 2 },
+    ];
+    const result = selectStatusRunId("2026-06-02T00:00:00.000Z", boundaries);
+    expect(result).toBe("run-3");
   });
 });

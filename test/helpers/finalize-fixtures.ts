@@ -4,10 +4,15 @@ import path from "node:path";
 // process.cwd() base is required: loadConfig→assertSafeCwd rejects absolute paths outside cwd.
 export function createTempProject(): string {
   const tmpDir = fs.mkdtempSync(path.join(process.cwd(), "omre-test-"));
-  fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
-  fs.mkdirSync(path.join(tmpDir, ".omre", "handoffs"), { recursive: true });
-  fs.mkdirSync(path.join(tmpDir, ".omre", "reports"), { recursive: true });
-  writeProjectConfig(tmpDir);
+  try {
+    fs.mkdirSync(path.join(tmpDir, ".omre"), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, ".omre", "handoffs"), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, ".omre", "reports"), { recursive: true });
+    writeProjectConfig(tmpDir);
+  } catch (err) {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    throw err;
+  }
   return tmpDir;
 }
 

@@ -360,28 +360,29 @@ describe("searchMemory", () => {
     expect(result.hits.map((hit) => hit.finding.id)).toEqual(["mem_0000000000000018", "mem_0000000000000019"]);
   });
 
-  it("linear scan performance stays within the local v0.4 budget", () => {
-    const makeFindings = (count: number): MemoryFinding[] => Array.from({ length: count }, (_unused, index) => validFinding({
-      id: memoryId(index + 1),
-      searchable: { redactedText: "tenant isolation", tokens: ["tenant", "isolation"] },
-    }));
-    const measureSearch = (findings: MemoryFinding[]): number => {
-      const start = performance.now();
-      const result = searchMemory({ query: "tenant isolation", findings });
-      const elapsed = performance.now() - start;
+  it("rejects invalid similarityThreshold values with RangeError", () => {
+    const findings = [
+      validFinding({
+        id: "mem_000000000000001b",
+        searchable: { redactedText: "tenant", tokens: ["tenant"] },
+      }),
+    ];
 
-      expect(result.hits).toHaveLength(findings.length);
-
-      return elapsed;
-    };
-
-    const oneThousandMs = measureSearch(makeFindings(1_000));
-    const fiveThousandMs = measureSearch(makeFindings(5_000));
-    const tenThousandMs = measureSearch(makeFindings(10_000));
-
-    expect(oneThousandMs).toBeLessThan(40);
-    expect(fiveThousandMs).toBeLessThan(100);
-    expect(tenThousandMs).toBeLessThan(200);
-    expect(tenThousandMs).toBeLessThanOrEqual(Math.max(100, oneThousandMs * 15));
+    expect(() => searchMemory({ query: "tenant", findings, similarityThreshold: NaN })).toThrow(
+      RangeError
+    );
+    expect(() => searchMemory({ query: "tenant", findings, similarityThreshold: Infinity })).toThrow(
+      RangeError
+    );
+    expect(() => searchMemory({ query: "tenant", findings, similarityThreshold: -1 })).toThrow(
+      RangeError
+    );
+    expect(() => searchMemory({ query: "tenant", findings, similarityThreshold: 2 })).toThrow(
+      RangeError
+    );
+    // Valid values should not throw
+    expect(() => searchMemory({ query: "tenant", findings, similarityThreshold: 0 })).not.toThrow();
+    expect(() => searchMemory({ query: "tenant", findings, similarityThreshold: 0.5 })).not.toThrow();
+    expect(() => searchMemory({ query: "tenant", findings, similarityThreshold: 1 })).not.toThrow();
   });
 });

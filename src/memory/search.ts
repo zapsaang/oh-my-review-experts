@@ -46,6 +46,9 @@ export function searchMemory(input: SearchMemoryInput): SearchMemoryResult {
   const reviewerFilter = buildReviewerFilter(input, effectiveReviewers);
   const normalizedInputPaths = normalizePaths(input.paths ?? []);
   const threshold = input.similarityThreshold ?? DEFAULT_SIMILARITY_THRESHOLD;
+  if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
+    throw new RangeError(`similarityThreshold must be finite in [0, 1], got ${threshold}`);
+  }
   const hits: MemorySearchHit[] = [];
 
   for (const finding of input.findings) {

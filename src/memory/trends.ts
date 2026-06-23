@@ -12,6 +12,7 @@ export interface TrendsReport {
 
 type TimelineBucket = TrendsReport["perRunTimeline"][number] & { firstAt: string; order: number };
 type RunBoundary = { runId: string; at: string; order: number };
+export type { RunBoundary };
 
 const UNKNOWN_MODULE = "unknown";
 const MARK_RUN_ID = "omre-mark";
@@ -130,7 +131,7 @@ function computeRecurringRegressions(events: MemoryEvent[], findingsById: Map<st
 
 // SCOPE NOTE: computeFixSurvivalTime turns Date.parse output into a numeric duration.
 // Other Date.parse calls here are ordering-only sort comparators, and filterTimelineEvents already guards its bucket parse.
-function safeDateParse(value: string): number | undefined {
+export function safeDateParse(value: string): number | undefined {
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
@@ -256,7 +257,7 @@ function directRunId(event: MemoryEvent): string | undefined {
   }
 }
 
-function selectStatusRunId(at: string, boundaries: RunBoundary[]): string {
+export function selectStatusRunId(at: string, boundaries: RunBoundary[]): string {
   if (boundaries.length === 0) return MARK_RUN_ID;
   const atMs = Date.parse(at);
   let left = 0;

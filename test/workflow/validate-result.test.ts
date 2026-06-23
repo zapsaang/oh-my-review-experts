@@ -1,4 +1,4 @@
-import { describe, expect, it, expectTypeOf } from "vitest";
+import { describe, expect, it, expectTypeOf, afterEach } from "vitest";
 import { z } from "zod";
 import fs from "node:fs";
 import path from "node:path";
@@ -13,12 +13,22 @@ import {
 } from "../../src/workflow/validate-result.js";
 import { SCHEMA_VERSION, UnifiedFindingSchema, UnifiedHandoffSchema, NormalizedUnifiedHandoffSchema } from "../../src/agents/schemas.js";
 
+const createdTempDirs = new Set<string>();
+
 function createMockHandoffFile(content: string): string {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-test-"));
+  createdTempDirs.add(tmpDir);
   const filePath = path.join(tmpDir, "handoff.md");
   fs.writeFileSync(filePath, content, "utf-8");
   return filePath;
 }
+
+afterEach(() => {
+  for (const d of createdTempDirs) {
+    fs.rmSync(d, { recursive: true, force: true });
+  }
+  createdTempDirs.clear();
+});
 
 function createValidHandoff(): ReviewerHandoff {
   return {

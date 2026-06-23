@@ -1,0 +1,74 @@
+[
+  {
+    "id": "sc-01-high-relevance",
+    "description": "Query and path hit one specific finding exactly",
+    "query": "tenant isolation",
+    "reviewer": "security",
+    "slicePaths": ["src/tenants.ts"],
+    "relevantFindingIds": ["mem_0000000000000001"]
+  },
+  {
+    "id": "sc-02-partial",
+    "description": "Multiple relevant findings across security injection cluster",
+    "query": "injection vulnerability",
+    "reviewer": "security",
+    "slicePaths": ["src/"],
+    "relevantFindingIds": ["mem_0000000000000002", "mem_0000000000000019"]
+  },
+  {
+    "id": "sc-03-zero-relevant",
+    "description": "No findings match this query at all",
+    "query": "documentation formatting",
+    "reviewer": "quality",
+    "slicePaths": ["docs/"],
+    "relevantFindingIds": []
+  },
+  {
+    "id": "sc-04-reviewer-mismatch",
+    "description": "Security finding exists but reviewer filter is performance",
+    "query": "SQL injection",
+    "reviewer": "performance",
+    "slicePaths": ["src/db/"],
+    "relevantFindingIds": []
+  },
+  {
+    "id": "sc-05-path-overlap",
+    "description": "Slice paths overlap with finding locations",
+    "query": "cache headers",
+    "reviewer": "performance",
+    "slicePaths": ["src/middleware/"],
+    "relevantFindingIds": ["mem_000000000000000a"]
+  },
+  {
+    "id": "sc-06-path-none",
+    "description": "Slice paths do not overlap with relevant findings",
+    "query": "sorting algorithm",
+    "reviewer": "performance",
+    "slicePaths": ["src/algorithms/"],
+    "relevantFindingIds": []
+  },
+  {
+    "id": "sc-07-medium-recall",
+    "description": "2-3 relevant findings for a correctness query",
+    "query": "null or type error",
+    "reviewer": "correctness",
+    "slicePaths": ["src/"],
+    "relevantFindingIds": ["mem_000000000000000b", "mem_000000000000000d"]
+  },
+  {
+    "id": "sc-08-low-recall",
+    "description": "1 relevant finding among many potential distractors",
+    "query": "deadlock lock ordering",
+    "reviewer": "concurrency",
+    "slicePaths": ["src/"],
+    "relevantFindingIds": ["mem_0000000000000012"]
+  },
+  {
+    "id": "sc-09-mixed",
+    "description": "Combination of categories across API module",
+    "query": "API contract response format",
+    "reviewer": "spec",
+    "slicePaths": ["src/api/"],
+    "relevantFindingIds": ["mem_0000000000000015", "mem_0000000000000016"]
+  }
+]
