@@ -230,4 +230,4 @@ export type SliceTypeValue = z.infer<typeof SliceType>;
 
 export const DEFAULT_CONFIG: OmreConfig = OmreConfigSchema.parse({});
 
-export const DEFAULT_MODEL = "minimax-cn/MiniMax-M2.7";
+export const DEFAULT_MODEL = "minimax-cn/MiniMax-M3";

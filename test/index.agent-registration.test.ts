@@ -8,7 +8,7 @@ import { AGENT_NAMES } from "../src/agents/registry.js";
 import { clearLoadConfigCache } from "../src/config/load-config.js";
 import { stubPluginInput } from "./_helpers/plugin-input.js";
 
-const DEFAULT_MODEL = "minimax-cn/MiniMax-M2.7";
+const DEFAULT_MODEL = "minimax-cn/MiniMax-M3";
 
 const OhMyReviewExperts = pluginModule.server;
 
