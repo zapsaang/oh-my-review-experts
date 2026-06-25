@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { resolveLogger, type OmreLogger, type ResolvedOmreLogger } from "../logger.js";
 import type { RawFinding, RawLocation } from "./types.js";
 
 interface MarkdownFinding {
@@ -7,33 +8,34 @@ interface MarkdownFinding {
   fields: Record<string, string>;
 }
 
-export function extractFromHandoffs(handoffDir: string): RawFinding[] {
+export function extractFromHandoffs(handoffDir: string, logger?: OmreLogger): RawFinding[] {
+  const output = resolveLogger(logger);
   let fileNames: string[];
 
   try {
     fileNames = readdirSync(handoffDir);
   } catch (error) {
-    warnSkip(handoffDir, "list handoff directory", error);
+    warnSkip(output, handoffDir, "list handoff directory", error);
     return [];
   }
 
   return fileNames
     .filter((fileName) => fileName.endsWith(".md"))
     .sort()
-    .flatMap((fileName) => extractFromFile(join(handoffDir, fileName)));
+    .flatMap((fileName) => extractFromFile(join(handoffDir, fileName), output));
 }
 
-function extractFromFile(sourcePath: string): RawFinding[] {
+function extractFromFile(sourcePath: string, logger: ResolvedOmreLogger): RawFinding[] {
   let content: string;
 
   try {
     content = readFileSync(sourcePath, "utf8");
   } catch (error) {
-    warnSkip(sourcePath, "read handoff file", error);
+    warnSkip(logger, sourcePath, "read handoff file", error);
     return [];
   }
 
-  const header = parseJsonHeader(content, sourcePath);
+  const header = parseJsonHeader(content, sourcePath, logger);
   const markdownFindings = parseMarkdownFindings(content);
 
   if (!header && markdownFindings.length === 0) {
@@ -55,7 +57,7 @@ function extractFromFile(sourcePath: string): RawFinding[] {
   );
 }
 
-function parseJsonHeader(content: string, sourcePath: string): Record<string, unknown> | undefined {
+function parseJsonHeader(content: string, sourcePath: string, logger: ResolvedOmreLogger): Record<string, unknown> | undefined {
   const match = /^\uFEFF?\s*```json\s*\r?\n([\s\S]*?)\r?\n```/.exec(content);
   if (!match) {
     return undefined;
@@ -65,7 +67,7 @@ function parseJsonHeader(content: string, sourcePath: string): Record<string, un
     const parsed = JSON.parse(match[1] ?? "");
     return recordValue(parsed);
   } catch (error) {
-    warnSkip(sourcePath, "parse handoff JSON header", error);
+    warnSkip(logger, sourcePath, "parse handoff JSON header", error);
     return undefined;
   }
 }
@@ -216,7 +218,7 @@ function recordValue(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-function warnSkip(sourcePath: string, action: string, error: unknown): void {
+function warnSkip(logger: ResolvedOmreLogger, sourcePath: string, action: string, error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
-  console.warn(`[memory-extractor] Unable to ${action} at ${sourcePath}; skipping. ${message}`);
+  logger.warn(`[memory-extractor] Unable to ${action} at ${sourcePath}; skipping. ${message}`);
 }

@@ -63,6 +63,8 @@ export function renderReviewMemoryContextHeader(): string {
   ].join("\n");
 }
 
+import { resolveLogger, type OmreLogger } from "../memory/logger.js";
+
 export function collectReviewMemorySections(
   cwd: string,
   config: OmreConfig,
@@ -70,6 +72,7 @@ export function collectReviewMemorySections(
   diffSummary: string,
   userGuidance: string,
   flags: MemoryFlags,
+  logger?: OmreLogger,
 ): ReviewMemorySectionCollection {
   if (!shouldAttemptMemoryRetrieval(config, flags)) {
     return { attempted: false, sections: [], truncated: false };
@@ -93,6 +96,7 @@ export function collectReviewMemorySections(
         memoryConfig: config.memory,
         withMemory: flags.isWithMemory,
         noMemory: flags.isNoMemory,
+        logger,
       });
 
       if (contextPack === undefined || contextPack.includedIds.length === 0 || contextPack.text.trim().length === 0) {

@@ -30,10 +30,13 @@ import {
  * `writeReport` validation, atomic-write, and history pipeline.
  */
 
+import { resolveLogger, type OmreLogger } from "../memory/logger.js";
+
 export interface FinalizeReviewInput {
   runId: string;
   cwd: string;
   withMemory?: boolean;
+  output?: OmreLogger;
 }
 
 export interface FinalizeReviewResult {
@@ -53,6 +56,7 @@ function summarizeError(err: unknown): string {
 }
 
 export function finalizeReview(input: FinalizeReviewInput): FinalizeReviewResult {
+  const output = resolveLogger(input.output);
   const config = loadConfig(input.cwd);
 
   const resolvedCwd = path.resolve(input.cwd);
@@ -113,7 +117,7 @@ export function finalizeReview(input: FinalizeReviewInput): FinalizeReviewResult
   if (config.memory.enabled) {
     if (config.memory.indexing?.autoIndexAfterReview !== false) {
       try {
-        runIndexLatest({ cwd: input.cwd });
+        runIndexLatest({ cwd: input.cwd, output });
         memoryIndexResult = { success: true };
       } catch (err) {
         memoryIndexResult = {
@@ -123,9 +127,9 @@ export function finalizeReview(input: FinalizeReviewInput): FinalizeReviewResult
       }
     }
 
-    const compactCheck = checkAutoCompactThreshold(input.cwd, config.memory);
+    const compactCheck = checkAutoCompactThreshold(input.cwd, config.memory, output);
     if (compactCheck.needsCompaction) {
-      console.log(`Review memory threshold exceeded (${compactCheck.reason}). Run \`omre memory compact\` to merge segments.`);
+      output.log(`Review memory threshold exceeded (${compactCheck.reason}). Run \`omre memory compact\` to merge segments.`);
     }
   }
 

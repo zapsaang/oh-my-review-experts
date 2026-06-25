@@ -20,17 +20,14 @@ import {
 } from "./store.js";
 import { assertSafePath } from "../tools/fs-utils.js";
 
-interface MemoryIndexOutput {
-  log: (...values: unknown[]) => void;
-  error: (...values: unknown[]) => void;
-}
+import { resolveLogger, type OmreLogger } from "./logger.js";
 
 export interface IndexLatestOptions {
   cwd?: string;
   dryRun?: boolean;
   report?: string;
   handoffDir?: string;
-  output?: MemoryIndexOutput;
+  output?: OmreLogger;
 }
 
 export interface IndexLatestResult {
@@ -53,7 +50,7 @@ export function runIndexLatest(options: IndexLatestOptions = {}): IndexLatestRes
   const cwd = options.cwd ?? process.cwd();
   const repoRoot = cwd;
   const dryRun = !!options.dryRun;
-  const output = options.output ?? console;
+  const output = resolveLogger(options.output);
   const config = loadConfig(cwd);
 
   if (!config.memory.enabled) {
@@ -89,6 +86,7 @@ export function runIndexLatest(options: IndexLatestOptions = {}): IndexLatestRes
   const { report: reportFindings, handoffs: handoffFindings } = extractStructuredFindings({
     reportPath: extractReportPath,
     handoffDir: extractHandoffDir,
+    logger: output,
   });
   const newFindings = [
     ...normalizeRawFindings(reportFindings, {
@@ -144,7 +142,7 @@ export function runIndexLatest(options: IndexLatestOptions = {}): IndexLatestRes
 
   const written = withMemoryLock(paths, () => {
     const segment = writeEventSegment(paths, dedupeResult.events.sort(compareMemoryEvents), runId);
-    const { events: allEvents, skipped } = readAllEventSegments(paths);
+    const { events: allEvents, skipped } = readAllEventSegments(paths, output);
     if (skipped > 0) {
       output.log(`warning: skipped ${skipped} corrupted event lines during rebuild`);
     }

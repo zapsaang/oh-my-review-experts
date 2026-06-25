@@ -10,6 +10,8 @@ import { searchMemory } from "./search.js";
 import { normalizeWhitespace, stripMarkdownFences, tokenizeForSimilarity } from "./similarity.js";
 import { readMaterializedState } from "./store.js";
 
+import { resolveLogger, type OmreLogger } from "./logger.js";
+
 export interface RetrieveMemoryContextInput {
   repoRoot: string;
   reviewer: string;
@@ -19,6 +21,7 @@ export interface RetrieveMemoryContextInput {
   memoryConfig: MemoryConfig;
   withMemory?: boolean;
   noMemory?: boolean;
+  logger?: OmreLogger;
 }
 
 export interface AutoCompactThresholdResult {
@@ -48,7 +51,7 @@ export function retrieveMemoryContext(input: RetrieveMemoryContextInput): Memory
     const paths = resolveMemoryPaths(input.repoRoot, input.memoryConfig.directory);
     state = readMaterializedState(paths);
   } catch (err) {
-    console.warn(`memory: failed to read materialized state, skipping retrieval: ${errorSummary(err)}`);
+    resolveLogger(input.logger).warn(`memory: failed to read materialized state, skipping retrieval: ${errorSummary(err)}`);
     return undefined;
   }
 
@@ -100,12 +103,12 @@ export function retrieveMemoryContext(input: RetrieveMemoryContextInput): Memory
   });
 }
 
-export function checkAutoCompactThreshold(cwd: string, memoryConfig: MemoryConfig): AutoCompactThresholdResult {
+export function checkAutoCompactThreshold(cwd: string, memoryConfig: MemoryConfig, logger?: OmreLogger): AutoCompactThresholdResult {
   if (!memoryConfig.compaction.enabled) {
     return { needsCompaction: false };
   }
 
-  const segmentStats = readSegmentStats(cwd, memoryConfig);
+  const segmentStats = readSegmentStats(cwd, memoryConfig, logger);
   const segmentCount = segmentStats.length;
   if (segmentCount > memoryConfig.compaction.minRawSegments) {
     return {
@@ -138,8 +141,8 @@ export function checkAutoCompactThreshold(cwd: string, memoryConfig: MemoryConfi
   return { needsCompaction: false };
 }
 
-export function autoIndexAfterReview(cwd: string): IndexLatestResult {
-  return runIndexLatest({ cwd });
+export function autoIndexAfterReview(cwd: string, logger?: OmreLogger): IndexLatestResult {
+  return runIndexLatest({ cwd, output: logger });
 }
 
 function isRetrievalEnabled(input: RetrieveMemoryContextInput): boolean {
@@ -171,7 +174,7 @@ function normalizePositiveInteger(value: number): number {
   return Math.floor(value);
 }
 
-function readSegmentStats(cwd: string, memoryConfig: MemoryConfig): Stats[] {
+function readSegmentStats(cwd: string, memoryConfig: MemoryConfig, logger?: OmreLogger): Stats[] {
   try {
     const paths = resolveMemoryPaths(cwd, memoryConfig.directory);
     if (!fs.existsSync(paths.segmentsDir)) {
@@ -192,7 +195,7 @@ function readSegmentStats(cwd: string, memoryConfig: MemoryConfig): Stats[] {
 
     return stats;
   } catch (err) {
-    console.warn(`memory: failed to read segment stats: ${errorSummary(err)}`);
+    resolveLogger(logger).warn(`memory: failed to read segment stats: ${errorSummary(err)}`);
     return [];
   }
 }

@@ -3,6 +3,7 @@ import path from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import { MemoryEventSchema, type MemoryEvent } from "./schema.js";
 import type { MemoryPaths } from "./paths.js";
+import { resolveLogger, type OmreLogger } from "./logger.js";
 
 export interface EventBatchContext {
   runId: string;
@@ -69,7 +70,8 @@ export function writeEventSegment(
   return { segmentPath, eventsWritten: events.length };
 }
 
-export function readAllEventSegments(paths: MemoryPaths): ReadAllEventSegmentsResult {
+export function readAllEventSegments(paths: MemoryPaths, logger?: OmreLogger): ReadAllEventSegmentsResult {
+  const output = resolveLogger(logger);
   const events: MemoryEvent[] = [];
   let skipped = 0;
   const dirs = [paths.segmentsDir, paths.compactedDir];
@@ -92,13 +94,13 @@ export function readAllEventSegments(paths: MemoryPaths): ReadAllEventSegmentsRe
           } else {
             skipped++;
             if (process.env.NODE_ENV !== "production") {
-              console.warn(`Skipped invalid event in ${filePath}:`, result.error.message);
+              output.warn(`Skipped invalid event in ${filePath}:`, result.error.message);
             }
           }
         } catch {
           skipped++;
           if (process.env.NODE_ENV !== "production") {
-            console.warn(`Skipped malformed JSON line in ${filePath}`);
+            output.warn(`Skipped malformed JSON line in ${filePath}`);
           }
         }
       }

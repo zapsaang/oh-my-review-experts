@@ -85,10 +85,10 @@ describe("extractFromReport", () => {
   });
 
   it("returns an empty list and warns when slices is missing", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const warn = vi.fn();
     const reportPath = writeTempReport({ findings: [{ title: "top-level finding must be ignored" }] });
 
-    expect(extractFromReport(reportPath)).toEqual([]);
+    expect(extractFromReport(reportPath, { warn })).toEqual([]);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("missing or invalid slices"));
   });
 

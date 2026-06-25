@@ -228,17 +228,17 @@ describe("memory event helpers", () => {
       sourcePath: ".omre/reports/latest.json",
     };
     const safeParseSpy = vi.spyOn(MemoryEventSchema, "safeParse");
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const warn = vi.fn();
 
     writeJsonl(path.join(paths.segmentsDir, "raw.jsonl"), [later, invalidSchemaLine]);
     fs.appendFileSync(path.join(paths.segmentsDir, "raw.jsonl"), "not valid json\n", "utf8");
     writeJsonl(path.join(paths.compactedDir, "compacted.jsonl"), [sameTime, earlier]);
     fs.writeFileSync(path.join(paths.segmentsDir, "ignored.txt"), `${JSON.stringify(discoveredEvent({ eventId: "evt_ignored" }))}\n`, "utf8");
 
-    const { events, skipped } = readAllEventSegments(paths);
+    const { events, skipped } = readAllEventSegments(paths, { warn });
 
     expect(safeParseSpy).toHaveBeenCalledTimes(4);
-    expect(warnSpy).toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled();
     expect(skipped).toBe(2);
     expect(events.map((event) => event.eventId)).toEqual(["evt_earlier", "evt_middle", "evt_later"]);
   });

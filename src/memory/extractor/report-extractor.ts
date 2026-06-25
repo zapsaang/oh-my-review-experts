@@ -1,13 +1,15 @@
 import { readFileSync } from "node:fs";
+import { resolveLogger, type OmreLogger } from "../logger.js";
 import { MemoryExtractionError, type RawFinding, type RawLocation } from "./types.js";
 
 type JsonObject = Record<string, unknown>;
 
-export function extractFromReport(reportPath: string): RawFinding[] {
+export function extractFromReport(reportPath: string, logger?: OmreLogger): RawFinding[] {
+  const output = resolveLogger(logger);
   const report = parseReportJson(reportPath);
 
   if (!isObject(report) || !Array.isArray(report.slices)) {
-    console.warn(`Report ${reportPath} has missing or invalid slices; skipping extraction.`);
+    output.warn(`Report ${reportPath} has missing or invalid slices; skipping extraction.`);
     return [];
   }
 

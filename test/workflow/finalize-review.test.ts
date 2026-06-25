@@ -19,6 +19,7 @@ interface FinalizeReviewInput {
   cwd: string;
   trusted?: boolean;
   withMemory?: boolean;
+  output?: { log?: (...values: unknown[]) => void; warn?: (...values: unknown[]) => void; error?: (...values: unknown[]) => void };
 }
 
 interface DegradedSlice {
@@ -285,7 +286,7 @@ describe("finalizeReview [Fix 2-B RED]", () => {
 
       const mod = await loadFinalizeReviewWithMemoryMocks({
         runIndexLatest: (options) => {
-          expect(options).toEqual({ cwd });
+          expect(options).toEqual(expect.objectContaining({ cwd }));
           latestJsonExistedWhenIndexRan = fs.existsSync(path.join(cwd, ".omre", "reports", "latest.json"));
           return buildIndexLatestResult();
         },
@@ -296,7 +297,7 @@ describe("finalizeReview [Fix 2-B RED]", () => {
       expect(latestJsonExistedWhenIndexRan).toBe(true);
       expect(mod.runIndexLatestMock).toHaveBeenCalledTimes(1);
       expect(mod.checkAutoCompactThresholdMock).toHaveBeenCalledTimes(1);
-      expect(mod.checkAutoCompactThresholdMock).toHaveBeenCalledWith(cwd, expect.objectContaining({ enabled: true }));
+      expect(mod.checkAutoCompactThresholdMock).toHaveBeenCalledWith(cwd, expect.objectContaining({ enabled: true }), expect.anything());
       expect(result.memoryIndexResult).toEqual({ success: true });
       expect(result.written.some((filePath) => filePath.endsWith("latest.json"))).toBe(true);
     } finally {
@@ -363,7 +364,7 @@ describe("finalizeReview [Fix 2-B RED]", () => {
       const runId = "run-auto-compact-warning";
       writeHandoffFile(cwd, runId, "handoff-1.md");
 
-      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const logSpy = vi.fn();
 
       const mod = await loadFinalizeReviewWithMemoryMocks({
         checkAutoCompactThreshold: () => ({
@@ -372,7 +373,7 @@ describe("finalizeReview [Fix 2-B RED]", () => {
         }),
       });
 
-      const result = mod.finalizeReview({ runId, cwd });
+      const result = mod.finalizeReview({ runId, cwd, output: { log: logSpy } });
 
       expect(mod.checkAutoCompactThresholdMock).toHaveBeenCalledTimes(1);
       expect(logSpy).toHaveBeenCalledTimes(1);

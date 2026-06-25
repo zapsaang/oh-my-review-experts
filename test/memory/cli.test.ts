@@ -263,7 +263,7 @@ describe("memory index-latest CLI", () => {
     process.chdir(repoRoot);
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    const result = runIndexLatest();
+    const result = runIndexLatest({ output: console });
 
     const paths = resolveMemoryPaths(repoRoot);
     expect(result.rawFindings).toBe(0);
@@ -402,6 +402,7 @@ describe("memory index-latest CLI", () => {
     expect(extractStructuredFindings).toHaveBeenCalledWith({
       reportPath,
       handoffDir,
+      logger: expect.anything(),
     });
     const paths = resolveMemoryPaths(repoRoot);
     const [segmentFile] = segmentFiles(repoRoot);

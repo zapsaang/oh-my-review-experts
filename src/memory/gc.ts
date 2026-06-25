@@ -7,9 +7,12 @@ import { readMaterializedState, writeMaterializedState } from "./store.js";
 import { writeFileAtomicOverwrite, formatTimestamp } from "../tools/fs-utils.js";
 import type { CompactedSegment, MemoryManifest, QuarantineEntry } from "./schema.js";
 
+import { resolveLogger, type OmreLogger } from "./logger.js";
+
 export interface GcOptions {
   cwd?: string;
   dryRun?: boolean;
+  output?: OmreLogger;
   quarantine?: {
     olderThanDays?: number;
   };
@@ -51,6 +54,7 @@ const MS_PER_DAY = 86_400_000;
 export function runMemoryGc(options: GcOptions): GcResult {
   const cwd = options.cwd ?? process.cwd();
   const dryRun = options.dryRun === true;
+  const output = resolveLogger(options.output);
 
   const config = loadConfigUnsafe(cwd);
   const paths = resolveMemoryPaths(cwd, config.memory.directory);
@@ -104,8 +108,7 @@ export function runMemoryGc(options: GcOptions): GcResult {
     if (manifest !== null) {
       const segments = manifest.compactedInputSegments;
       if (isLegacyStringArray(segments)) {
-        // eslint-disable-next-line no-console
-        console.warn(
+        output.warn(
           "memory gc: compactedInputSegments is a legacy string[]; refusing compacted-raw-expired deletions for safety",
         );
       } else {

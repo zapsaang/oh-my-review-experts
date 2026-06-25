@@ -248,15 +248,18 @@ describe("retrieveMemoryContext", () => {
   it("warns and returns undefined when materialized state reading fails", () => {
     const repoRoot = makeTempRepo();
     const memoryConfig = memoryConfigWith();
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const warn = vi.fn();
     vi.mocked(memoryStore.readMaterializedState).mockImplementationOnce(() => {
       throw new Error("corrupt manifest");
     });
 
-    const result = retrieveMemoryContext(retrievalInput(repoRoot, memoryConfig));
+    const result = retrieveMemoryContext({
+      ...retrievalInput(repoRoot, memoryConfig),
+      logger: { warn },
+    });
 
     expect(result).toBeUndefined();
-    expect(warnSpy).toHaveBeenCalledWith("memory: failed to read materialized state, skipping retrieval: corrupt manifest");
+    expect(warn).toHaveBeenCalledWith("memory: failed to read materialized state, skipping retrieval: corrupt manifest");
   });
 
   it("returns undefined instead of throwing when the materialized manifest is corrupt", () => {
@@ -355,15 +358,15 @@ describe("checkAutoCompactThreshold", () => {
     const repoRoot = makeTempRepo();
     const memoryConfig = memoryConfigWith();
     writeSegment(repoRoot, memoryConfig, "unreadable.jsonl");
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const warn = vi.fn();
     vi.spyOn(fs, "statSync").mockImplementation(() => {
       throw new Error("EACCES");
     });
 
-    const result = checkAutoCompactThreshold(repoRoot, memoryConfig);
+    const result = checkAutoCompactThreshold(repoRoot, memoryConfig, { warn });
 
     expect(result).toEqual({ needsCompaction: false });
-    expect(warnSpy).toHaveBeenCalledWith("memory: failed to read segment stats: EACCES");
+    expect(warn).toHaveBeenCalledWith("memory: failed to read segment stats: EACCES");
   });
 
   it("returns needsCompaction=false when segment count and age are under thresholds", () => {

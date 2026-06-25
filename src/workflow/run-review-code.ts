@@ -23,11 +23,14 @@ import {
 // Re-export for backwards compatibility (test imports from this path)
 export { buildPerReviewerMemorySection } from "./review-memory-context.js";
 
+import { resolveLogger, type OmreLogger } from "../memory/logger.js";
+
 export interface ReviewCodeInput {
   args?: string;
   cwd?: string;
   isWithMemory?: boolean;
   isNoMemory?: boolean;
+  output?: OmreLogger;
 }
 
 export interface ReviewCodePromptBundle {
@@ -163,7 +166,7 @@ export function buildReviewCodePrompt(input: ReviewCodeInput = {}): ReviewCodePr
   const diff = redactSecrets(rawDiff);
   const reviewersBySlice = JSON.stringify(plan.selectedReviewers, null, 2);
   const slices = JSON.stringify(plan.slices, null, 2);
-  const reviewMemorySections = collectReviewMemorySections(cwd, config, plan, summary, userArgsText, memoryFlags);
+  const reviewMemorySections = collectReviewMemorySections(cwd, config, plan, summary, userArgsText, memoryFlags, resolveLogger(input.output));
   const reviewMemoryContext = renderReviewMemoryContext(reviewMemorySections);
   const reviewMemoryContextBlock = reviewMemoryContext.length > 0 ? `\n\n${reviewMemoryContext}` : "";
 

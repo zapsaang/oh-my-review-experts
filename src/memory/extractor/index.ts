@@ -1,5 +1,6 @@
 import { extractFromHandoffs } from "./handoff-extractor.js";
 import { extractFromReport } from "./report-extractor.js";
+import type { OmreLogger } from "../logger.js";
 import type { RawFinding } from "./types.js";
 
 type ExtractSource = "reports" | "handoffs";
@@ -10,12 +11,14 @@ export interface ExtractStructuredFindingsInput {
   reportPath?: string;
   handoffDir?: string;
   sources?: ExtractSource[];
+  logger?: OmreLogger;
 }
 
 export interface ExtractRawFindingsInput {
   reportPath?: string;
   handoffDir?: string;
   sources: ExtractSource[];
+  logger?: OmreLogger;
 }
 
 export interface StructuredRawFindings {
@@ -33,11 +36,11 @@ export function extractStructuredFindings(input: ExtractStructuredFindingsInput)
   const sources = input.sources ?? DEFAULT_SOURCES;
 
   const report = sources.includes("reports") && input.reportPath !== undefined
-    ? extractFromReport(input.reportPath)
+    ? extractFromReport(input.reportPath, input.logger)
     : [];
 
   const handoffs = sources.includes("handoffs") && input.handoffDir !== undefined
-    ? extractFromHandoffs(input.handoffDir)
+    ? extractFromHandoffs(input.handoffDir, input.logger)
     : [];
 
   return { report, handoffs };

@@ -7,12 +7,14 @@ import {
   rebuildMaterializedStateFromEvents,
   writeMaterializedState,
 } from "./store.js";
+import { resolveLogger, type OmreLogger } from "./logger.js";
 
 export interface MarkOptions {
   findingId: string;
   status: string;
   reason?: string;
   cwd?: string;
+  output?: OmreLogger;
 }
 
 export interface MarkResult {
@@ -82,7 +84,7 @@ export function runMemoryMark(options: MarkOptions): MarkResult {
 
     const segment = writeEventSegment(paths, [event], MARK_RUN_ID);
 
-    const { events } = readAllEventSegments(paths);
+    const { events } = readAllEventSegments(paths, resolveLogger(options.output));
     const rebuilt = rebuildMaterializedStateFromEvents(events);
     writeMaterializedState(paths, rebuilt);
 

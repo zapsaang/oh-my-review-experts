@@ -33,7 +33,10 @@ export interface CheckResult {
   warnings: string[];
 }
 
-export function runMemoryCheck(paths: MemoryPaths): CheckResult {
+import { resolveLogger, type OmreLogger } from "./logger.js";
+
+export function runMemoryCheck(paths: MemoryPaths, logger?: OmreLogger): CheckResult {
+  const output = resolveLogger(logger);
   const warnings: string[] = [];
 
   // Rule 1: VERSION exists and schema versions are supported
@@ -129,7 +132,7 @@ export function runMemoryCheck(paths: MemoryPaths): CheckResult {
     relatedIndexHash = state.manifest.relatedIndexHash;
 
     // Rule 7: Recompute materializedHash from events and compare
-    const { events } = readAllEventSegments(paths);
+    const { events } = readAllEventSegments(paths, output);
     const rebuilt = rebuildMaterializedStateFromEvents(events);
     if (rebuilt.manifest.materializedHash !== state.manifest.materializedHash) {
       warnings.push("materialized state stale; run index-latest (materializedHash mismatch)");

@@ -68,7 +68,7 @@ export function registerMemoryCli(program: Command): void {
     .option("--dry-run", "run extraction, redaction, normalization, and dedupe without writing", false)
     .action((opts: { dryRun?: boolean; report?: string; handoffDir?: string }) => {
       try {
-        runIndexLatest({ dryRun: !!opts.dryRun, report: opts.report, handoffDir: opts.handoffDir });
+        runIndexLatest({ dryRun: !!opts.dryRun, report: opts.report, handoffDir: opts.handoffDir, output: console });
       } catch (err) {
         console.error(`memory index-latest failed: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(1);
@@ -113,7 +113,7 @@ export function registerMemoryCli(program: Command): void {
     .action(() => {
       runMemoryCliAction("memory check", () => {
         const paths = resolveMemoryPaths(process.cwd());
-        const result = runMemoryCheck(paths);
+        const result = runMemoryCheck(paths, console);
         console.log(renderCheckResult(result));
       });
     });
@@ -128,7 +128,7 @@ export function registerMemoryCli(program: Command): void {
         if (status === undefined) {
           throw new Error("--status is required");
         }
-        const result = runMemoryMark({ findingId: id, status, reason: opts.reason, cwd: process.cwd() });
+        const result = runMemoryMark({ findingId: id, status, reason: opts.reason, cwd: process.cwd(), output: console });
         console.log(`marked ${result.findingId}: ${result.previousStatus} → ${result.newStatus}`);
       });
     });
@@ -157,6 +157,7 @@ export function registerMemoryCli(program: Command): void {
         const result = runMemoryGc({
           cwd: process.cwd(),
           dryRun: !!opts.dryRun,
+          output: console,
           quarantine: opts.quarantine ? { olderThanDays: Number(opts.quarantine) } : undefined,
         });
         console.log(`deleted: tmp=${result.deleted.tmpFiles}, empty=${result.deleted.emptySegments}, compacted-raw=${result.deleted.compactedRawSegments}, overflow=${result.deleted.overflowRawSegments}, quarantine=${result.deleted.quarantineFiles}`);
