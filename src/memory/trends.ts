@@ -187,14 +187,18 @@ function computePerRunTimeline(events: MemoryEvent[], options: ComputeTrendsOpti
   const boundaries = collectBoundaries(timelineEvents);
   const bucketsByRunId = new Map<string, TimelineBucket>();
   const statusesByFindingId = new Map<string, MemoryFinding["status"]>();
+  let activeCount = 0;
 
   for (const event of timelineEvents) {
     let bucket: TimelineBucket | undefined;
+    let findingId: string | undefined;
+    let nextStatus: MemoryFinding["status"] | undefined;
     switch (event.type) {
       case "finding.discovered":
         bucket = ensureTimelineBucket(bucketsByRunId, event.finding.origin.runId, event.at);
         bucket.introduced += 1;
-        statusesByFindingId.set(event.finding.id, event.finding.status);
+        findingId = event.finding.id;
+        nextStatus = event.finding.status;
         break;
       case "finding.seen_again":
         bucket = ensureTimelineBucket(bucketsByRunId, event.runId, event.at);
@@ -203,18 +207,26 @@ function computePerRunTimeline(events: MemoryEvent[], options: ComputeTrendsOpti
       case "finding.status_changed":
         bucket = ensureTimelineBucket(bucketsByRunId, selectStatusRunId(event.at, boundaries), event.at);
         bucket.statusChanged += 1;
-        statusesByFindingId.set(event.findingId, event.to);
+        findingId = event.findingId;
+        nextStatus = event.to;
         break;
       case "finding.regressed":
         bucket = ensureTimelineBucket(bucketsByRunId, event.runId, event.at);
         bucket.regressed += 1;
-        statusesByFindingId.set(event.findingId, event.toStatus);
+        findingId = event.findingId;
+        nextStatus = event.toStatus;
         break;
       case "finding.related":
         continue;
     }
+    if (findingId !== undefined && nextStatus !== undefined) {
+      const previousStatus = statusesByFindingId.get(findingId);
+      activeCount += Number(ACTIVE_STATUSES.has(nextStatus));
+      activeCount -= Number(previousStatus !== undefined && ACTIVE_STATUSES.has(previousStatus));
+      statusesByFindingId.set(findingId, nextStatus);
+    }
     if (bucket !== undefined) {
-      bucket.totalActive = countActive(statusesByFindingId);
+      bucket.totalActive = activeCount;
     }
   }
 
@@ -291,10 +303,6 @@ function ensureTimelineBucket(
   const bucket = { runId, introduced: 0, seenAgain: 0, statusChanged: 0, regressed: 0, totalActive: 0, firstAt: at, order: bucketsByRunId.size };
   bucketsByRunId.set(runId, bucket);
   return bucket;
-}
-
-function countActive(statusesByFindingId: Map<string, MemoryFinding["status"]>): number {
-  return Array.from(statusesByFindingId.values()).filter((status) => ACTIVE_STATUSES.has(status)).length;
 }
 
 function compareBoundary(a: RunBoundary, b: RunBoundary): number {
