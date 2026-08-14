@@ -105,6 +105,25 @@ describe("findConfigFiles", () => {
       fs.rmSync(fakeHomeDir, { recursive: true, force: true, maxRetries: 3 });
     }
   });
+
+  // slop-fix: fails until B1 fix lands
+  it("surfaces non-ENOENT access errors instead of treating the config as absent", () => {
+    const missingError = Object.assign(new Error("config not found"), { code: "ENOENT" });
+    const accessError = Object.assign(new Error("permission denied"), { code: "EACCES" });
+    const targetSuffix = path.join(".omre", "config.json");
+    const accessSpy = vi.spyOn(fs, "accessSync").mockImplementation((filePath) => {
+      if (String(filePath).endsWith(targetSuffix)) {
+        throw accessError;
+      }
+      throw missingError;
+    });
+
+    try {
+      expect(() => findConfigFiles("/repo", "/home")).toThrow("permission denied");
+    } finally {
+      accessSpy.mockRestore();
+    }
+  });
 });
 
 describe("loadConfig cache", () => {

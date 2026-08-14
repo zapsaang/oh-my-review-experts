@@ -59,22 +59,32 @@ export function readJsonc(file: string): unknown | undefined {
   }
 }
 
+function isReadableConfigFile(file: string): boolean {
+  try {
+    fs.accessSync(file, fs.constants.R_OK);
+    return true;
+  } catch (err) {
+    if (typeof err === "object" && err !== null && "code" in err && err.code === "ENOENT") {
+      return false;
+    }
+    throw new Error(`Failed to access config file ${file}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 export function findConfigFiles(cwd = process.cwd(), homeDir = os.homedir()): string[] {
   const files: string[] = [];
   const globalDir = path.join(homeDir, ".config", "opencode");
   for (const name of ["oh-my-review-experts.jsonc", "oh-my-review-experts.json"]) {
     const p = path.join(globalDir, name);
-    try {
-      fs.accessSync(p, fs.constants.R_OK);
+    if (isReadableConfigFile(p)) {
       files.push(p);
-    } catch { }
+    }
   }
   for (const name of CONFIG_NAMES) {
     const p = path.join(cwd, name);
-    try {
-      fs.accessSync(p, fs.constants.R_OK);
+    if (isReadableConfigFile(p)) {
       files.push(p);
-    } catch { }
+    }
   }
   return files;
 }
