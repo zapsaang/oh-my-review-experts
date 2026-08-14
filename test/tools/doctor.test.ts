@@ -158,6 +158,16 @@ describe("checkOpencodeConfig", () => {
       },
     );
   });
+
+  // slop-fix: fails until B3 fix lands
+  it("surfaces non-ENOENT config read errors instead of reporting the file as absent", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omre-doctor-read-error-"));
+    try {
+      expect(() => checkOpencodeConfig(dir)).toThrow();
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("[step 18] checkAgentRegistration", () => {
@@ -403,6 +413,26 @@ describe("checkReportLayout [Fix 6]", () => {
       fs.writeFileSync(path.join(reportsDir, "latest.json"), JSON.stringify({ slices: [] }), "utf8");
       const warnings = checkReportLayout(cwd);
       expect(warnings).toEqual([]);
+    });
+  });
+
+  // slop-fix: fails until B3 fix lands
+  it("surfaces non-ENOENT report directory listing errors", async () => {
+    const checkReportLayout = await loadCheckReportLayout();
+    withTempCwd((cwd) => {
+      const fileInsteadOfDirectory = path.join(cwd, "not-a-directory");
+      fs.writeFileSync(fileInsteadOfDirectory, "content", "utf8");
+      expect(() => checkReportLayout(fileInsteadOfDirectory)).toThrow();
+    });
+  });
+
+  // slop-fix: fails until B3 fix lands
+  it("surfaces non-ENOENT latest report read errors", async () => {
+    const checkReportLayout = await loadCheckReportLayout();
+    withTempCwd((cwd) => {
+      const latest = path.join(cwd, ".omre", "reports", "latest.md");
+      fs.mkdirSync(latest, { recursive: true });
+      expect(() => checkReportLayout(cwd)).toThrow();
     });
   });
 });

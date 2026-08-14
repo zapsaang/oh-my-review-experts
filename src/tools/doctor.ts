@@ -249,12 +249,17 @@ export interface OpencodeConfigStatus {
   permissionWarnings: string[];
 }
 
+function isNotFoundError(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
 function readConfigFile(filePath: string): string | undefined {
   try {
     const text = fs.readFileSync(filePath, "utf-8");
     return text.length > 0 ? text : undefined;
-  } catch {
-    return undefined;
+  } catch (error: unknown) {
+    if (isNotFoundError(error)) return undefined;
+    throw error;
   }
 }
 
@@ -305,16 +310,18 @@ function listFilesIfExists(dir: string): string[] {
     return fs.readdirSync(dir, { withFileTypes: true })
       .filter((entry) => entry.isFile())
       .map((entry) => entry.name);
-  } catch {
-    return [];
+  } catch (error: unknown) {
+    if (isNotFoundError(error)) return [];
+    throw error;
   }
 }
 
 function readFileIfExists(file: string): string | undefined {
   try {
     return fs.readFileSync(file, "utf-8");
-  } catch {
-    return undefined;
+  } catch (error: unknown) {
+    if (isNotFoundError(error)) return undefined;
+    throw error;
   }
 }
 
