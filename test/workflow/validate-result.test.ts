@@ -166,6 +166,19 @@ describe("validateReviewerHandoff", () => {
     }
   });
 
+  // slop-fix: fails until J2 fix lands
+  it("distinguishes a non-ENOENT read failure from missing output", () => {
+    const unreadablePath = fs.mkdtempSync(path.join(os.tmpdir(), "omre-test-"));
+    createdTempDirs.add(unreadablePath);
+
+    const result = validateReviewerHandoff(unreadablePath);
+
+    expect(result.isValid).toBe(false);
+    if (!result.isValid) {
+      expect(result.failureReason).not.toBe("missing-output");
+    }
+  });
+
   it("returns missing-fence for file without json fence", () => {
     const filePath = createMockHandoffFile("plain text without fence");
 

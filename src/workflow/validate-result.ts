@@ -34,6 +34,7 @@ export interface ExpectedValues {
 
 export type FailureReason =
   | "missing-output"
+  | "read-error"
   | "invalid-json"
   | "partial-output"
   | "wrong-dimension"
@@ -65,6 +66,7 @@ export function validateSchemaVersion(parsed: unknown): ValidationResult {
 function isRetryRecommended(reason: FailureReason): boolean {
   switch (reason) {
     case "missing-output":
+    case "read-error":
     case "invalid-json":
     case "partial-output":
     case "missing-fence":
@@ -176,14 +178,10 @@ function validateFindings(findings: unknown[]): { valid: boolean; partial: boole
   return { valid: true, partial: false };
 }
 
-function validateSchemaShape(data: unknown): { valid: boolean; partial: boolean; reason?: string } {
-  const topLevelResult = UnifiedHandoffSchema.safeParse(data);
-  if (!topLevelResult.success) {
-    return { valid: false, partial: false, reason: "invalid-schema" };
-  }
+type ParsedHandoff = z.infer<typeof UnifiedHandoffSchema>;
 
-  const validated = topLevelResult.data;
-  const findingsResult = validateFindings(validated.findings);
+function validateSchemaShape(data: ParsedHandoff): { valid: boolean; partial: boolean; reason?: string } {
+  const findingsResult = validateFindings(data.findings);
   if (!findingsResult.valid) {
     return {
       valid: false,
@@ -195,8 +193,11 @@ function validateSchemaShape(data: unknown): { valid: boolean; partial: boolean;
   return { valid: true, partial: false };
 }
 
-function normalizeHandoff(data: unknown): ReviewerHandoff {
-  return NormalizedUnifiedHandoffSchema.parse(data);
+function normalizeHandoff(data: ParsedHandoff): ReviewerHandoff {
+  return {
+    ...data,
+    findings: data.findings.map((finding) => UnifiedFindingSchema.parse(finding)),
+  };
 }
 
 /**
@@ -314,13 +315,13 @@ function validateParsedHandoff(
 
   const enumWarnings = preCheckEnumFields(topLevelResult.data.findings);
 
-  const shapeCheck = validateSchemaShape(data);
+  const shapeCheck = validateSchemaShape(topLevelResult.data);
   if (!shapeCheck.valid) {
     const reason = shapeCheck.partial ? "partial-output" : (shapeCheck.reason as FailureReason);
     return { isValid: false, failureReason: reason, retryRecommended: isRetryRecommended(reason) };
   }
 
-  const advisories = applyAdvisories(normalizeHandoff(data));
+  const advisories = applyAdvisories(normalizeHandoff(topLevelResult.data));
   const memoryAdvisories = applyMemoryAdvisories(advisories.normalized, expected?.memoryContext);
   const allWarnings = [...enumWarnings, ...advisories.warnings, ...memoryAdvisories.warnings];
 
@@ -352,8 +353,11 @@ export function validateReviewerHandoff(filePath: string, expected?: ExpectedVal
   let content: string;
   try {
     content = fs.readFileSync(filePath, "utf-8");
-  } catch {
-    return { isValid: false, failureReason: "missing-output", retryRecommended: true };
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return { isValid: false, failureReason: "missing-output", retryRecommended: true };
+    }
+    return { isValid: false, failureReason: "read-error", retryRecommended: true };
   }
 
   if (hasProseOutsideJson(content)) {
