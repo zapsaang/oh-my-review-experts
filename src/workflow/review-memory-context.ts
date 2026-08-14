@@ -63,7 +63,7 @@ export function renderReviewMemoryContextHeader(): string {
   ].join("\n");
 }
 
-import { resolveLogger, type OmreLogger } from "../memory/logger.js";
+import type { OmreLogger } from "../memory/logger.js";
 
 export function collectReviewMemorySections(
   cwd: string,
@@ -187,8 +187,11 @@ export function hasMaterializedMemoryState(cwd: string, config: OmreConfig): boo
   try {
     const paths = resolveMemoryPaths(path.resolve(cwd), config.memory.directory);
     return readMaterializedState(paths) !== null;
-  } catch {
-    return false;
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return false;
+    }
+    throw error;
   }
 }
 
