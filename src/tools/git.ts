@@ -72,12 +72,8 @@ function getDefaultChangedFiles(cwd: string): string[] {
   } catch (err) {
     if (err instanceof GitError && err.message.includes("HEAD")) {
       // Fresh repository with no commits: only untracked files
-      try {
-        const untracked = git(["ls-files", "--others", "--exclude-standard"], cwd);
-        return splitLines(untracked);
-      } catch {
-        return [];
-      }
+      const untracked = git(["ls-files", "--others", "--exclude-standard"], cwd);
+      return splitLines(untracked);
     }
     throw err;
   }

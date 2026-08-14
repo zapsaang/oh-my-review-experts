@@ -64,6 +64,37 @@ describe("getChangedFiles — backward compat (no scope)", () => {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
+
+  // slop-fix: fails until B7 fix lands
+  it("surfaces an unexpected git ls-files failure in the fresh-repository fallback", () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "omre-git-fallback-"));
+    const binDir = path.join(tmp, "bin");
+    fs.mkdirSync(binDir);
+    const fakeGit = path.join(binDir, "git");
+    fs.writeFileSync(
+      fakeGit,
+      `#!/usr/bin/env node
+const command = process.argv[2];
+if (command === "diff") {
+  console.error("fatal: ambiguous argument 'HEAD': unknown revision");
+  process.exit(128);
+}
+console.error("fatal: unable to read index: Input/output error");
+process.exit(128);
+`,
+      "utf8",
+    );
+    fs.chmodSync(fakeGit, 0o755);
+    const originalPath = process.env.PATH;
+    process.env.PATH = `${binDir}${path.delimiter}${originalPath ?? ""}`;
+
+    try {
+      expect(() => getChangedFiles(tmp)).toThrow(GitError);
+    } finally {
+      process.env.PATH = originalPath;
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("getChangedFiles — scope: staged", () => {
