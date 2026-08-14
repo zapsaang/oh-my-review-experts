@@ -132,7 +132,8 @@ export function scanEventFiles(paths: MemoryPaths): EventFileInfo[] {
     const files = fs.readdirSync(dir).filter((file) => file.endsWith(".jsonl"));
     for (const file of files) {
       const filePath = path.join(dir, file);
-      const content = fs.readFileSync(filePath, "utf8");
+      const buffer = fs.readFileSync(filePath);
+      const content = buffer.toString("utf8");
       const lines = content.split("\n").filter((line) => line.trim() !== "");
 
       const timestamps: string[] = [];
@@ -156,7 +157,7 @@ export function scanEventFiles(paths: MemoryPaths): EventFileInfo[] {
       infos.push({
         path: path.relative(paths.root, filePath),
         kind,
-        sha256: createHash("sha256").update(content).digest("hex"),
+        sha256: createHash("sha256").update(buffer).digest("hex"),
         eventCount,
         minTimestamp,
         maxTimestamp,
@@ -235,8 +236,6 @@ export function rebuildMaterializedStateFromEvents(events: MemoryEvent[]): Mater
         }
         break;
       }
-      default:
-        break;
     }
   }
 

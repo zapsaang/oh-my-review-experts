@@ -695,7 +695,7 @@ describe("persistReport", () => {
   it("persistReport writes both markdown and JSON files", () => {
     const markdown = createValidReportMarkdown();
     const json = { ok: true };
-    const written = persistReport(markdown, json, tmpDir, undefined, undefined);
+    const written = persistReport({ markdown, json, cwd: tmpDir });
     expect(written.length).toBeGreaterThanOrEqual(2);
     for (const p of written) {
       expect(fs.existsSync(p)).toBe(true);
@@ -709,7 +709,12 @@ describe("persistReport", () => {
   it("persistReport with degradedSlices propagates them to writeReport", () => {
     const markdown = createValidReportMarkdown();
     const json = { ok: true };
-    persistReport(markdown, json, tmpDir, [{ slice_id: "s1", missing_dimensions: ["security"] }], undefined);
+    persistReport({
+      markdown,
+      json,
+      cwd: tmpDir,
+      degradedSlices: [{ slice_id: "s1", missing_dimensions: ["security"] }],
+    });
     const latestMd = fs.readFileSync(path.join(tmpDir, ".omre", "reports", "latest.md"), "utf8");
     expect(latestMd).toContain("s1");
   });

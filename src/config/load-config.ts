@@ -67,7 +67,7 @@ function isReadableConfigFile(file: string): boolean {
     if (typeof err === "object" && err !== null && "code" in err && err.code === "ENOENT") {
       return false;
     }
-    throw new Error(`Failed to access config file ${file}: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(`Failed to access config file: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 

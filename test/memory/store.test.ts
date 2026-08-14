@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -491,6 +492,19 @@ describe("materialized memory store", () => {
     expect(scanned[0]!.kind).toBe("compacted");
     expect(scanned[1]!.path).toBe(path.relative(paths.root, rawPath));
     expect(scanned[1]!.kind).toBe("raw");
+  });
+
+  it("hashes the exact segment bytes when malformed UTF-8 is present", () => {
+    const filePath = path.join(paths.segmentsDir, "malformed.jsonl");
+    const bytes = Buffer.concat([
+      Buffer.from(`${JSON.stringify(discoveredEvent())}\n`, "utf8"),
+      Buffer.from([0x80]),
+    ]);
+    fs.writeFileSync(filePath, bytes);
+
+    const [scanned] = scanEventFiles(paths);
+
+    expect(scanned?.sha256).toBe(createHash("sha256").update(bytes).digest("hex"));
   });
 
   it("keeps rebuildMaterializedStateFromEvents pure with no filesystem writes", () => {

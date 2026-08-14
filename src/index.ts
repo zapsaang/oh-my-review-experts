@@ -2,7 +2,7 @@ import type { Plugin, Hooks, Config, PluginModule } from "@opencode-ai/plugin"
 import type { Part, Permission } from "@opencode-ai/sdk"
 import { injectReviewCodePrompt } from "./hooks/command-injection.js"
 import { tools } from "./tools/plugin-tools.js"
-import { loadConfig, loadConfigUnsafe } from "./config/load-config.js"
+import { loadConfigUnsafe } from "./config/load-config.js"
 import { registerAgents } from "./agents/registry.js"
 import { VERSION } from "./version.js"
 

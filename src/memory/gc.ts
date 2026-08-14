@@ -45,8 +45,8 @@ const MS_PER_DAY = 86_400_000;
  * Run garbage collection over the on-disk memory store.
  *
  * SAFETY (C5): This routine reads the manifest ONCE at the start (a snapshot)
- * and writes it LAST. It must NOT run concurrently with compaction — both
- * mutate the manifest and the segment directories, and there is no lock yet.
+ * and writes it LAST. GC and compaction both mutate the manifest and segment
+ * directories, so withMemoryLock serializes them.
  *
  * Every candidate path is checked against a strict path-prefix guard so that
  * nothing outside `.omre/memory/` (paths.root) can ever be deleted.
@@ -180,26 +180,26 @@ export function runMemoryGc(options: GcOptions): GcResult {
     };
     for (const filePath of plan.tmpFiles) {
       if (safeUnlink(filePath, paths)) deleted.tmpFiles += 1;
-      else output.warn("memory gc: failed to delete file", filePath);
+      else output.warn("memory gc: failed to delete file", path.relative(paths.root, filePath));
     }
     for (const filePath of plan.emptySegments) {
       if (safeUnlink(filePath, paths)) deleted.emptySegments += 1;
-      else output.warn("memory gc: failed to delete file", filePath);
+      else output.warn("memory gc: failed to delete file", path.relative(paths.root, filePath));
     }
     for (const filePath of plan.compactedRawSegments) {
       if (safeUnlink(filePath, paths)) deleted.compactedRawSegments += 1;
-      else output.warn("memory gc: failed to delete file", filePath);
+      else output.warn("memory gc: failed to delete file", path.relative(paths.root, filePath));
     }
     for (const filePath of plan.overflowRawSegments) {
       if (safeUnlink(filePath, paths)) deleted.overflowRawSegments += 1;
-      else output.warn("memory gc: failed to delete file", filePath);
+      else output.warn("memory gc: failed to delete file", path.relative(paths.root, filePath));
     }
     for (const filePath of plan.quarantineFiles) {
       if (safeUnlink(filePath, paths)) deleted.quarantineFiles += 1;
-      else output.warn("memory gc: failed to delete file", filePath);
+      else output.warn("memory gc: failed to delete file", path.relative(paths.root, filePath));
       const metaPath = `${filePath}.meta.json`;
       if (fs.existsSync(metaPath) && !safeUnlink(metaPath, paths)) {
-        output.warn("memory gc: failed to delete file", metaPath);
+        output.warn("memory gc: failed to delete file", path.relative(paths.root, metaPath));
       }
     }
 

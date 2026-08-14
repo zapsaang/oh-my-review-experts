@@ -31,6 +31,16 @@ export interface ReviewMemorySectionCollection {
   truncated: boolean;
 }
 
+export interface CollectReviewMemorySectionsOptions {
+  readonly cwd: string;
+  readonly config: OmreConfig;
+  readonly plan: EstimatedPlan;
+  readonly diffSummary: string;
+  readonly userGuidance: string;
+  readonly flags: MemoryFlags;
+  readonly logger?: OmreLogger;
+}
+
 export function buildPerReviewerMemorySection(
   reviewer: ReviewDimensionType,
   sliceId: string,
@@ -65,15 +75,8 @@ export function renderReviewMemoryContextHeader(): string {
 
 import type { OmreLogger } from "../memory/logger.js";
 
-export function collectReviewMemorySections(
-  cwd: string,
-  config: OmreConfig,
-  plan: EstimatedPlan,
-  diffSummary: string,
-  userGuidance: string,
-  flags: MemoryFlags,
-  logger?: OmreLogger,
-): ReviewMemorySectionCollection {
+export function collectReviewMemorySections(options: CollectReviewMemorySectionsOptions): ReviewMemorySectionCollection {
+  const { cwd, config, plan, diffSummary, userGuidance, flags, logger } = options;
   if (!shouldAttemptMemoryRetrieval(config, flags)) {
     return { attempted: false, sections: [], truncated: false };
   }

@@ -23,13 +23,13 @@ export function readRunMeta(handoffDir: string): RunMeta | undefined {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {
       return undefined;
     }
-    throw new Error(`readRunMeta: failed to read run metadata at ${filePath}`, { cause: error });
+    throw new Error("readRunMeta: failed to read run metadata", { cause: error });
   }
   let data: unknown;
   try {
     data = JSON.parse(raw) as unknown;
   } catch (error) {
-    throw new Error(`readRunMeta: invalid JSON in run metadata at ${filePath}`, { cause: error });
+    throw new Error("readRunMeta: invalid JSON in run metadata", { cause: error });
   }
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
     return undefined;

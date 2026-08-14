@@ -201,15 +201,6 @@ function normalizeHandoff(data: ParsedHandoff): ReviewerHandoff {
 }
 
 /**
- * Apply post-validation advisory adjustments:
- * - Append warnings to meta.notes when classifications fall outside the
- *   dimension's standard taxonomy (advisory only, not a failure).
- * - Auto-correct meta.total_findings to match findings.length if the LLM
- *   miscounted, recording the original value in meta.notes.
- *
- * Returns a new normalized handoff; does not mutate the input.
- */
-/**
  * Compute advisory adjustments without mutating user-controlled fields.
  *
  * Returns a copy with `meta.total_findings` corrected if it diverged from

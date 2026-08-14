@@ -398,7 +398,6 @@ export function createCliProgram(): Command {
           isNoMemory: !!opts.noMemory,
           output: console,
         })
-        // Detect scope-resolution errors surfaced by renderLocalDryRun
         const errorMatch = output.match(/^Resolved scope: error(?: \(([^)]+)\))?\n(.+)$/m)
         if (errorMatch) {
           console.error(pc.red(`Error: ${errorMatch[2]}`))

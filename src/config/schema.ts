@@ -44,13 +44,6 @@ export const AgentConfigSchema = z.object({
     .describe("Nucleus sampling cutoff. Passed through to the runtime."),
 });
 
-const AGENT_NAMES = [
-  "omre-reviewer-spec", "omre-reviewer-quality", "omre-reviewer-security",
-  "omre-reviewer-performance", "omre-reviewer-concurrency",
-  "omre-slice-planner", "omre-slice-plan-validator", "omre-result-validator",
-  "omre-slice-arbiter", "omre-global-arbiter", "omre-report-writer",
-] as const;
-
 const DEFAULT_COMMAND = {
   enabled: true,
   name: "review-code",

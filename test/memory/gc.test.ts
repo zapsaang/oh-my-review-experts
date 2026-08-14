@@ -92,6 +92,7 @@ describe("runMemoryGc", () => {
       const oldTmp = writeTmpFile(paths, "undeletable.tmp");
       backdateHours(oldTmp, 25);
       const originalUnlink = fs.unlinkSync.bind(fs);
+      const warn = vi.fn();
       const unlinkSpy = vi.spyOn(fs, "unlinkSync").mockImplementation((filePath) => {
         if (filePath === oldTmp) {
           throw Object.assign(new Error("permission denied"), { code: "EACCES" });
@@ -100,9 +101,17 @@ describe("runMemoryGc", () => {
       });
 
       try {
-        const result = runMemoryGc({ cwd: repoRoot });
+        const result = runMemoryGc({ cwd: repoRoot, output: { warn } });
         expect(result.deleted.tmpFiles).toBe(0);
         expect(fs.existsSync(oldTmp)).toBe(true);
+        expect(warn).toHaveBeenCalledWith(
+          "memory gc: failed to delete file",
+          path.relative(paths.root, oldTmp),
+        );
+        expect(warn).not.toHaveBeenCalledWith(
+          "memory gc: failed to delete file",
+          oldTmp,
+        );
       } finally {
         unlinkSpy.mockRestore();
       }

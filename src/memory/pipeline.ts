@@ -213,7 +213,3 @@ function oldestMtimeMs(stats: Stats[]): number | undefined {
 
   return oldest;
 }
-
-function formatAgeHours(ageHours: number): string {
-  return ageHours.toFixed(2).replace(/\.00$/, "");
-}

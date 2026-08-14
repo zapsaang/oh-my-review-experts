@@ -90,14 +90,14 @@ export const tools = {
     },
     async execute(input, context) {
       const { cwd } = resolveCwd(input.cwd, context.directory);
-      const written = persistReport(
-        input.markdown,
-        input.json ?? {},
+      const written = persistReport({
+        markdown: input.markdown,
+        json: input.json ?? {},
         cwd,
-        input.degradedSlices,
-        input.missingDimensionsGlobal,
-        input.runId
-      );
+        degradedSlices: input.degradedSlices,
+        missingDimensionsGlobal: input.missingDimensionsGlobal,
+        runId: input.runId,
+      });
       return JSON.stringify({ written });
     },
   }),

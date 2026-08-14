@@ -142,14 +142,7 @@ export function buildReviewCodePrompt(input: ReviewCodeInput = {}): ReviewCodePr
 
   let scope: ReviewScope = { kind: "default" };
   if (config.command.scopeResolution === "auto") {
-    try {
-      scope = parseReviewScope(userArgsText, cwd);
-    } catch (err) {
-      if (err instanceof ScopeResolutionError || err instanceof AmbiguousScopeError) {
-        throw err;
-      }
-      throw err;
-    }
+    scope = parseReviewScope(userArgsText, cwd);
     if (scope.kind === "ambiguous") {
       throw new AmbiguousScopeError(
         `Input "${userArgsText}" is ambiguous (matches both a branch and a path). Use explicit prefix: branch:${(scope.candidates[0] as Extract<ReviewScope, { kind: "branch" }>).name} or path:${(scope.candidates[1] as Extract<ReviewScope, { kind: "paths" }>).paths.join(",")}`,
@@ -166,7 +159,15 @@ export function buildReviewCodePrompt(input: ReviewCodeInput = {}): ReviewCodePr
   const diff = redactSecrets(rawDiff);
   const reviewersBySlice = JSON.stringify(plan.selectedReviewers, null, 2);
   const slices = JSON.stringify(plan.slices, null, 2);
-  const reviewMemorySections = collectReviewMemorySections(cwd, config, plan, summary, userArgsText, memoryFlags, resolveLogger(input.output));
+  const reviewMemorySections = collectReviewMemorySections({
+    cwd,
+    config,
+    plan,
+    diffSummary: summary,
+    userGuidance: userArgsText,
+    flags: memoryFlags,
+    logger: resolveLogger(input.output),
+  });
   const reviewMemoryContext = renderReviewMemoryContext(reviewMemorySections);
   const reviewMemoryContextBlock = reviewMemoryContext.length > 0 ? `\n\n${reviewMemoryContext}` : "";
 
@@ -343,7 +344,14 @@ export function renderLocalDryRun(input: ReviewCodeInput = {}): string {
     ? getDiffSummary(cwd, safeScope, files)
     : "";
   const memorySections = canPreviewMemory
-    ? collectReviewMemorySections(cwd, config, plan, summary, userArgsText, memoryFlags)
+    ? collectReviewMemorySections({
+      cwd,
+      config,
+      plan,
+      diffSummary: summary,
+      userGuidance: userArgsText,
+      flags: memoryFlags,
+    })
     : { attempted: false, sections: [], truncated: false } satisfies ReviewMemorySectionCollection;
   const hasMemoryState = hasMaterializedMemoryState(cwd, config);
   const memoryPreview = canPreviewMemory
@@ -365,7 +373,17 @@ export function renderLocalDryRun(input: ReviewCodeInput = {}): string {
   return `${output.join("\n")}\n`;
 }
 
-export function persistReport(markdown: string, json: unknown, cwd = process.cwd(), degradedSlices?: Array<{ slice_id: string; missing_dimensions: string[] }>, missingDimensionsGlobal?: string[], runId?: string): string[] {
+interface PersistReportOptions {
+  readonly markdown: string;
+  readonly json: unknown;
+  readonly cwd?: string;
+  readonly degradedSlices?: Array<{ slice_id: string; missing_dimensions: string[] }>;
+  readonly missingDimensionsGlobal?: string[];
+  readonly runId?: string;
+}
+
+export function persistReport(options: PersistReportOptions): string[] {
+  const { markdown, json, cwd = process.cwd(), degradedSlices, missingDimensionsGlobal, runId } = options;
   const config = loadConfig(cwd);
   return writeReport(config, { target: "current-change", markdown, json, degradedSlices, missingDimensionsGlobal, runId }, cwd);
 }

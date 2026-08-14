@@ -50,6 +50,5 @@ export function ensureMemoryDirs(paths: MemoryPaths): void {
   fs.mkdirSync(paths.gcDir, { recursive: true });
   fs.mkdirSync(paths.materializedDir, { recursive: true });
   fs.mkdirSync(paths.tmpDir, { recursive: true });
-  // locksDir is created here for future Claim 2 implementation
   fs.mkdirSync(paths.locksDir, { recursive: true });
 }

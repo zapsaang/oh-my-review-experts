@@ -3,7 +3,6 @@
  * Uses regex patterns to detect common secret formats and replaces them with [REDACTED].
  */
 
-// Layer C: Allowlist - known harmless patterns that should not be redacted
 const ALLOWLIST = [
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, // UUID
   /^[0-9a-f]{40}$/i, // git hash
@@ -20,7 +19,6 @@ function isAllowlisted(s: string): boolean {
   return ALLOWLIST.some((pattern) => pattern.test(s));
 }
 
-// Layer B: Shannon entropy calculation
 function shannonEntropy(s: string): number {
   const freq = new Map<string, number>();
   for (const c of s) {
@@ -59,7 +57,6 @@ const SPECIFIC_PATTERNS: SecretPattern[] = [
   { pattern: /(?:password|passwd|pwd)[\s]*[:=][\s]*["']?[^\s"']{8,}["']?/gi, replacement: "[REDACTED_PASSWORD]" },
 ];
 
-// Layer A: Generic pattern with context anchoring
 // Requires secret-like context (prefix: start of line, whitespace, quotes, =, :)
 // (suffix: end of line, whitespace, quotes, comma, &, ;)
 const GENERIC_SECRET_PATTERN = /(?:^|[\s"'=:])([a-zA-Z0-9_\-]{32,})(?:$|[\s"'&,;])/g;
@@ -80,23 +77,19 @@ function applySpecificPattern(text: string, pattern: SecretPattern): string {
 export function redactSecrets(text: string): string {
   let redacted = text;
 
-  // Phase 1: Apply specific patterns
   for (const pattern of SPECIFIC_PATTERNS) {
     redacted = applySpecificPattern(redacted, pattern);
   }
 
-  // Phase 2: Apply generic pattern with three-layer defense
   redacted = redacted.replace(
     GENERIC_SECRET_PATTERN,
     (match, group1) => {
       const candidate = group1 || match;
 
-      // Layer C: Allowlist
       if (isAllowlisted(candidate)) {
         return match; // Keep original
       }
 
-      // Layer B: Entropy filter
       if (shannonEntropy(candidate) <= ENTROPY_THRESHOLD) {
         return match; // Keep original
       }

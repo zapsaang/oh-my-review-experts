@@ -119,7 +119,7 @@ describe("findConfigFiles", () => {
     });
 
     try {
-      expect(() => findConfigFiles("/repo", "/home")).toThrow("permission denied");
+      expect(() => findConfigFiles("/repo", "/home")).toThrow("Failed to access config file: permission denied");
     } finally {
       accessSpy.mockRestore();
     }

@@ -51,13 +51,21 @@ describe("run-meta", () => {
     expect(read).toBeUndefined();
   });
 
+  it("read failure does not expose the metadata path", async () => {
+    const { readRunMeta } = await loadRunMeta();
+    const handoffDir = path.join(tmpDir, "handoff");
+    fs.mkdirSync(path.join(handoffDir, ".run-meta.json"), { recursive: true });
+
+    expect(() => readRunMeta(handoffDir)).toThrow(/^readRunMeta: failed to read run metadata$/);
+  });
+
   it("corrupt JSON surfaces a clear error", async () => {
     const { readRunMeta } = await loadRunMeta();
     const handoffDir = path.join(tmpDir, "handoff");
     fs.mkdirSync(handoffDir, { recursive: true });
     fs.writeFileSync(path.join(handoffDir, ".run-meta.json"), "not-json", { encoding: "utf8" });
 
-    expect(() => readRunMeta(handoffDir)).toThrow("readRunMeta: invalid JSON in run metadata");
+    expect(() => readRunMeta(handoffDir)).toThrow(/^readRunMeta: invalid JSON in run metadata$/);
   });
 
   // slop-fix: fails until B6 fix lands

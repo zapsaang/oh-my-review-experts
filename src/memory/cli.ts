@@ -179,9 +179,9 @@ export function registerMemoryCli(program: Command): void {
   memory.command("apply-suggestions")
     .description("Apply high-confidence stale-finding suggestions")
     .option("--dry-run", "show what would be marked without writing", false)
-    .action(async (opts: { dryRun?: boolean }) => {
+    .action((opts: { dryRun?: boolean }) => {
       try {
-        await runMemoryApplySuggestions({ dryRun: !!opts.dryRun });
+        runMemoryApplySuggestions({ dryRun: !!opts.dryRun });
       } catch (err) {
         console.error(`memory apply-suggestions failed: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(1);
