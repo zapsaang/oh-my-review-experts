@@ -160,44 +160,44 @@ export function zodToExample(schema: unknown, depth = 0): unknown {
   const def = (schema as { _zod?: { def?: { type?: string; innerType?: unknown } } })._zod?.def;
   const type = def?.type;
 
-  if (type === "object") {
-    const shape = (schema as { shape?: Record<string, unknown> }).shape ?? {};
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(shape)) {
-      result[key] = zodToExample(value, depth + 1);
+  switch (type) {
+    case "object": {
+      const shape = (schema as { shape?: Record<string, unknown> }).shape ?? {};
+      const result: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(shape)) {
+        result[key] = zodToExample(value, depth + 1);
+      }
+      return result;
     }
-    return result;
+    case "enum": {
+      const options = (schema as { options?: readonly string[] }).options ?? [];
+      return options.join("|");
+    }
+    case "union": {
+      const options = (schema as { options?: readonly unknown[] }).options ?? [];
+      return options.length > 0 ? zodToExample(options[0], depth + 1) : "unknown";
+    }
+    case "default":
+    case "catch":
+    case "optional":
+      return zodToExample(def?.innerType, depth + 1);
+    case "nullable":
+      return null;
+    case "array": {
+      const element = (schema as { element?: unknown }).element;
+      return [zodToExample(element, depth + 1)];
+    }
+    case "string":
+      return "string";
+    case "number":
+      return 0;
+    case "boolean":
+      return true;
+    case "unknown":
+      return null;
+    default:
+      return "unknown";
   }
-
-  if (type === "enum") {
-    const options = (schema as { options?: readonly string[] }).options ?? [];
-    return options.join("|");
-  }
-
-  if (type === "union") {
-    const options = (schema as { options?: readonly unknown[] }).options ?? [];
-    return options.length > 0 ? zodToExample(options[0], depth + 1) : "unknown";
-  }
-
-  if (type === "default" || type === "catch" || type === "optional") {
-    return zodToExample(def?.innerType, depth + 1);
-  }
-
-  if (type === "nullable") {
-    return null;
-  }
-
-  if (type === "array") {
-    const element = (schema as { element?: unknown }).element;
-    return [zodToExample(element, depth + 1)];
-  }
-
-  if (type === "string") return "string";
-  if (type === "number") return 0;
-  if (type === "boolean") return true;
-  if (type === "unknown") return null;
-
-  return "unknown";
 }
 
 /** Expected JSON output for a single reviewer finding. */
