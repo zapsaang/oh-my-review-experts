@@ -13,7 +13,6 @@ import {
   type EventFileInfo,
 } from "./schema.js";
 import type { MemoryPaths } from "./paths.js";
-import { sha256File } from "./ids.js";
 import { writeFileAtomicOverwrite } from "../tools/fs-utils.js";
 import { sleepSync } from "./lock.js";
 
@@ -157,7 +156,7 @@ export function scanEventFiles(paths: MemoryPaths): EventFileInfo[] {
       infos.push({
         path: path.relative(paths.root, filePath),
         kind,
-        sha256: sha256File(filePath),
+        sha256: createHash("sha256").update(content).digest("hex"),
         eventCount,
         minTimestamp,
         maxTimestamp,
@@ -171,23 +170,24 @@ export function scanEventFiles(paths: MemoryPaths): EventFileInfo[] {
 
 export function rebuildMaterializedStateFromEvents(events: MemoryEvent[]): MaterializedState {
   const findings: MemoryFinding[] = [];
-  const findingIds = new Set<string>();
+  const findingsById = new Map<string, MemoryFinding>();
   const relations: RelatedIndex["relations"] = [];
+  const relationKeys = new Set<string>();
   const byFindingId: RelatedIndex["byFindingId"] = {};
 
   for (const event of events) {
     switch (event.type) {
       case "finding.discovered": {
-        if (!findingIds.has(event.finding.id)) {
+        if (!findingsById.has(event.finding.id)) {
           const finding = event.finding;
           finding.status = normalizeMemoryStatus(finding.status) as MemoryFinding["status"];
           findings.push(finding);
-          findingIds.add(finding.id);
+          findingsById.set(finding.id, finding);
         }
         break;
       }
       case "finding.seen_again": {
-        const finding = findings.find((candidate) => candidate.id === event.findingId);
+        const finding = findingsById.get(event.findingId);
         if (finding) {
           finding.occurrence.count += 1;
           finding.occurrence.lastSeenAt = event.at;
@@ -198,14 +198,14 @@ export function rebuildMaterializedStateFromEvents(events: MemoryEvent[]): Mater
         break;
       }
       case "finding.status_changed": {
-        const finding = findings.find((candidate) => candidate.id === event.findingId);
+        const finding = findingsById.get(event.findingId);
         if (finding) {
           finding.status = normalizeMemoryStatus(event.to) as MemoryFinding["status"];
         }
         break;
       }
       case "finding.regressed": {
-        const finding = findings.find((candidate) => candidate.id === event.findingId);
+        const finding = findingsById.get(event.findingId);
         if (finding) {
           finding.status = normalizeMemoryStatus(event.toStatus) as MemoryFinding["status"];
           finding.occurrence.lastSeenAt = event.at;
@@ -221,14 +221,15 @@ export function rebuildMaterializedStateFromEvents(events: MemoryEvent[]): Mater
           relatedFindingId: event.relatedFindingId,
           relationType: event.relationType,
         };
-        const alreadyRecorded = relations.some((existing) => (
-          existing.findingId === relation.findingId
-          && existing.relatedFindingId === relation.relatedFindingId
-          && existing.relationType === relation.relationType
-        ));
+        const relationKey = JSON.stringify([
+          relation.findingId,
+          relation.relatedFindingId,
+          relation.relationType,
+        ]);
 
-        if (!alreadyRecorded) {
+        if (!relationKeys.has(relationKey)) {
           relations.push(relation);
+          relationKeys.add(relationKey);
           byFindingId[relation.findingId] = byFindingId[relation.findingId] ?? [];
           byFindingId[relation.findingId].push(relation);
         }
