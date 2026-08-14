@@ -105,8 +105,12 @@ function listUncompactedRawSegments(paths: MemoryPaths): string[] {
     .map((file) => path.join(paths.segmentsDir, file))
     .filter((abs) => !compactedRawPaths.has(path.relative(paths.root, abs)));
 
-  candidates.sort((a, b) => fs.statSync(a).mtimeMs - fs.statSync(b).mtimeMs);
-  return candidates;
+  const candidatesByMtime = candidates.map((candidate) => ({
+    path: candidate,
+    mtimeMs: fs.statSync(candidate).mtimeMs,
+  }));
+  candidatesByMtime.sort((a, b) => a.mtimeMs - b.mtimeMs);
+  return candidatesByMtime.map((candidate) => candidate.path);
 }
 
 function readCompactedRawPaths(paths: MemoryPaths): Set<string> {

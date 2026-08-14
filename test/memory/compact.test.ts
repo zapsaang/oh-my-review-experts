@@ -141,6 +141,30 @@ describe("runMemoryCompact", () => {
     expect(manifestAfter).toEqual(manifestBefore);
   });
 
+  it("orders dry-run raw paths by ascending segment mtime", () => {
+    const paths = makeTempRepo();
+    const repoRoot = repoRootOf(paths.root);
+    seedManifest(paths);
+
+    const newest = writeSegment(paths, [makeEvent()], "newest");
+    const oldest = writeSegment(paths, [makeEvent()], "oldest");
+    const middle = writeSegment(paths, [makeEvent()], "middle");
+    fs.utimesSync(oldest, new Date(1_000), new Date(1_000));
+    fs.utimesSync(middle, new Date(2_000), new Date(2_000));
+    fs.utimesSync(newest, new Date(3_000), new Date(3_000));
+
+    try {
+      const result = runMemoryCompact({ cwd: repoRoot, dryRun: true });
+      expect(result.compactedSegments[0]?.rawPaths).toEqual([
+        path.relative(paths.root, oldest),
+        path.relative(paths.root, middle),
+        path.relative(paths.root, newest),
+      ]);
+    } finally {
+      fs.rmSync(repoRoot, { recursive: true, force: true });
+    }
+  });
+
   it("stops gracefully on timeout, keeping completed work without corruption", () => {
     const paths = makeTempRepo();
     seedManifest(paths);
