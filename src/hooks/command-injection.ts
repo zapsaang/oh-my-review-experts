@@ -122,14 +122,16 @@ function formatAmbiguousScopeError(args: string, candidates: ReviewScope[]): str
   return lines.join("\n");
 }
 
-export function injectReviewCodePrompt(input: InjectReviewCodeInput): string | undefined {
-  const cwd = input.cwd ?? process.cwd();
+function injectReviewCodePromptForArgs(
+  cwd: string,
+  resolveArgs: (config: OmreConfig) => string | undefined,
+): string | undefined {
   const config = loadConfig(cwd);
   if (!config.enabled || !config.command.enabled) return undefined;
   if (config.command.injection === "disabled" || config.command.injection === "tool") return undefined;
-  const names = [config.command.name, ...config.command.aliases].filter(Boolean);
-  if (!names.includes(input.command)) return undefined;
-  let args = input.args ?? "";
+  const resolvedArgs = resolveArgs(config);
+  if (resolvedArgs === undefined) return undefined;
+  let args = resolvedArgs;
   if (args.length > MAX_ARGS_LENGTH) {
     args = args.slice(0, MAX_ARGS_LENGTH) + "\n[WARNING: User guidance truncated due to excessive length]";
   }
@@ -153,34 +155,19 @@ export function injectReviewCodePrompt(input: InjectReviewCodeInput): string | u
   }
 }
 
+export function injectReviewCodePrompt(input: InjectReviewCodeInput): string | undefined {
+  const cwd = input.cwd ?? process.cwd();
+  return injectReviewCodePromptForArgs(cwd, (config) => {
+    const names = [config.command.name, ...config.command.aliases].filter(Boolean);
+    return names.includes(input.command) ? input.args ?? "" : undefined;
+  });
+}
+
 export function maybeInjectReviewCodePrompt(text: string, cwd = process.cwd()): string | undefined {
   const trimmed = text.trim();
   if (!trimmed.startsWith("/")) return undefined;
-  const config = loadConfig(cwd);
-  if (!config.enabled || !config.command.enabled) return undefined;
-  if (config.command.injection === "disabled" || config.command.injection === "tool") return undefined;
-  const match = parseReviewCodeCommand(text, config);
-  if (!match.matched) return undefined;
-  let args = match.args;
-  if (args.length > MAX_ARGS_LENGTH) {
-    args = args.slice(0, MAX_ARGS_LENGTH) + "\n[WARNING: User guidance truncated due to excessive length]";
-  }
-  const memoryArgs = stripMemoryFlagsFromArgs(args);
-  args = validateAndSanitizeArgs(memoryArgs.args);
-  try {
-    return buildReviewCodePrompt({
-      args,
-      cwd,
-      isWithMemory: memoryArgs.isWithMemory,
-      isNoMemory: memoryArgs.isNoMemory,
-    }).prompt;
-  } catch (err) {
-    if (err instanceof ScopeResolutionError) {
-      return `Error: ${err.message}`;
-    }
-    if (err instanceof AmbiguousScopeError) {
-      return formatAmbiguousScopeError(args, err.candidates);
-    }
-    throw err;
-  }
+  return injectReviewCodePromptForArgs(cwd, (config) => {
+    const match = parseReviewCodeCommand(text, config);
+    return match.matched ? match.args : undefined;
+  });
 }
