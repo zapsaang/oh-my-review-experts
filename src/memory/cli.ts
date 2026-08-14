@@ -48,6 +48,11 @@ interface LoadedMaterializedState {
   memoryConfig: ReturnType<typeof loadConfig>["memory"];
 }
 
+interface SuggestionsContext {
+  readonly loaded: LoadedMaterializedState;
+  readonly result: ReturnType<typeof generateSuggestions>;
+}
+
 const MEMORY_STATUS_VALUES = [
   "open",
   "confirmed",
@@ -321,22 +326,12 @@ function runMemoryStats(options: MemoryReadCliOptions = {}): void {
 }
 
 function runMemorySuggestions(): void {
-  const repoRoot = process.cwd();
-  const loaded = loadMaterializedMemory({});
-  if (loaded === null) {
+  const context = loadSuggestionsContext();
+  if (context === null) {
     return;
   }
 
-  if (loaded.memoryConfig.suggestions.enabled === false) {
-    console.log("suggestions disabled by config");
-    return;
-  }
-
-  const result = generateSuggestions(loaded.state.findings, {
-    repoRoot,
-    timeDecayDays: loaded.memoryConfig.suggestions.timeDecayDays,
-    skipImportSourceForFileDeletion: loaded.memoryConfig.suggestions.skipImportSource,
-  });
+  const { loaded, result } = context;
 
   if (result.suggestions.length === 0) {
     console.log("no suggestions");
@@ -351,22 +346,12 @@ function runMemorySuggestions(): void {
 }
 
 function runMemoryApplySuggestions({ dryRun }: { dryRun: boolean }): void {
-  const repoRoot = process.cwd();
-  const loaded = loadMaterializedMemory({});
-  if (loaded === null) {
+  const context = loadSuggestionsContext();
+  if (context === null) {
     return;
   }
 
-  if (loaded.memoryConfig.suggestions.enabled === false) {
-    console.log("suggestions disabled by config");
-    return;
-  }
-
-  const result = generateSuggestions(loaded.state.findings, {
-    repoRoot,
-    timeDecayDays: loaded.memoryConfig.suggestions.timeDecayDays,
-    skipImportSourceForFileDeletion: loaded.memoryConfig.suggestions.skipImportSource,
-  });
+  const { loaded, result } = context;
 
   const high = result.suggestions.filter(s => s.confidence === "high");
   if (high.length === 0) {
@@ -397,6 +382,27 @@ function runMemoryApplySuggestions({ dryRun }: { dryRun: boolean }): void {
   if (failures > 0) {
     process.exit(1);
   }
+}
+
+function loadSuggestionsContext(): SuggestionsContext | null {
+  const repoRoot = process.cwd();
+  const loaded = loadMaterializedMemory({});
+  if (loaded === null) {
+    return null;
+  }
+
+  if (loaded.memoryConfig.suggestions.enabled === false) {
+    console.log("suggestions disabled by config");
+    return null;
+  }
+
+  const result = generateSuggestions(loaded.state.findings, {
+    repoRoot,
+    timeDecayDays: loaded.memoryConfig.suggestions.timeDecayDays,
+    skipImportSourceForFileDeletion: loaded.memoryConfig.suggestions.skipImportSource,
+  });
+
+  return { loaded, result };
 }
 
 function runMemoryTrends(options: MemoryReadCliOptions & { atBucket?: string } = {}): void {
