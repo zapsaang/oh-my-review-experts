@@ -16,15 +16,20 @@ export function writeRunMeta(handoffDir: string, meta: RunMeta): string {
 
 export function readRunMeta(handoffDir: string): RunMeta | undefined {
   const filePath = path.join(handoffDir, ".run-meta.json");
-  if (!fs.existsSync(filePath)) {
-    return undefined;
+  let raw: string;
+  try {
+    raw = fs.readFileSync(filePath, { encoding: "utf8" });
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return undefined;
+    }
+    throw new Error(`readRunMeta: failed to read run metadata at ${filePath}`, { cause: error });
   }
   let data: unknown;
   try {
-    const raw = fs.readFileSync(filePath, { encoding: "utf8" });
     data = JSON.parse(raw) as unknown;
-  } catch {
-    return undefined;
+  } catch (error) {
+    throw new Error(`readRunMeta: invalid JSON in run metadata at ${filePath}`, { cause: error });
   }
   if (typeof data !== "object" || data === null || Array.isArray(data)) {
     return undefined;

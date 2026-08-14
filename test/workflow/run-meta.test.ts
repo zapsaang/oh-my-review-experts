@@ -51,14 +51,23 @@ describe("run-meta", () => {
     expect(read).toBeUndefined();
   });
 
-  it("corrupt JSON returns undefined", async () => {
+  it("corrupt JSON surfaces a clear error", async () => {
     const { readRunMeta } = await loadRunMeta();
     const handoffDir = path.join(tmpDir, "handoff");
     fs.mkdirSync(handoffDir, { recursive: true });
     fs.writeFileSync(path.join(handoffDir, ".run-meta.json"), "not-json", { encoding: "utf8" });
 
-    const read = readRunMeta(handoffDir);
-    expect(read).toBeUndefined();
+    expect(() => readRunMeta(handoffDir)).toThrow("readRunMeta: invalid JSON in run metadata");
+  });
+
+  // slop-fix: fails until B6 fix lands
+  it("surfaces corrupt JSON instead of treating run metadata as absent", async () => {
+    const { readRunMeta } = await loadRunMeta();
+    const handoffDir = path.join(tmpDir, "corrupt-handoff");
+    fs.mkdirSync(handoffDir, { recursive: true });
+    fs.writeFileSync(path.join(handoffDir, ".run-meta.json"), "not-json", { encoding: "utf8" });
+
+    expect(() => readRunMeta(handoffDir)).toThrow();
   });
 
   it("non-object JSON returns undefined", async () => {
