@@ -156,29 +156,50 @@ export function runMemoryGc(options: GcOptions): GcResult {
       }
     }
 
-    const deleted = {
-      tmpFiles: plan.tmpFiles.length,
-      emptySegments: plan.emptySegments.length,
-      compactedRawSegments: plan.compactedRawSegments.length,
-      overflowRawSegments: plan.overflowRawSegments.length,
-      quarantineFiles: plan.quarantineFiles.length,
-    };
-
     // --- dryRun: return the plan WITHOUT deleting or writing ---
     if (dryRun) {
-      return { success: true, deleted };
+      return {
+        success: true,
+        deleted: {
+          tmpFiles: plan.tmpFiles.length,
+          emptySegments: plan.emptySegments.length,
+          compactedRawSegments: plan.compactedRawSegments.length,
+          overflowRawSegments: plan.overflowRawSegments.length,
+          quarantineFiles: plan.quarantineFiles.length,
+        },
+      };
     }
 
     // --- Perform deletions (guarded once more at the boundary) ---
-    for (const filePath of plan.tmpFiles) safeUnlink(filePath, paths);
-    for (const filePath of plan.emptySegments) safeUnlink(filePath, paths);
-    for (const filePath of plan.compactedRawSegments) safeUnlink(filePath, paths);
-    for (const filePath of plan.overflowRawSegments) safeUnlink(filePath, paths);
+    const deleted = {
+      tmpFiles: 0,
+      emptySegments: 0,
+      compactedRawSegments: 0,
+      overflowRawSegments: 0,
+      quarantineFiles: 0,
+    };
+    for (const filePath of plan.tmpFiles) {
+      if (safeUnlink(filePath, paths)) deleted.tmpFiles += 1;
+      else output.warn("memory gc: failed to delete file", filePath);
+    }
+    for (const filePath of plan.emptySegments) {
+      if (safeUnlink(filePath, paths)) deleted.emptySegments += 1;
+      else output.warn("memory gc: failed to delete file", filePath);
+    }
+    for (const filePath of plan.compactedRawSegments) {
+      if (safeUnlink(filePath, paths)) deleted.compactedRawSegments += 1;
+      else output.warn("memory gc: failed to delete file", filePath);
+    }
+    for (const filePath of plan.overflowRawSegments) {
+      if (safeUnlink(filePath, paths)) deleted.overflowRawSegments += 1;
+      else output.warn("memory gc: failed to delete file", filePath);
+    }
     for (const filePath of plan.quarantineFiles) {
-      safeUnlink(filePath, paths);
+      if (safeUnlink(filePath, paths)) deleted.quarantineFiles += 1;
+      else output.warn("memory gc: failed to delete file", filePath);
       const metaPath = `${filePath}.meta.json`;
-      if (fs.existsSync(metaPath)) {
-        safeUnlink(metaPath, paths);
+      if (fs.existsSync(metaPath) && !safeUnlink(metaPath, paths)) {
+        output.warn("memory gc: failed to delete file", metaPath);
       }
     }
 
@@ -314,12 +335,13 @@ function isWithinRoot(candidate: string, paths: MemoryPaths): boolean {
   return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
 }
 
-function safeUnlink(filePath: string, paths: MemoryPaths): void {
-  if (!isWithinRoot(filePath, paths)) return;
+function safeUnlink(filePath: string, paths: MemoryPaths): boolean {
+  if (!isWithinRoot(filePath, paths)) return false;
   try {
     fs.unlinkSync(filePath);
+    return true;
   } catch {
-    // best-effort
+    return false;
   }
 }
 

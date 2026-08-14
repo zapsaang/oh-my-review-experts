@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeTempRepo, seedManifest } from "./_helpers.js";
 import { runMemoryGc } from "../../src/memory/gc.js";
 import type { MemoryPaths } from "../../src/memory/paths.js";
@@ -80,6 +80,32 @@ describe("runMemoryGc", () => {
       expect(result.deleted.tmpFiles).toBe(1);
       expect(fs.existsSync(oldTmp)).toBe(false);
       expect(fs.existsSync(freshTmp)).toBe(true);
+    });
+
+    // slop-fix: fails until B5 fix lands
+    it("reports only successfully deleted tmp files when unlink fails", () => {
+      const paths = makeTempRepo();
+      const repoRoot = repoRootFromPaths(paths);
+      tempDirs.push(repoRoot);
+      seedManifest(paths);
+
+      const oldTmp = writeTmpFile(paths, "undeletable.tmp");
+      backdateHours(oldTmp, 25);
+      const originalUnlink = fs.unlinkSync.bind(fs);
+      const unlinkSpy = vi.spyOn(fs, "unlinkSync").mockImplementation((filePath) => {
+        if (filePath === oldTmp) {
+          throw Object.assign(new Error("permission denied"), { code: "EACCES" });
+        }
+        return originalUnlink(filePath);
+      });
+
+      try {
+        const result = runMemoryGc({ cwd: repoRoot });
+        expect(result.deleted.tmpFiles).toBe(0);
+        expect(fs.existsSync(oldTmp)).toBe(true);
+      } finally {
+        unlinkSpy.mockRestore();
+      }
     });
   });
 
