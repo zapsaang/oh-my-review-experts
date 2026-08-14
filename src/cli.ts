@@ -240,8 +240,15 @@ export function runDoctor(options: RunDoctorOptions = {}): void {
       }
       probeConfig = obj as Config;
     }
-  } catch {
-    // opencode.json does not exist — probeConfig stays empty
+  } catch (err: unknown) {
+    if (
+      typeof err !== "object" ||
+      err === null ||
+      !("code" in err) ||
+      err.code !== "ENOENT"
+    ) {
+      throw err
+    }
   }
 
   // Register OMRE agents; skip-on-conflict preserves existing opencode.json slots

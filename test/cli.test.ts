@@ -75,6 +75,22 @@ describe("doctor CLI", () => {
     );
   });
 
+  // slop-fix: fails until B2 fix lands
+  it("surfaces malformed opencode.json instead of probing it as an absent file", () => {
+    const tmpDir = fs.mkdtempSync(".omre-doctor-malformed-");
+    fs.writeFileSync(path.join(tmpDir, "opencode.json"), "{ definitely not JSON", "utf8");
+
+    try {
+      expect(() => runDoctor({
+        cwd: tmpDir,
+        output: captureOutput().output,
+        contractChecks: cleanContractChecks,
+      })).toThrow();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
 describe("doctor agent runtime models table", () => {
     it("shows all agents with default source when no config", () => {
       const captured = captureOutput();
