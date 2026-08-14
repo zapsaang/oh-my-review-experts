@@ -47,16 +47,34 @@ function compareRankedHits(
   right: RankedMemoryHit,
   targetReviewers: Set<string>,
 ): number {
-  return firstNonZero([
-    compareBooleanDescending(left.regressionCandidate, right.regressionCandidate),
-    compareSeverity(left.finding.severity, right.finding.severity),
-    compareNumberDescending(statusRank(left.finding.status), statusRank(right.finding.status)),
-    compareNumberDescending(left.pathOverlapRank, right.pathOverlapRank),
-    compareNumberDescending(reviewerRank(left.finding.reviewer, targetReviewers), reviewerRank(right.finding.reviewer, targetReviewers)),
-    compareNumberDescending(left.keywordScore, right.keywordScore),
-    compareNumberDescending(Date.parse(left.finding.occurrence.lastSeenAt), Date.parse(right.finding.occurrence.lastSeenAt)),
-    compareStringAscending(left.finding.id, right.finding.id),
-  ]);
+  let comparison = compareBooleanDescending(left.regressionCandidate, right.regressionCandidate);
+  if (comparison !== 0) return comparison;
+
+  comparison = compareSeverity(left.finding.severity, right.finding.severity);
+  if (comparison !== 0) return comparison;
+
+  comparison = compareNumberDescending(statusRank(left.finding.status), statusRank(right.finding.status));
+  if (comparison !== 0) return comparison;
+
+  comparison = compareNumberDescending(left.pathOverlapRank, right.pathOverlapRank);
+  if (comparison !== 0) return comparison;
+
+  comparison = compareNumberDescending(
+    reviewerRank(left.finding.reviewer, targetReviewers),
+    reviewerRank(right.finding.reviewer, targetReviewers),
+  );
+  if (comparison !== 0) return comparison;
+
+  comparison = compareNumberDescending(left.keywordScore, right.keywordScore);
+  if (comparison !== 0) return comparison;
+
+  comparison = compareNumberDescending(
+    Date.parse(left.finding.occurrence.lastSeenAt),
+    Date.parse(right.finding.occurrence.lastSeenAt),
+  );
+  if (comparison !== 0) return comparison;
+
+  return compareStringAscending(left.finding.id, right.finding.id);
 }
 
 function statusRank(status: MemoryFinding["status"]): number {
@@ -103,8 +121,4 @@ function compareStringAscending(left: string, right: string): number {
   }
 
   return 0;
-}
-
-function firstNonZero(values: number[]): number {
-  return values.find((value) => value !== 0) ?? 0;
 }
