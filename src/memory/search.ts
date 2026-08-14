@@ -143,15 +143,7 @@ function resolveFindingTokens(finding: MemoryFinding): string[] {
 }
 
 function uniqueTokens(tokens: string[]): string[] {
-  const unique: string[] = [];
-
-  for (const token of tokens) {
-    if (!unique.includes(token)) {
-      unique.push(token);
-    }
-  }
-
-  return unique;
+  return [...new Set(tokens)];
 }
 
 function jaccardTokenSimilarity(queryTokens: Set<string>, findingTokens: string[]): number {
@@ -171,10 +163,13 @@ function jaccardTokenSimilarity(queryTokens: Set<string>, findingTokens: string[
 
 function findMatchedTokens(queryTokens: string[], findingTokens: string[]): string[] {
   const matched: string[] = [];
+  const matchedTokenSet = new Set<string>();
+  const findingTokenSet = new Set(findingTokens);
 
   for (const token of queryTokens) {
-    if (!matched.includes(token) && findingTokens.includes(token)) {
+    if (!matchedTokenSet.has(token) && findingTokenSet.has(token)) {
       matched.push(token);
+      matchedTokenSet.add(token);
     }
   }
 
