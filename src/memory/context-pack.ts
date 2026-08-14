@@ -61,17 +61,24 @@ export function buildMemoryContextPack(
   const itemLimitedHits = input.hits.slice(0, maxContextItems);
   const itemBudgetTruncated = itemLimitedHits.length < totalMatched;
   const includedHits: RankedMemoryHit[] = [];
+  let renderedHitsLength = 0;
 
   for (const hit of itemLimitedHits) {
-    const candidateHits = [...includedHits, hit];
-    const candidateTruncated = itemBudgetTruncated || candidateHits.length < itemLimitedHits.length;
-    const candidateText = renderContextPackText(candidateHits, input.relatedIndex, totalMatched, candidateTruncated);
+    const candidateIncludedCount = includedHits.length + 1;
+    const candidateTruncated = itemBudgetTruncated || candidateIncludedCount < itemLimitedHits.length;
+    const renderedHitLength = renderHit(hit, input.relatedIndex).join("\n").length;
+    const candidateRenderedHitsLength = renderedHitsLength
+      + (includedHits.length > 0 ? 1 : 0)
+      + renderedHitLength;
+    const candidateHeader = `Memory Context Pack (totalMatched=${totalMatched}, included=${candidateIncludedCount}, truncated=${candidateTruncated})`;
+    const candidateTextLength = candidateHeader.length + 1 + candidateRenderedHitsLength;
 
-    if (candidateText.length > maxContextChars) {
+    if (candidateTextLength > maxContextChars) {
       break;
     }
 
     includedHits.push(hit);
+    renderedHitsLength = candidateRenderedHitsLength;
   }
 
   const charBudgetTruncated = includedHits.length < itemLimitedHits.length;
@@ -208,4 +215,3 @@ function formatRelatedMemoryIds(findingId: string, relatedIndex: RelatedIndex | 
     })
     .join(", ");
 }
-
