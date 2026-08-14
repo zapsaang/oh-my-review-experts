@@ -266,8 +266,12 @@ ${prompt}
   return { prompt, estimatedTasks: plan.estimatedTasks, files, runId };
 }
 
-function formatScopeDetail(scope: ReviewScope): string {
+function formatScopeFields(scope: ReviewScope, presentation: "detail" | "resolved"): string {
   switch (scope.kind) {
+    case "default":
+      return "default";
+    case "guidance":
+      return presentation === "resolved" ? `guidance (${scope.text})` : "guidance";
     case "branch":
       return `branch (${scope.name})`;
     case "commit":
@@ -276,28 +280,10 @@ function formatScopeDetail(scope: ReviewScope): string {
       return `range (${scope.from}..${scope.to})`;
     case "paths":
       return `paths (${scope.paths.join(", ")})`;
-    default:
-      return scope.kind;
-  }
-}
-
-function formatResolvedScopeLine(scope: ReviewScope): string {
-  switch (scope.kind) {
-    case "default":
-      return "Resolved scope: default";
-    case "guidance":
-      return `Resolved scope: guidance (${scope.text})`;
-    case "branch":
-      return `Resolved scope: branch (${scope.name})`;
-    case "commit":
-      return `Resolved scope: commit (${scope.ref})`;
-    case "range":
-      return `Resolved scope: range (${scope.from}..${scope.to})`;
-    case "paths":
-      return `Resolved scope: paths (${scope.paths.join(", ")})`;
     case "staged":
-      return "Resolved scope: staged";
+      return "staged";
     case "ambiguous": {
+      if (presentation === "detail") return "ambiguous";
       const hints = scope.candidates
         .map((c) => {
           if (c.kind === "branch") return `branch:${c.name}`;
@@ -305,9 +291,17 @@ function formatResolvedScopeLine(scope: ReviewScope): string {
           return String(c);
         })
         .join(" or ");
-      return `Resolved scope: ambiguous\nInput is ambiguous. Use explicit prefix: ${hints}`;
+      return `ambiguous\nInput is ambiguous. Use explicit prefix: ${hints}`;
     }
   }
+}
+
+function formatScopeDetail(scope: ReviewScope): string {
+  return formatScopeFields(scope, "detail");
+}
+
+function formatResolvedScopeLine(scope: ReviewScope): string {
+  return `Resolved scope: ${formatScopeFields(scope, "resolved")}`;
 }
 
 export function renderLocalDryRun(input: ReviewCodeInput = {}): string {
