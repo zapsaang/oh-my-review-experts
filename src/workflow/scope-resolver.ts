@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { SAFE_DIR_PATTERN } from "../config/schema.js";
 import { git, GitError } from "../tools/git.js";
 
 /**
@@ -50,8 +51,6 @@ export class AmbiguousScopeError extends Error {
   }
 }
 
-// Mirrors SAFE_DIR_PATTERN from src/config/schema.ts: no leading "/", no ".." segments.
-const SAFE_PATH_PATTERN = /^(?!\/)((?!\.\.)[a-zA-Z0-9_\-\.\/])+$/;
 const SHA_BARE_PATTERN = /^[A-Fa-f0-9]{7,40}$/;
 const SHA_PREFIX_PATTERN = /^[A-Fa-f0-9]{4,40}$/;
 const HEAD_REF_PATTERN = /^HEAD(?:~\d+|\^\d*)?$/;
@@ -77,7 +76,7 @@ const STAGED_KEYWORDS = new Set(["staged", "--staged", "--cached"]);
  * 10. Otherwise                          → `{ kind: "guidance", text: trimmed }`
  *
  * Bare-form path detection enforces defense-in-depth: paths must validate against
- * {@link SAFE_PATH_PATTERN} and `path.resolve(cwd, p)` must remain under `cwd`.
+ * {@link SAFE_DIR_PATTERN} and `path.resolve(cwd, p)` must remain under `cwd`.
  *
  * Ambiguity resolution and precedence wiring (e.g. SHA-vs-branch coincidences)
  * are handled by callers; this function returns the first concrete match it finds,
@@ -216,7 +215,7 @@ function parsePathPrefix(arg: string, cwd: string): ReviewScope {
         arg
       );
     }
-    if (!SAFE_PATH_PATTERN.test(part)) {
+    if (!SAFE_DIR_PATTERN.test(part)) {
       throw new ScopeResolutionError(
         `Invalid path: ${JSON.stringify(part)}`,
         "INVALID_INPUT",
@@ -302,7 +301,7 @@ function verifyRef(fullRef: string, cwd: string): boolean {
 /**
  * Check whether `arg` would resolve as a valid bare-form path list
  * without throwing. Returns `true` only when every part passes
- * {@link SAFE_PATH_PATTERN}, resolves under `cwd`, and exists on disk.
+ * {@link SAFE_DIR_PATTERN}, resolves under `cwd`, and exists on disk.
  */
 function wouldBarePathsResolve(arg: string, cwd: string): boolean {
   try {
@@ -332,7 +331,7 @@ function tryBarePaths(arg: string, cwd: string): string[] | null {
         arg
       );
     }
-    if (!SAFE_PATH_PATTERN.test(part)) return null;
+    if (!SAFE_DIR_PATTERN.test(part)) return null;
   }
   const cwdResolved = path.resolve(cwd);
   const existence = parts.map((part) => {

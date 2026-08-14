@@ -5,7 +5,7 @@ import { MemoryConfigSchema, DEFAULT_MEMORY_CONFIG } from "../memory/config.js";
 // These patterns ensure user-controlled path segments cannot escape the project directory.
 
 /** Matches safe relative directory paths: no "..", no absolute paths, only alphanumeric + _ - . / */
-const SAFE_DIR_PATTERN = /^(?!\/)((?!\.\.)[a-zA-Z0-9_\-\.\/])+$/;
+export const SAFE_DIR_PATTERN = /^(?!\/)((?!\.\.)[a-zA-Z0-9_\-\.\/])+$/;
 
 /** Matches safe filename segments: no path separators, no ".." */
 const SAFE_FILENAME_PATTERN = /^(?!.*\.\.)[a-zA-Z0-9_\-\.]+$/;
@@ -120,13 +120,13 @@ const DEFAULT_REVIEWERS: {
 export const OmreConfigSchema = z.object({
   enabled: z.boolean().default(true).describe("Globally enable or disable the review plugin."),
   command: z.object({
-    enabled: z.boolean().default(true).describe("Enable the /review-code slash command."),
+    enabled: z.boolean().default(DEFAULT_COMMAND.enabled).describe("Enable the /review-code slash command."),
     name: z.string()
       .regex(SAFE_COMMAND_PATTERN, "command.name must only contain alphanumeric, underscore, or hyphen")
       .refine((val) => !FORBIDDEN_COMMAND_NAMES.has(val), {
         message: `command.name must not be a forbidden name`,
       })
-      .default("review-code")
+      .default(DEFAULT_COMMAND.name)
       .describe("Slash command name. Alphanumeric, underscore, or hyphen only. Forbidden names: __proto__, constructor, prototype."),
     aliases: z.array(
       z.string()
@@ -134,11 +134,11 @@ export const OmreConfigSchema = z.object({
         .refine((val) => !FORBIDDEN_COMMAND_NAMES.has(val), {
           message: `command.alias must not be a forbidden name`,
         })
-    ).default(["rc"]).describe("Alternative names for the slash command."),
-    injection: z.enum(["hook", "tool", "both", "disabled"]).default("both").describe(
+    ).default(() => structuredClone(DEFAULT_COMMAND.aliases)).describe("Alternative names for the slash command."),
+    injection: z.enum(["hook", "tool", "both", "disabled"]).default(DEFAULT_COMMAND.injection).describe(
       "How the command is wired: 'both' registers via config hook and intercepts execution; 'hook' same as both; 'disabled' mutes the plugin; 'tool' disables slash commands but keeps plugin tools available."
     ),
-    scopeResolution: z.enum(["auto", "guidance-only"]).default("auto").describe(
+    scopeResolution: z.enum(["auto", "guidance-only"]).default(DEFAULT_COMMAND.scopeResolution).describe(
       "How user-provided args drive review scope. 'auto' (default) parses commit/branch/path/staged forms deterministically. 'guidance-only' treats args as opaque guidance text and uses the default git diff HEAD scope (preserves pre-0.x behavior)."
     ),
   }).default(() => structuredClone(DEFAULT_COMMAND)).describe("Slash command registration settings."),
@@ -156,57 +156,57 @@ export const OmreConfigSchema = z.object({
     "omre-report-writer": AgentConfigSchema.optional(),
   }).strict().default(() => ({})).describe("Agent-specific model and inference settings."),
   slicing: z.object({
-    enabled: z.boolean().default(true).describe("Enable the file slicing engine that groups changed files into coherent review slices."),
-    maxSlices: z.number().int().min(1).max(32).default(4).describe("Maximum number of slices to generate. Range: 1-32."),
-    skipDocsOnly: z.boolean().default(true).describe("Skip heavy review for docs-only slices."),
-    skipTestOnlyHeavyReview: z.boolean().default(true).describe("Skip heavy review for test-only slices."),
-    forceWholeTargetAboveSlices: z.number().int().min(1).max(100).default(12).describe(
+    enabled: z.boolean().default(DEFAULT_SLICING.enabled).describe("Enable the file slicing engine that groups changed files into coherent review slices."),
+    maxSlices: z.number().int().min(1).max(32).default(DEFAULT_SLICING.maxSlices).describe("Maximum number of slices to generate. Range: 1-32."),
+    skipDocsOnly: z.boolean().default(DEFAULT_SLICING.skipDocsOnly).describe("Skip heavy review for docs-only slices."),
+    skipTestOnlyHeavyReview: z.boolean().default(DEFAULT_SLICING.skipTestOnlyHeavyReview).describe("Skip heavy review for test-only slices."),
+    forceWholeTargetAboveSlices: z.number().int().min(1).max(100).default(DEFAULT_SLICING.forceWholeTargetAboveSlices).describe(
       "When the estimated number of slices exceeds this threshold, review the entire target as one unit instead of slicing. Range: 1-100."
     ),
   }).default(() => structuredClone(DEFAULT_SLICING)).describe("File classification and grouping settings."),
   partialRerun: z.object({
-    enabled: z.boolean().default(true).describe("Enable partial rerun: when a reviewer fails, re-run only that task instead of the whole pipeline."),
-    maxRetriesPerTask: z.number().int().min(0).max(1).default(1).describe("Maximum retry attempts per failed task. Range: 0-1."),
+    enabled: z.boolean().default(DEFAULT_PARTIAL_RERUN.enabled).describe("Enable partial rerun: when a reviewer fails, re-run only that task instead of the whole pipeline."),
+    maxRetriesPerTask: z.number().int().min(0).max(1).default(DEFAULT_PARTIAL_RERUN.maxRetriesPerTask).describe("Maximum retry attempts per failed task. Range: 0-1."),
   }).default(() => structuredClone(DEFAULT_PARTIAL_RERUN)).describe("Partial rerun settings for failed reviewer tasks."),
   costGuardrail: z.object({
-    enabled: z.boolean().default(true).describe("Enable cost estimation and guardrails before launching the review pipeline."),
-    maxEstimatedTasks: z.number().int().min(1).max(1000).default(24).describe("Maximum estimated tasks before switching to compact mode. Range: 1-1000."),
-    compactModeThreshold: z.number().int().min(1).max(1000).default(20).describe("Estimated task threshold for compact mode (reduced reviewer matrix). Range: 1-1000."),
-    hardStopThreshold: z.number().int().min(1).max(1000).default(60).describe("Absolute maximum estimated tasks; pipeline halts if exceeded. Range: 1-1000."),
+    enabled: z.boolean().default(DEFAULT_COST_GUARDRAIL.enabled).describe("Enable cost estimation and guardrails before launching the review pipeline."),
+    maxEstimatedTasks: z.number().int().min(1).max(1000).default(DEFAULT_COST_GUARDRAIL.maxEstimatedTasks).describe("Maximum estimated tasks before switching to compact mode. Range: 1-1000."),
+    compactModeThreshold: z.number().int().min(1).max(1000).default(DEFAULT_COST_GUARDRAIL.compactModeThreshold).describe("Estimated task threshold for compact mode (reduced reviewer matrix). Range: 1-1000."),
+    hardStopThreshold: z.number().int().min(1).max(1000).default(DEFAULT_COST_GUARDRAIL.hardStopThreshold).describe("Absolute maximum estimated tasks; pipeline halts if exceeded. Range: 1-1000."),
   }).default(() => structuredClone(DEFAULT_COST_GUARDRAIL)).describe("Cost guardrail settings to prevent accidental high-cost reviews."),
   arbitration: z.object({
-    hierarchicalThreshold: z.number().int().min(1).max(32).default(3).describe(
+    hierarchicalThreshold: z.number().int().min(1).max(32).default(DEFAULT_ARBITRATION.hierarchicalThreshold).describe(
       "Number of slices above which hierarchical arbitration is used instead of flat merging. Range: 1-32."
     ),
   }).default(() => structuredClone(DEFAULT_ARBITRATION)).describe("Arbitration strategy settings for merging reviewer findings."),
   report: z.object({
-    enabled: z.boolean().default(true).describe("Enable report generation and persistence."),
+    enabled: z.boolean().default(DEFAULT_REPORT.enabled).describe("Enable report generation and persistence."),
     // SECURITY: directory must be a relative path without ".." segments to prevent path traversal.
     directory: z.string()
       .regex(SAFE_DIR_PATTERN, "report.directory must be a safe relative path (no .., no absolute paths, only a-zA-Z0-9_-./)")
-      .default(".omre/reports")
+      .default(DEFAULT_REPORT.directory)
       .describe("Directory for report output. Must be a safe relative path (no .., no absolute paths)."),
     // SECURITY: filenames must not contain path separators to prevent directory escape.
     latestMarkdown: z.string()
       .regex(SAFE_FILENAME_PATTERN, "report.latestMarkdown must be a safe filename (no path separators, no ..)")
-      .default("latest.md")
+      .default(DEFAULT_REPORT.latestMarkdown)
       .describe("Filename for the latest markdown report."),
     latestJson: z.string()
       .regex(SAFE_FILENAME_PATTERN, "report.latestJson must be a safe filename (no path separators, no ..)")
-      .default("latest.json")
+      .default(DEFAULT_REPORT.latestJson)
       .describe("Filename for the latest JSON report."),
-    timestamped: z.boolean().default(true).describe("Generate timestamped history copies alongside latest.md/latest.json."),
+    timestamped: z.boolean().default(DEFAULT_REPORT.timestamped).describe("Generate timestamped history copies alongside latest.md/latest.json."),
   }).default(() => structuredClone(DEFAULT_REPORT)).describe("Report output settings."),
   handoff: z.object({
-    enabled: z.boolean().default(true).describe("Enable the handoff protocol for structured subagent communication."),
+    enabled: z.boolean().default(DEFAULT_HANDOFF.enabled).describe("Enable the handoff protocol for structured subagent communication."),
     // SECURITY: directory must be a relative path without ".." segments to prevent path traversal.
     directory: z.string()
       .regex(SAFE_DIR_PATTERN, "handoff.directory must be a safe relative path (no .., no absolute paths, only a-zA-Z0-9_-./)")
-      .default(".omre/handoffs")
+      .default(DEFAULT_HANDOFF.directory)
       .describe("Directory for handoff files. Must be a safe relative path (no .., no absolute paths)."),
   }).default(() => structuredClone(DEFAULT_HANDOFF)).describe("Handoff protocol settings for structured subagent output."),
   reviewers: z.object({
-    default: z.array(ReviewDimension).default(["spec", "quality", "security", "performance", "concurrency"]).describe(
+    default: z.array(ReviewDimension).default(() => structuredClone(DEFAULT_REVIEWERS.default)).describe(
       "Default reviewer dimensions applied to all slices."
     ),
     bySliceType: z.object(
